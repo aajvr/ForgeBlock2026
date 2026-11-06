@@ -838,7 +838,7 @@ export default function Landing() {
             {PRIVACY.map((p, i) => (
               <RevealOnScroll key={p.key} delay={i * 0.1}>
                 <div className="pv-card h-full rounded-2xl border border-white/15 bg-white/[0.06] p-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-md">
-                  <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-400 to-indigo-500 text-white shadow-lg shadow-brand-900/40">
+                  <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-white/25 bg-white/15 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.2)]">
                     <PrivacyIcon kind={p.key} />
                   </span>
                   <h3 className="mt-4 font-semibold">{p.title}</h3>
