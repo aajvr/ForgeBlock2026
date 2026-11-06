@@ -93,12 +93,17 @@ const SECTIONS = [
   ['#privacy', 'Privacy'],
 ]
 
-// Illustrative values, not real records.
-const CHAIN = [
-  { index: 1247, kind: 'Screening', hash: '3f9a…b71c', previous: '09de…e24f' },
-  { index: 1248, kind: 'Decision', hash: '7a10…c5b3', previous: '3f9a…b71c' },
-  { index: 1249, kind: 'Screening', hash: '58e2…a0f7', previous: '7a10…c5b3' },
+// The scroll story: each step lights up the matching part of the dashboard.
+const STORY = [
+  { title: 'Register the client’s signatures', text: 'An examiner enrolls 5 to 20 genuine signatures for each client.' },
+  { title: 'Screen a questioned signature', text: 'ForgeBlock compares it and gives a result with a confidence score.' },
+  { title: 'The examiner decides; the ledger seals it', text: 'Anything not clearly Consistent goes to the examiner, and every result is sealed.' },
 ]
+
+// Illustrative values, not real records.
+const LEDGER_TONES = ['border-t-brand-500', 'border-t-cyan-500', 'border-t-indigo-500', 'border-t-ok-600', 'border-t-amber-500']
+const LEDGER = ['3f9a…b71c', '7a10…c5b3', '58e2…a0f7', 'c4d1…09ee', '1b7f…63a2', 'e90c…d415', '62ab…f7c8', '0d3e…8b91', 'a5f2…2c07', '9c18…e6d3', '47e6…1fa0', 'b2c9…7d5e']
+  .map((hash, i) => ({ index: 1240 + i, hash, kind: i % 3 === 2 ? 'Decision' : 'Screening', tone: LEDGER_TONES[i % LEDGER_TONES.length] }))
 
 // Free pen flourishes that join the written "ForgeBlock" strokes in the hero background.
 const FLOURISHES = [
@@ -128,6 +133,17 @@ function HeroStrokes({ color = '#fff', words = true }) {
       </svg>
     </div>
   )
+}
+
+function useMedia(query) {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const onChange = (e) => setMatch(e.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [query])
+  return match
 }
 
 function RevealOnScroll({ as = 'div', delay = 0, className = '', children }) {
@@ -230,7 +246,11 @@ function ScreeningScene() {
 }
 
 // A still preview of the workspace. All of it is made-up sample data.
-function WorkspacePreview() {
+function WorkspacePreview({ focus = 0 }) {
+  const dim = (n) => `relative transition-opacity duration-300 ${focus && focus !== n ? 'opacity-40' : 'opacity-100'}`
+  const ring = (n) => (
+    <span className={`pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-brand-500 transition-opacity duration-300 ${focus === n ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
+  )
   const nav = [
     { icon: Home, label: 'My work', on: true },
     { icon: Briefcase, label: 'Cases' },
@@ -256,15 +276,23 @@ function WorkspacePreview() {
       <div className="hidden w-[21%] shrink-0 flex-col py-4 pl-3 text-white sm:flex">
         <div className="mb-4 flex items-center gap-1.5 text-[13px] font-semibold"><BrandMark light className="h-5 w-5" /> ForgeBlock</div>
         {nav.map((n) => (
-          <div key={n.label} className={`mb-0.5 flex items-center gap-1.5 rounded-l-lg px-2 py-1.5 text-[11px] ${n.on ? 'bg-white font-semibold text-brand-700' : 'text-white/85'}`}>
+          <div key={n.label} className={`relative mb-0.5 flex items-center gap-1.5 rounded-l-lg px-2 py-1.5 text-[11px] ${n.on ? 'bg-white font-semibold text-brand-700' : 'text-white/85'}`}>
             <n.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{n.label}</span>
+            {n.label === 'Clients' && <span className={`pointer-events-none absolute inset-0 rounded-l-lg bg-white/20 ring-2 ring-inset ring-white transition-opacity duration-300 ${focus === 1 ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />}
           </div>
         ))}
       </div>
       <div className="min-w-0 flex-1 overflow-hidden bg-white p-3 text-slate-900 sm:my-2 sm:mr-2 sm:rounded-2xl sm:p-5">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">Examiner</div>
-        <div className="text-base font-semibold tracking-[-0.01em] sm:text-xl">My work</div>
-        <div className="mt-2 grid grid-cols-3 gap-2 sm:mt-3 sm:gap-3">
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">Examiner</div>
+            <div className="text-base font-semibold tracking-[-0.01em] sm:text-xl">My work</div>
+          </div>
+          <span className={`${dim(1)} flex items-center gap-1 rounded-md bg-brand-600 px-2 py-1 text-[10px] font-medium text-white`}>
+            <UserPlus className="h-3 w-3" /> Register client{ring(1)}
+          </span>
+        </div>
+        <div className={`mt-2 grid grid-cols-3 gap-2 transition-opacity duration-300 sm:mt-3 sm:gap-3 ${focus ? 'opacity-40' : ''}`}>
           {stats.map((s) => (
             <div key={s.label} className="rounded-xl border border-slate-100 p-2 shadow-soft sm:p-3">
               <div className="flex items-start justify-between gap-1">
@@ -276,16 +304,23 @@ function WorkspacePreview() {
           ))}
         </div>
         <div className="mt-2 grid gap-2 sm:mt-3 sm:grid-cols-[1fr_1.2fr] sm:gap-3">
-          <div className="rounded-xl border border-ok-100 bg-gradient-to-br from-ok-100/80 via-ok-50 to-white p-3">
+          <div className={`${dim(2)} rounded-xl border border-ok-100 bg-gradient-to-br from-ok-100/80 via-ok-50 to-white p-3`}>
+            {ring(2)}
             <div className="text-[10px] uppercase tracking-wider text-slate-500">Screening result</div>
             <div className="mt-0.5 flex items-center justify-between gap-2">
               <span className="flex items-center gap-1 text-sm font-semibold text-ok-600 sm:text-base"><CheckCircle2 className="h-4 w-4" /> Consistent</span>
               <span className="text-lg font-semibold tabular-nums sm:text-2xl">82%</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full w-[82%] rounded-full bg-ok-600" /></div>
-            <div className="mt-1.5 font-mono text-[10px] text-slate-500">FB-7KQ2-M9TX</div>
+            <div className="mt-1.5 flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] text-slate-500">FB-7KQ2-M9TX</span>
+              <span className={`relative flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-800 transition-opacity duration-300 ${focus === 2 ? 'opacity-40' : ''}`}>
+                <Link2 className="h-3 w-3" /> Sealed #1249{ring(3)}
+              </span>
+            </div>
           </div>
-          <div className="hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block">
+          <div className={`${dim(3)} hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block`}>
+            {ring(3)}
             <div className="text-[11px] font-semibold">Needs your decision</div>
             {cases.map(([initials, code, result, tone]) => (
               <div key={code} className="mt-1.5 flex items-center gap-2 text-[11px]">
@@ -296,7 +331,7 @@ function WorkspacePreview() {
             ))}
           </div>
         </div>
-        <div className="mt-3 hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block">
+        <div className={`${dim(2)} mt-3 hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block`}>
           <div className="text-[11px] font-semibold">Latest screenings</div>
           {latest.map(([receipt, client, module, result, tone, score]) => (
             <div key={receipt} className="mt-1.5 grid grid-cols-[1.2fr_1fr_1fr_1.1fr_auto] items-center gap-2 border-t border-slate-50 pt-1.5 text-[11px]">
@@ -313,27 +348,26 @@ function WorkspacePreview() {
   )
 }
 
-// The large browser-style window in the hero. The play button appears once the
-// demo video file exists; until then the still preview stays on its own.
-function ProductWindow() {
+// The dashboard window of the scroll story. The play button appears once the demo
+// video file exists; until then the still preview stays on its own.
+function StoryWindow({ focus, live, cardRef, dashRef }) {
   const [hasVideo, setHasVideo] = useState(false)
   const [playing, setPlaying] = useState(false)
   useEffect(() => {
-    let live = true
+    let alive = true
     // The dev server and many hosts answer unknown paths with the app's HTML, so check the type.
     fetch(DEMO_VIDEO, { method: 'HEAD' })
-      .then((res) => live && setHasVideo(res.ok && (res.headers.get('content-type') || '').startsWith('video/')))
+      .then((res) => alive && setHasVideo(res.ok && (res.headers.get('content-type') || '').startsWith('video/')))
       .catch(() => {})
-    return () => { live = false }
+    return () => { alive = false }
   }, [])
   const stopVideo = () => {
     setPlaying(false)
     setHasVideo(false)
   }
   return (
-    <div className="hero-window relative mx-auto mt-12 max-w-5xl">
-      <div className="pointer-events-none absolute -inset-6 rounded-[3rem] bg-brand-300/40 blur-3xl" aria-hidden="true" />
-      <div className="relative overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl sm:rounded-3xl">
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-brand-900/15">
+      <div ref={dashRef} style={live ? { opacity: 0, visibility: 'hidden' } : undefined}>
         <div className="flex h-9 items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-4" aria-hidden="true">
           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
@@ -346,7 +380,7 @@ function ProductWindow() {
           </video>
         ) : (
           <div className="relative">
-            <WorkspacePreview />
+            <WorkspacePreview focus={focus} />
             {hasVideo && (
               <button
                 onClick={() => setPlaying(true)}
@@ -359,61 +393,192 @@ function ProductWindow() {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function ChainBlock({ block }) {
-  return (
-    <div className="grid h-36 min-w-0 flex-1 grid-rows-3 rounded-2xl border border-white/25 bg-white/10 px-4 text-white backdrop-blur">
-      <div className="flex items-center justify-between gap-2 text-xs text-white/75">
-        <span className="font-semibold text-white">Block #{block.index}</span>
-        <span>{block.kind}</span>
-      </div>
-      <div className="flex items-center justify-between gap-2 border-t border-white/15 text-xs">
-        <span className="text-white/70">Hash</span>
-        <span className="font-mono text-sm">{block.hash}</span>
-      </div>
-      <div className="flex items-center justify-between gap-2 border-t border-white/15 text-xs">
-        <span className="text-white/70">Previous</span>
-        <span className="font-mono text-sm text-white/85">{block.previous}</span>
-      </div>
-    </div>
-  )
-}
-
-// Joins one block's hash to the "previous hash" row of the next block, with a pulse travelling along it.
-function ChainLink({ delay }) {
-  const trace = (d, dash) => (
-    <>
-      <path d={d} stroke="#fff" strokeOpacity="0.4" strokeWidth="2" />
-      <path d={d} stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeDasharray={dash} className="chain-pulse" style={{ '--delay': `${delay}s` }} />
-    </>
-  )
-  return (
-    <div className="shrink-0" aria-hidden="true">
-      <svg viewBox="0 0 48 144" preserveAspectRatio="none" fill="none" className="hidden h-36 w-12 md:block">{trace('M0 72H24V120H48', '12 200')}</svg>
-      <svg viewBox="0 0 12 36" fill="none" className="mx-auto h-9 w-3 md:hidden">{trace('M6 0V36', '10 200')}</svg>
-    </div>
-  )
-}
-
-function LedgerCard() {
-  return (
-    <div className="sidebar-bg mx-auto max-w-5xl rounded-3xl p-6 shadow-lift sm:p-8">
-      <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-white">
-        <div className="text-lg font-semibold sm:text-xl">Every screening is sealed into a tamper-evident chain.</div>
-        <div className="text-xs text-white/70">Example values</div>
-      </div>
-      <div className="flex flex-col md:flex-row">
-        {CHAIN.map((b, i) => (
-          <div key={b.index} className="contents">
-            <ChainBlock block={b} />
-            {i < CHAIN.length - 1 && <ChainLink delay={i * 1.8} />}
+      {live && (
+        // The hero's result card, drawn large because the window starts small and grows.
+        <div ref={cardRef} className="pointer-events-none absolute inset-0 flex flex-col justify-center bg-white px-14" aria-hidden="true">
+          <div className="flex items-center justify-between text-2xl text-slate-500">
+            <span>Static screening · CL-0042</span>
+            <span className="font-mono">FB-7KQ2-M9TX</span>
           </div>
-        ))}
-      </div>
+          <div className="mt-6 flex items-center gap-5">
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-ok-50 text-ok-600"><CheckCircle2 className="h-12 w-12" /></span>
+            <span className="text-5xl font-semibold text-ok-700">Consistent</span>
+            <span className="ml-auto text-5xl font-semibold tabular-nums">82%</span>
+          </div>
+          <div className="mt-6 h-4 overflow-hidden rounded-full bg-slate-100"><div className="h-full w-[82%] rounded-full bg-ok-600" /></div>
+          <div className="mt-6 grid grid-cols-3 gap-4 text-center text-2xl">
+            {['Cosine', 'Euclidean', 'Manhattan'].map((m) => (
+              <div key={m} className="rounded-xl bg-slate-50 py-4">
+                <div className="text-slate-500">{m}</div>
+                <div className="mt-1 font-medium text-ok-700">Pass</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+const clamp01 = (v) => Math.min(1, Math.max(0, v))
+const lerp = (a, b, t) => a + (b - a) * t
+const easeOut = (t) => 1 - (1 - t) ** 3
+
+function StoryStep({ step, n, stepRef, live }) {
+  return (
+    <li ref={stepRef} className="flex gap-4" style={live ? { opacity: 0 } : undefined}>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-lg font-semibold text-white">{n}</span>
+      <div>
+        <h3 className="text-xl font-semibold leading-snug sm:text-2xl">{step.title}</h3>
+        <p className="mt-1.5 text-slate-600">{step.text}</p>
+      </div>
+    </li>
+  )
+}
+
+// Scroll story: the hero's result card moves to the centre and grows into the examiner
+// dashboard, which then slides right while the three steps appear on the left. It is
+// driven by the scroll position, moves only transform and opacity, and listens only
+// while the section is on screen. Phones and reduced motion get a still layout.
+function ScrollStory() {
+  const wide = useMedia('(min-width: 64rem)')
+  const still = useMedia('(prefers-reduced-motion: reduce)')
+  const live = wide && !still
+  const [focus, setFocus] = useState(0)
+  const section = useRef(null)
+  const stage = useRef(null)
+  const slot = useRef(null)
+  const frame = useRef(null)
+  const card = useRef(null)
+  const dash = useRef(null)
+  const steps = useRef([])
+  const shown = useRef(0)
+
+  useEffect(() => {
+    if (!live) return
+    let raf = 0
+    const render = () => {
+      raf = 0
+      const r = section.current.getBoundingClientRect()
+      const p = clamp01(-r.top / (r.height - window.innerHeight))
+      const seg = (a, b) => clamp01((p - a) / (b - a))
+      // Horizontal distance from the window's resting place (right) to the centre of the stage.
+      const st = stage.current.getBoundingClientRect()
+      const sl = slot.current.getBoundingClientRect()
+      const toCentre = st.left + st.width / 2 - (sl.left + sl.width / 2)
+      const grow = easeOut(seg(0.14, 0.3))
+      const slide = easeOut(seg(0.3, 0.42))
+      const scale = slide > 0 ? lerp(1.4, 1, slide) : lerp(0.55, 1.4, grow)
+      frame.current.style.transform = `translateX(${lerp(toCentre, 0, slide)}px) scale(${scale})`
+      card.current.style.opacity = String(1 - seg(0.07, 0.13))
+      const d = seg(0.08, 0.15)
+      dash.current.style.opacity = String(d)
+      dash.current.style.visibility = d > 0.01 ? 'visible' : 'hidden'
+      let current = 0
+      STORY.forEach((_, i) => {
+        const t = seg(0.42 + i * 0.16, 0.48 + i * 0.16)
+        if (t >= 0.5) current = i + 1
+        steps.current[i].dataset.t = t
+      })
+      STORY.forEach((_, i) => {
+        const el = steps.current[i]
+        const t = Number(el.dataset.t)
+        el.style.opacity = String(t * (current === i + 1 ? 1 : 0.45))
+        el.style.transform = `translateY(${lerp(16, 0, t)}px)`
+      })
+      if (current !== shown.current) {
+        shown.current = current
+        setFocus(current)
+      }
+    }
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(render) }
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        window.addEventListener('scroll', onScroll, { passive: true })
+        window.addEventListener('resize', onScroll)
+        onScroll()
+      } else {
+        window.removeEventListener('scroll', onScroll)
+        window.removeEventListener('resize', onScroll)
+      }
+    })
+    io.observe(section.current)
+    return () => {
+      io.disconnect()
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      cancelAnimationFrame(raf)
+    }
+  }, [live])
+
+  if (!live) {
+    return (
+      <section className="mx-auto max-w-6xl px-5 py-16" aria-label="How a screening works">
+        <div className="grid items-center gap-10 lg:grid-cols-[2fr_3fr]">
+          <ol className="space-y-7">
+            {STORY.map((s, i) => <StoryStep key={s.title} step={s} n={i + 1} />)}
+          </ol>
+          <RevealOnScroll><StoryWindow focus={0} /></RevealOnScroll>
+        </div>
+      </section>
+    )
+  }
+  return (
+    <section ref={section} className="relative h-[300vh]" aria-label="How a screening works">
+      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+        <div ref={stage} className="relative mx-auto h-[36rem] w-full max-w-6xl px-5">
+          <ol className="absolute left-5 top-1/2 w-[36%] -translate-y-1/2 space-y-9">
+            {STORY.map((s, i) => <StoryStep key={s.title} step={s} n={i + 1} live stepRef={(el) => { steps.current[i] = el }} />)}
+          </ol>
+          <div ref={slot} className="absolute inset-y-0 right-5 flex w-[56%] items-center">
+            <div ref={frame} className="w-full will-change-transform" style={{ transform: 'scale(0.55)' }}>
+              <StoryWindow focus={focus} live cardRef={card} dashRef={dash} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// An endless strip of ledger blocks joined by a thin line, with a soft pulse running along it.
+function LedgerStrip() {
+  const box = useRef(null)
+  const onScreen = useOnScreen(box)
+  const row = [...LEDGER, ...LEDGER]
+  return (
+    <section className="py-16">
+      <div className="mx-auto mb-8 flex max-w-6xl flex-wrap items-end justify-between gap-x-6 gap-y-2 px-5">
+        <div>
+          <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-600">Hash-linked ledger</div>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.01em] sm:text-3xl">Every screening is sealed into a tamper-evident chain.</h2>
+        </div>
+        <span className="text-xs text-slate-500">Example values</span>
+      </div>
+      <div
+        ref={box}
+        role="img"
+        aria-label="Example ledger: screening and decision blocks, each linked to the one before by its hash"
+        className={`ledger-strip relative overflow-hidden py-3 [mask-image:linear-gradient(90deg,transparent,#000_6%,#000_94%,transparent)] ${onScreen ? '' : 'motion-paused'}`}
+      >
+        <div className="ledger-track flex w-max items-center" aria-hidden="true">
+          {row.map((b, i) => (
+            <div key={i} className="flex items-center">
+              <div className={`w-48 shrink-0 rounded-xl border border-t-[3px] border-slate-200 bg-white px-4 py-3 shadow-soft ${b.tone}`}>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-slate-800">Block #{b.index}</span>
+                  <span className={`rounded px-1.5 py-0.5 font-medium ${b.kind === 'Decision' ? 'bg-violet-50 text-violet-700' : 'bg-brand-50 text-brand-700'}`}>{b.kind}</span>
+                </div>
+                <div className="mt-2 font-mono text-sm text-slate-600">{b.hash}</div>
+              </div>
+              <div className="relative h-px w-10 shrink-0 bg-slate-300">
+                <span className="ledger-pulse absolute -top-[3px] left-0 h-[7px] w-3 rounded-full bg-brand-400 shadow-[0_0_10px_rgb(71_158_245/0.9)]" style={{ '--delay': `${(i % LEDGER.length) * 0.2}s` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -526,15 +691,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Product window (it becomes part of the scroll story later). */}
-      <section className="px-5 pb-6">
-        <ProductWindow />
-      </section>
+      <ScrollStory />
 
-      {/* Ledger */}
-      <section className="px-5 pb-6 pt-16">
-        <RevealOnScroll><LedgerCard /></RevealOnScroll>
-      </section>
+      <LedgerStrip />
 
       {/* How it works */}
       <section id="how" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-20">
