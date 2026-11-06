@@ -1,0 +1,243 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand blue (#0F6CBD) scale */
+  --color-brand-50: #ebf3fc;
+  --color-brand-100: #cfe4fa;
+  --color-brand-200: #b4d6fa;
+  --color-brand-300: #77b7f7;
+  --color-brand-400: #479ef5;
+  --color-brand-500: #2886de;
+  --color-brand-600: #0f6cbd;
+  --color-brand-700: #115ea3;
+  --color-brand-800: #0f548c;
+  --color-brand-900: #0c3b5e;
+  --color-brand-950: #082338;
+
+  /* Screening results */
+  --color-ok-50: #f1faf1;
+  --color-ok-100: #dff6dd;
+  --color-ok-600: #107c10;
+  --color-ok-700: #0e700e;
+  --color-warn-50: #fff9f0;
+  --color-warn-100: #fdeacc;
+  --color-warn-600: #bc4b09;
+  --color-warn-700: #8a3707;
+  --color-bad-50: #fdf3f4;
+  --color-bad-100: #fde7e9;
+  --color-bad-600: #c50f1f;
+  --color-bad-700: #a80000;
+
+  /* Larger type (v7): every size is a little bigger and easier to read. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.45rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6rem;
+
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Soft layered depth for cards and panels. */
+  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.05), 0 10px 28px -14px rgb(16 24 40 / 0.16);
+  --shadow-lift: 0 2px 6px rgb(16 24 40 / 0.06), 0 24px 44px -18px rgb(12 59 94 / 0.34);
+}
+
+html {
+  font-size: 106.25%; /* 17px base */
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Sidebar colour per role, all in the ForgeBlock blue family. */
+.sidebar-bg,
+.sidebar-examiner {
+  background: linear-gradient(180deg, #0f6cbd 0%, #0c4f8c 55%, #0c3b5e 100%);
+}
+.sidebar-admin {
+  background: linear-gradient(180deg, #1f3a93 0%, #172f73 55%, #101f4d 100%);
+}
+.sidebar-client {
+  background: linear-gradient(180deg, #0b7a9c 0%, #0a5e7a 55%, #083f52 100%);
+}
+
+/* Signature tracing (landing page and sign-in). */
+.trace path {
+  stroke-dasharray: var(--len, 2000) calc(var(--len, 2000) * 1.1);
+  stroke-dashoffset: calc(var(--len, 2000) * 1.05);
+  animation: trace var(--dur, 3.2s) cubic-bezier(0.55, 0.1, 0.35, 1) var(--delay, 0.2s) forwards;
+}
+@keyframes trace {
+  to { stroke-dashoffset: 0; }
+}
+.fade-up {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: fade-up 0.7s ease-out var(--delay, 0s) forwards;
+}
+@keyframes fade-up {
+  to { opacity: 1; transform: none; }
+}
+
+/* App shell: the role colour runs behind a large rounded white panel. */
+@media (min-width: 64rem) {
+  .app-shell > aside {
+    background: none;
+  }
+  /* The active item flows into the panel, with concave corners above and below. */
+  .nav-connected::before,
+  .nav-connected::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+  }
+  .nav-connected::before {
+    top: -18px;
+    background: radial-gradient(circle at 0 0, transparent 17.5px, #fff 18px);
+  }
+  .nav-connected::after {
+    bottom: -18px;
+    background: radial-gradient(circle at 0 100%, transparent 17.5px, #fff 18px);
+  }
+}
+.nav-scroll {
+  scrollbar-width: none;
+  mask-image: linear-gradient(#000 calc(100% - 18px), transparent);
+}
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Group folders: a coloured card with a tab, set per group with --folder. */
+.folder {
+  position: relative;
+  margin-top: 1.05rem;
+  border-radius: 0 1.25rem 1.25rem 1.25rem;
+  background: linear-gradient(150deg, var(--folder) 15%, var(--folder-deep));
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.folder::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: calc(100% - 1px);
+  width: 44%;
+  height: 1.05rem;
+  border-top-left-radius: 0.8rem;
+  background: var(--folder);
+  clip-path: polygon(0 100%, 0 0, 82% 0, 100% 100%);
+}
+.folder:hover,
+.folder:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Landing page. */
+.hero-bg {
+  background:
+    radial-gradient(60rem 32rem at 50% -8%, rgb(71 158 245 / 0.42), transparent 70%),
+    linear-gradient(180deg, #0a2f57 0%, #0c4f8c 62%, #0f6cbd 100%);
+}
+.hero-strokes {
+  animation: hero-drift 38s ease-in-out infinite alternate;
+}
+@keyframes hero-drift {
+  from { transform: translate3d(-1.5%, -1%, 0); }
+  to { transform: translate3d(1.5%, 1.5%, 0); }
+}
+.hero-window {
+  opacity: 0;
+  transform: perspective(1600px) rotateX(13deg) translateY(44px);
+  transform-origin: 50% 100%;
+  animation: hero-rise 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s forwards;
+}
+@keyframes hero-rise {
+  to { opacity: 1; transform: perspective(1600px) rotateX(2.5deg); }
+}
+.play-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: #fff;
+  animation: play-pulse 2.4s ease-out infinite;
+}
+@keyframes play-pulse {
+  from { opacity: 0.45; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.6); }
+}
+/* The bright dash that travels from one block's hash to the next block's "previous hash". */
+.chain-pulse {
+  animation: chain-pulse 3.6s linear var(--delay, 0s) infinite;
+}
+@keyframes chain-pulse {
+  from { stroke-dashoffset: 14; }
+  to { stroke-dashoffset: -110; }
+}
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s ease-out var(--delay, 0s), transform 0.7s ease-out var(--delay, 0s);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+.lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lift);
+}
+
+/* Sign-in panel: blobs drift, glass cards bob. Both pause when the panel is off-screen. */
+.blob {
+  animation: blob-drift 22s ease-in-out infinite alternate;
+}
+@keyframes blob-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(3rem, 2rem, 0) scale(1.12); }
+}
+.bob {
+  animation: bob 6.5s ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.motion-paused,
+.motion-paused * {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trace path { animation: none; stroke-dashoffset: 0; }
+  .fade-up { animation: none; opacity: 1; transform: none; }
+  .hero-strokes, .blob, .bob { animation: none; }
+  .hero-window { animation: none; opacity: 1; transform: none; }
+  .play-pulse::before { animation: none; opacity: 0; }
+  .chain-pulse { display: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .lift:hover, .folder:hover, .folder:focus-visible { transform: none; }
+  *, ::before, ::after { transition-duration: 0.01ms !important; }
+}
+
+@media print {
+  aside, header.topbar { display: none !important; }
+  .app-shell { display: block !important; height: auto !important; overflow: visible !important; background: none !important; }
+  .app-panel, .app-scroll { overflow: visible !important; height: auto !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+}

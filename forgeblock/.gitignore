@@ -1,0 +1,50 @@
+# ForgeBlock .gitignore
+# Rule of thumb: code goes to GitHub; secrets and anyone's signatures never do.
+
+# --- Secrets -------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# evaluation account passwords
+**/eval_accounts*.csv
+
+# --- Personal research data (signatures are personal data) ---------------
+# collector/data: SVC2004 files, sheet crops, staging photos
+data/
+# uploaded signature images and records
+backend/storage/
+backend/*.db
+*.db
+*.sqlite
+*.sqlite3
+# dataset exports from the collector
+forgeblock-dataset-*.zip
+**/scans/
+training/results/
+
+# --- Python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# --- Node / frontend -----------------------------------------------------
+node_modules/
+frontend/dist/
+*.log
+
+# --- Editors / OS / tools ------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.claude/settings.local.json

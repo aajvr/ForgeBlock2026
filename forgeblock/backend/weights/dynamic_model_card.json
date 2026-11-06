@@ -1,0 +1,97 @@
+{
+  "experiment": "E2",
+  "exported_at": "2026-10-27 03:50:49",
+  "features_used": [
+    "x",
+    "y",
+    "dx",
+    "dy",
+    "speed",
+    "acc",
+    "pen",
+    "theta_sin",
+    "theta_cos",
+    "curvature",
+    "azimuth_sin",
+    "azimuth_cos",
+    "altitude",
+    "pressure",
+    "dpressure"
+  ],
+  "feature_groups": {
+    "BASE": [
+      "x",
+      "y",
+      "dx",
+      "dy",
+      "speed",
+      "acc",
+      "pen",
+      "theta_sin",
+      "theta_cos",
+      "curvature"
+    ],
+    "ORIENTATION": [
+      "azimuth_sin",
+      "azimuth_cos",
+      "altitude"
+    ],
+    "PRESSURE": [
+      "pressure",
+      "dpressure"
+    ]
+  },
+  "needs_pressure_or_orientation": true,
+  "T_steps": 256,
+  "thresholds": {
+    "pairs": 0.7016778588294983,
+    "enroll": 0.6378940939903259
+  },
+  "n_enroll_calibrated_with": 5,
+  "enroll_aggregate": "mean",
+  "selected_from": {
+    "seed": 0,
+    "fold": 2,
+    "val_eer": 0.05083333333333332
+  },
+  "env_trained_with": {
+    "python": "3.13.16",
+    "platform": "Linux-6.6.159+-x86_64-with-glibc2.39",
+    "torch": "2.11.0+cu130",
+    "numpy": "2.1.3",
+    "pandas": "2.2.3",
+    "sklearn": "1.6.1",
+    "device": "cuda",
+    "gpu": "Tesla T4"
+  },
+  "cv_results_mean_std": {
+    "pairs": {
+      "eer": [
+        0.15425,
+        0.05830516432958576
+      ],
+      "f1": [
+        0.8412018044806644,
+        0.051968504741831435
+      ],
+      "roc_auc": [
+        0.926121875,
+        0.03488416317023951
+      ]
+    },
+    "enroll": {
+      "eer": [
+        0.10722222222222225,
+        0.03767833111753318
+      ],
+      "f1": [
+        0.8645227737868886,
+        0.026186665511802654
+      ],
+      "roc_auc": [
+        0.9537488425925925,
+        0.026566931126508903
+      ]
+    }
+  }
+}

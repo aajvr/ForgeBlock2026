@@ -1,0 +1,21 @@
+# Render Blueprint for the researcher-only data collection tool (collector/).
+# Render dashboard > New > Blueprint > pick this repository. You are asked for the
+# three secret values below; they are never stored in the repository.
+services:
+  - type: web
+    name: forgeblock-collector
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: ./collector
+    dockerfilePath: ./collector/Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: COLLECTOR_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: collector-data
