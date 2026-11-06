@@ -311,6 +311,65 @@ html.lenis {
 @keyframes sc-seal { 0%, 75% { opacity: 0; transform: translateX(24px); } 80%, 100% { opacity: 1; transform: none; } }
 @keyframes sc-check { 0%, 80% { opacity: 0; transform: scale(0.4); } 84%, 100% { opacity: 1; transform: none; } }
 
+/* Role cards: while a card is hovered, a short loop plays inside its mock screen; it
+   stops (and resets) when the mouse leaves. Resting styles are the still picture. */
+.rc-row-new { opacity: 0; transform: translateX(-110%); }
+.rc-b2 { transform: translateY(110%); }
+.rc-bar { transform-origin: bottom; }
+.rc-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px rgb(16 124 16 / 0.55);
+  opacity: 0;
+}
+.rc-row-in { opacity: 0; transform: translateY(-8px); }
+.rc-check-cover { transform: translateX(101%); }
+.role-card:hover .rc-row-new { animation: rc-row-new 4.2s cubic-bezier(0.2, 0, 0, 1) 0.25s infinite both; }
+.role-card:hover .rc-shift { animation: rc-shift 4.2s cubic-bezier(0.2, 0, 0, 1) 0.25s infinite both; }
+.role-card:hover .rc-b1 { animation: rc-b1 4.2s cubic-bezier(0.2, 0, 0, 1) 0.25s infinite both; }
+.role-card:hover .rc-b2 { animation: rc-b2 4.2s cubic-bezier(0.2, 0, 0, 1) 0.25s infinite both; }
+.role-card:hover .rc-bar { animation: rc-bar 3s cubic-bezier(0.2, 0, 0, 1) var(--delay, 0s) infinite both; }
+.role-card:hover .rc-pulse { animation: rc-pulse 0.7s cubic-bezier(0.2, 0, 0, 1) 0.3s 1 both; }
+.role-card:hover .rc-pulse::after { animation: rc-ring 0.9s ease-out 0.3s 1 both; }
+.role-card:hover .rc-row-in { animation: rc-row-in 4.2s cubic-bezier(0.2, 0, 0, 1) 0.25s infinite both; }
+.role-card:hover .rc-check-cover { animation: rc-check 4.2s linear 0.25s infinite both; }
+@keyframes rc-row-new { 0% { opacity: 0; transform: translateX(-110%); } 14%, 88% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes rc-shift { 0% { transform: none; } 14%, 88% { transform: translateY(var(--rc-step)); } 100% { transform: none; } }
+@keyframes rc-b1 { 0%, 42% { transform: none; } 50%, 100% { transform: translateY(-110%); } }
+@keyframes rc-b2 { 0%, 42% { transform: translateY(110%); } 50%, 100% { transform: none; } }
+@keyframes rc-bar { 0% { transform: scaleY(1); } 22% { transform: scaleY(0.3); } 55% { transform: scaleY(1.12); } 75%, 100% { transform: scaleY(1); } }
+@keyframes rc-pulse { 0%, 100% { transform: none; } 40% { transform: scale(1.08); } }
+@keyframes rc-ring { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.3); } }
+@keyframes rc-row-in { 0% { opacity: 0; transform: translateY(-8px); } 14%, 88% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; transform: none; } }
+@keyframes rc-check { 0%, 24% { transform: translateX(0); } 44%, 100% { transform: translateX(101%); } }
+
+/* Privacy cards: one small move on the icon when the card is hovered. */
+.pv-scan { opacity: 0; }
+.pv-check { transform-box: fill-box; transform-origin: left center; }
+.pv-card:hover .pv-blink { animation: pv-blink 0.5s ease-in-out 1 both; }
+.pv-card:hover .pv-scan { animation: pv-scan 1s cubic-bezier(0.2, 0, 0, 1) 1 both; }
+.pv-card:hover .pv-click { animation: pv-click 0.45s cubic-bezier(0.2, 0, 0, 1) 1 both; }
+.pv-card:hover .pv-check { animation: pv-check 0.5s cubic-bezier(0.2, 0, 0, 1) 0.05s 1 both; }
+@keyframes pv-blink { 0%, 100% { transform: scaleY(1); } 45% { transform: scaleY(0.1); } }
+@keyframes pv-scan { 0% { opacity: 0; transform: translateY(-100%); } 25% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(100%); } }
+@keyframes pv-click { 0%, 100% { transform: none; } 35% { transform: translateY(2px) scale(0.94); } 70% { transform: translateY(-1px); } }
+@keyframes pv-check { 0% { opacity: 0; transform: scaleX(0); } 20% { opacity: 1; } 100% { opacity: 1; transform: scaleX(1); } }
+
+/* Closing banner: a signature writes itself, then a block seals with a check. One slow
+   loop on transform and opacity; the resting styles are the finished scene. */
+.cta-scene { animation: cta-scene 7s linear infinite both; }
+.cta-ink { transform: translateX(101%); animation: cta-ink 7s linear infinite both; }
+.cta-link { transform-origin: left; animation: cta-link 7s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+.cta-block { animation: cta-block 7s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+.cta-check { animation: cta-check 7s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+@keyframes cta-scene { 0% { opacity: 0; } 5%, 90% { opacity: 1; } 97%, 100% { opacity: 0; } }
+@keyframes cta-ink { 0%, 8% { transform: translateX(0); } 38%, 100% { transform: translateX(101%); } }
+@keyframes cta-link { 0%, 42% { transform: scaleX(0); } 50%, 100% { transform: scaleX(1); } }
+@keyframes cta-block { 0%, 46% { opacity: 0; transform: translateY(10px) scale(0.96); } 54%, 100% { opacity: 1; transform: none; } }
+@keyframes cta-check { 0%, 56% { opacity: 0; transform: scale(0.3); } 63%, 100% { opacity: 1; transform: none; } }
+
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
@@ -320,6 +379,10 @@ html.lenis {
   .trace path { animation: none; stroke-dashoffset: 0; }
   .fade-up { animation: none; opacity: 1; transform: none; }
   .hero-strokes, .blob, .bob { animation: none; }
+  .role-card .rc-row-new, .role-card .rc-shift, .role-card .rc-b1, .role-card .rc-b2, .role-card .rc-bar,
+  .role-card .rc-pulse, .role-card .rc-pulse::after, .role-card .rc-row-in, .role-card .rc-check-cover,
+  .pv-card .pv-blink, .pv-card .pv-scan, .pv-card .pv-click, .pv-card .pv-check,
+  .cta-scene, .cta-ink, .cta-link, .cta-block, .cta-check { animation: none !important; }
   .scene, .scene-doc, .scene-ink-cover, .scene-scan, .scene-card, .scene-bar, .scene-num, .scene-pass, .scene-seal, .scene-check { animation: none; }
   .play-pulse::before { animation: none; opacity: 0; }
   .ledger-track, .ledger-pulse { animation: none; }

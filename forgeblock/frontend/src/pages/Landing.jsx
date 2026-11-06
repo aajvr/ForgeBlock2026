@@ -2,6 +2,7 @@ import {
   ArrowDown,
   ArrowRight,
   Briefcase,
+  Check,
   CheckCircle2,
   ClipboardList,
   EyeOff,
@@ -16,6 +17,7 @@ import {
   Play,
   ScanLine,
   ScanSearch,
+  Shield,
   ShieldCheck,
   ShieldHalf,
   Upload,
@@ -84,10 +86,15 @@ const ACCOUNT_STEPS = [
 ]
 
 const PRIVACY = [
-  { icon: EyeOff, title: 'View only', text: 'Signature images cannot be downloaded or exported. They are shown inside ForgeBlock only.' },
-  { icon: Fingerprint, title: 'Your records only', text: 'Each person sees only their own clients, cases and screenings.' },
-  { icon: Lock, title: 'Protected sign-in', text: 'Invite-only accounts, Microsoft or Google sign-in, lockout after wrong passwords and automatic sign-out.' },
-  { icon: ShieldCheck, title: 'Tamper evident', text: 'The ledger is checked every day. Any change to a sealed record breaks the chain and shows.' },
+  { key: 'view', title: 'View only', text: 'Signature images cannot be downloaded or exported. They are shown inside ForgeBlock only.' },
+  { key: 'records', title: 'Your records only', text: 'Each person sees only their own clients, cases and screenings.' },
+  { key: 'signin', title: 'Protected sign-in', text: 'Invite-only accounts, Microsoft or Google sign-in, lockout after wrong passwords and automatic sign-out.' },
+  { key: 'tamper', title: 'Tamper evident', text: 'The ledger is checked every day. Any change to a sealed record breaks the chain and shows.' },
+]
+
+const FOOTER_COLUMNS = [
+  { title: 'Product', links: [['#how', 'How it works'], ['#who', 'Who uses it'], ['#access', 'Getting an account'], ['#access', 'Check a receipt']] },
+  { title: 'Privacy and Help', links: [['#privacy', 'Privacy and security'], ['/app/help', 'Help Center (after sign-in)'], ['/signin', 'Sign in']] },
 ]
 
 const SECTIONS = [
@@ -597,41 +604,71 @@ function LedgerStrip() {
 }
 
 function RoleMockup({ role }) {
+  const row = 'flex h-6 items-center justify-between gap-2 rounded-md bg-slate-50 px-2 text-[11px]'
   const body = {
+    // A new case slides in as Inconclusive, then is marked Decided.
     examiner: (
       <>
         <div className="text-[11px] font-semibold">Needs your decision</div>
-        {[['CL-0042', 'Inconclusive', 'bg-warn-50 text-warn-700'], ['CL-0057', 'Inconsistent', 'bg-bad-50 text-bad-700'], ['PR-0013', 'Inconclusive', 'bg-warn-50 text-warn-700']].map(([code, result, tone]) => (
-          <div key={code} className="mt-1.5 flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1 text-[11px]">
-            <span className="font-mono">{code}</span><span className={`rounded px-1.5 text-[10px] font-medium ${tone}`}>{result}</span>
+        <div className="relative mt-1.5 flex flex-col gap-1.5" style={{ '--rc-step': '1.875rem' }}>
+          <div className={`rc-row-new absolute inset-x-0 top-0 z-10 ring-1 ring-brand-200 ${row}`}>
+            <span className="font-mono">CL-0061</span>
+            <span className="relative h-4 w-[5.75rem] overflow-hidden">
+              <span className="rc-b1 absolute inset-0 rounded bg-warn-50 px-1.5 text-right text-[10px] font-medium leading-4 text-warn-700">Inconclusive</span>
+              <span className="rc-b2 absolute inset-0 rounded bg-ok-50 px-1.5 text-right text-[10px] font-medium leading-4 text-ok-700">Decided: Genuine</span>
+            </span>
           </div>
-        ))}
-      </>
-    ),
-    admin: (
-      <>
-        <div className="grid grid-cols-2 gap-1.5">
-          {[['Clients', '128'], ['Ledger', 'Intact']].map(([k, v]) => (
-            <div key={k} className="rounded-md bg-slate-50 px-2 py-1">
-              <div className="text-[10px] text-slate-500">{k}</div>
-              <div className="text-xs font-semibold">{v}</div>
+          {[['CL-0042', 'Inconclusive', 'bg-warn-50 text-warn-700'], ['CL-0057', 'Inconsistent', 'bg-bad-50 text-bad-700'], ['PR-0013', 'Inconclusive', 'bg-warn-50 text-warn-700']].map(([code, result, tone]) => (
+            <div key={code} className={`rc-shift ${row}`}>
+              <span className="font-mono">{code}</span><span className={`rounded px-1.5 text-[10px] font-medium ${tone}`}>{result}</span>
             </div>
           ))}
         </div>
-        <div className="mt-2 flex h-12 items-end gap-1">
-          {[40, 65, 35, 80, 55, 95, 70, 50].map((h, i) => <span key={i} className="flex-1 rounded-t bg-indigo-300" style={{ height: `${h}%` }} />)}
+      </>
+    ),
+    // The bars grow and settle; the ledger badge pulses once.
+    admin: (
+      <>
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="rounded-md bg-slate-50 px-2 py-1">
+            <div className="text-[10px] text-slate-500">Clients</div>
+            <div className="text-xs font-semibold">128</div>
+          </div>
+          <div className="rc-pulse relative rounded-md bg-ok-50 px-2 py-1">
+            <div className="text-[10px] text-slate-500">Ledger</div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-ok-700"><ShieldCheck className="h-3 w-3" /> Intact</div>
+          </div>
+        </div>
+        <div className="mt-2 flex h-12 items-end gap-1 overflow-hidden">
+          {[40, 65, 35, 80, 55, 95, 70, 50].map((h, i) => <span key={i} className="rc-bar flex-1 rounded-t bg-indigo-300" style={{ height: `${h}%`, '--delay': `${i * 0.06}s` }} />)}
         </div>
       </>
     ),
+    // A new screening row appears and its check mark draws itself.
     client: (
       <>
         <div className="text-[11px] font-semibold">Screenings on your documents</div>
-        <div className="mt-1.5 rounded-md bg-slate-50 px-2 py-1.5 text-[11px]">
-          <div className="flex items-center justify-between gap-2"><span>Screening</span><span className="rounded bg-ok-50 px-1.5 text-[10px] font-medium text-ok-700">Consistent</span></div>
-          <div className="mt-1 font-mono text-[10px] text-slate-500">FB-7KQ2-M9TX</div>
-        </div>
-        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-600">
-          <ShieldCheck className="h-3.5 w-3.5 text-ok-600" /> Sealed in the ledger
+        <div className="relative mt-1.5 flex flex-col gap-1.5" style={{ '--rc-step': '2.75rem' }}>
+          <div className="rc-row-in absolute inset-x-0 top-0 z-10 rounded-md bg-slate-50 px-2 py-1.5 text-[11px] ring-1 ring-cyan-200">
+            <div className="flex items-center justify-between gap-2">
+              <span>Screening</span>
+              <span className="flex items-center gap-1 rounded bg-ok-50 px-1.5 text-[10px] font-medium text-ok-700">
+                <span className="relative inline-flex overflow-hidden">
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                  <span className="rc-check-cover absolute inset-0 bg-ok-50" />
+                </span>
+                Consistent
+              </span>
+            </div>
+            <div className="mt-1 font-mono text-[10px] text-slate-500">FB-4QW7-L2ZC</div>
+          </div>
+          <div className="rc-shift rounded-md bg-slate-50 px-2 py-1.5 text-[11px]">
+            <div className="flex items-center justify-between gap-2"><span>Screening</span><span className="rounded bg-ok-50 px-1.5 text-[10px] font-medium text-ok-700">Consistent</span></div>
+            <div className="mt-1 font-mono text-[10px] text-slate-500">FB-7KQ2-M9TX</div>
+          </div>
+          <div className="rc-shift flex items-center gap-1.5 text-[11px] text-slate-600">
+            <ShieldCheck className="h-3.5 w-3.5 text-ok-600" /> Sealed in the ledger
+          </div>
         </div>
       </>
     ),
@@ -645,7 +682,65 @@ function RoleMockup({ role }) {
         <Users className="h-3.5 w-3.5" />
         <Link2 className="h-3.5 w-3.5" />
       </div>
-      <div className="min-w-0 flex-1 rounded-tl-xl bg-white p-3">{body}</div>
+      <div className="min-w-0 flex-1 overflow-hidden rounded-tl-xl bg-white p-3">{body}</div>
+    </div>
+  )
+}
+
+// Privacy icons, each with its own small hover move: the eye blinks, a scan passes over
+// the fingerprint, the lock clicks, and the shield's check draws itself.
+function PrivacyIcon({ kind }) {
+  if (kind === 'view') return <EyeOff className="pv-blink h-6 w-6" />
+  if (kind === 'records') {
+    return (
+      <>
+        <Fingerprint className="h-6 w-6" />
+        <span className="pv-scan absolute inset-x-0 top-0 h-full bg-gradient-to-b from-transparent via-white/60 to-transparent" />
+      </>
+    )
+  }
+  if (kind === 'signin') return <Lock className="pv-click h-6 w-6" />
+  return (
+    <span className="relative h-6 w-6">
+      <Shield className="absolute inset-0 h-6 w-6" />
+      <svg viewBox="0 0 24 24" className="absolute inset-0 h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path className="pv-check" d="m9 12 2 2 4-4" />
+      </svg>
+    </span>
+  )
+}
+
+// Closing banner scene: a signature writes itself on a slip, then a block seals it.
+function SealScene() {
+  const box = useRef(null)
+  const onScreen = useOnScreen(box)
+  return (
+    <div ref={box} className={`relative mx-auto h-56 w-full max-w-sm ${onScreen ? '' : 'motion-paused'}`} role="img" aria-label="A signature is written and sealed in ledger block #1250">
+      <div className="cta-scene absolute inset-0" aria-hidden="true">
+        <div className="absolute left-0 top-6 w-56 -rotate-2 rounded-xl bg-white p-4 text-slate-400 shadow-xl">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Signature card</div>
+          <div className="mt-3 space-y-1.5">
+            <div className="h-1.5 w-full rounded bg-slate-100" />
+            <div className="h-1.5 w-3/4 rounded bg-slate-100" />
+          </div>
+          <div className="relative mt-3 h-12 overflow-hidden">
+            <svg viewBox="0 0 160 40" className="absolute inset-0 h-full w-full" fill="none" stroke="#1e3a8a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 28 C 16 6, 24 38, 34 18 S 48 8, 54 26 S 66 32, 74 16 C 82 6, 90 30, 100 22 S 118 12, 128 24 C 136 32, 146 14, 154 18" />
+            </svg>
+            <div className="cta-ink absolute inset-0 bg-white" />
+          </div>
+          <div className="border-t border-slate-300 pt-1 text-[9px]">Signature</div>
+        </div>
+        <div className="cta-link absolute left-[13.5rem] top-[5.75rem] h-0.5 w-12 rounded bg-white/70" />
+        <div className="cta-block absolute right-0 top-14 w-40 rounded-xl border border-white/30 bg-white/15 p-3 text-white shadow-lg backdrop-blur-md">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold">Block #1250</span>
+            <span className="cta-check flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400 text-emerald-950"><Check className="h-4 w-4" strokeWidth={3} /></span>
+          </div>
+          <div className="mt-2 font-mono text-xs text-white/80">5c1e…9a2f</div>
+          <div className="mt-1 text-[11px] text-white/70">Sealed</div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -759,7 +854,7 @@ export default function Landing() {
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {ROLES.map((r, i) => (
               <RevealOnScroll key={r.key} delay={i * 0.12}>
-                <div className={`lift h-full rounded-2xl border border-t-4 border-slate-200/70 bg-white p-5 shadow-soft ${r.accent}`}>
+                <div className={`role-card lift h-full rounded-2xl border border-t-4 border-slate-200/70 bg-white p-5 shadow-soft ${r.accent}`}>
                   <RoleMockup role={r} />
                   <div className="mt-5 flex items-center gap-3">
                     <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${r.tile}`}><r.icon className="h-5 w-5" /></span>
@@ -805,40 +900,81 @@ export default function Landing() {
       </section>
 
       {/* Privacy */}
-      <section id="privacy" className="scroll-mt-20 pb-20">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {PRIVACY.map((p) => (
-              <div key={p.title} className="rounded-2xl bg-slate-50 p-6">
-                <p.icon className="h-5 w-5 text-brand-600" />
-                <h3 className="mt-3 font-semibold">{p.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600">{p.text}</p>
-              </div>
+      <section id="privacy" className="relative scroll-mt-20 overflow-hidden bg-[linear-gradient(180deg,#0a2540_0%,#0c3b5e_60%,#0a3f73_100%)] py-20 text-white">
+        <HeroStrokes words={false} calm />
+        <div className="relative mx-auto max-w-6xl px-5">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-300">Privacy and security</div>
+            <h2 className="mt-2 text-3xl font-semibold tracking-[-0.01em] sm:text-4xl">Built for personal signature data</h2>
+          </div>
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {PRIVACY.map((p, i) => (
+              <RevealOnScroll key={p.key} delay={i * 0.1}>
+                <div className="pv-card h-full rounded-2xl border border-white/15 bg-white/[0.06] p-6 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] backdrop-blur-md">
+                  <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-400 to-indigo-500 text-white shadow-lg shadow-brand-900/40">
+                    <PrivacyIcon kind={p.key} />
+                  </span>
+                  <h3 className="mt-4 font-semibold">{p.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-white/75">{p.text}</p>
+                </div>
+              </RevealOnScroll>
             ))}
           </div>
-          <div className="hero-bg relative mt-16 overflow-hidden rounded-3xl px-6 py-14 text-center text-white shadow-lift">
-            <h2 className="text-3xl font-semibold tracking-[-0.01em] sm:text-4xl">Your workspace is ready when you are.</h2>
-            <p className="mx-auto mt-3 max-w-xl text-white/85">Sign in with the account your administrator registered for you.</p>
-            <Link to="/signin" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-medium text-brand-700 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
-              Sign in <ArrowRight className="h-4 w-4" />
-            </Link>
+        </div>
+      </section>
+
+      {/* Closing banner */}
+      <section className="px-5 py-20">
+        <div className="relative mx-auto max-w-6xl">
+          <div className="pointer-events-none absolute -inset-4 rounded-[2.5rem] bg-brand-400/25 blur-3xl" aria-hidden="true" />
+          <div className="relative grid items-center gap-10 overflow-hidden rounded-3xl border border-white/20 bg-[radial-gradient(40rem_22rem_at_90%_0%,rgb(71_158_245/0.45),transparent_60%),radial-gradient(30rem_20rem_at_0%_100%,rgb(99_102_241/0.35),transparent_60%),linear-gradient(135deg,#0a3f73,#0f6cbd)] px-8 py-12 text-white shadow-[0_30px_80px_-30px_rgb(15_108_189/0.6)] sm:px-12 lg:grid-cols-[1.1fr_1fr]">
+            <span className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" aria-hidden="true" />
+            <div>
+              <h2 className="text-3xl font-semibold tracking-[-0.01em] sm:text-4xl">Your workspace is ready when you are.</h2>
+              <p className="mt-3 max-w-md text-white/85">Sign in with the account your administrator registered for you.</p>
+              <Link to="/signin" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-medium text-brand-800 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
+                Sign in <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <SealScene />
           </div>
         </div>
       </section>
 
       <footer className="border-t border-slate-200 bg-slate-50">
-        <div className="mx-auto max-w-6xl px-5 py-10 text-sm text-slate-500">
-          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-            <Brand tagline={false} />
-            <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Sections">
-              {SECTIONS.map(([href, label]) => <a key={href} href={href} className="transition hover:text-slate-900">{label}</a>)}
-            </nav>
+        <div className="mx-auto max-w-6xl px-5 pb-8 pt-14 text-sm text-slate-500">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]">
+            <div>
+              <Brand tagline={false} />
+              <p className="mt-3 max-w-xs">Signature screening with a tamper-evident record of every result and every examiner’s decision.</p>
+            </div>
+            {FOOTER_COLUMNS.map((col) => (
+              <nav key={col.title} aria-label={col.title}>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-700">{col.title}</h3>
+                <ul className="mt-3 space-y-2">
+                  {col.links.map(([href, label]) => (
+                    <li key={label}>
+                      {href.startsWith('#')
+                        ? <a href={href} className="transition hover:text-slate-900">{label}</a>
+                        : <Link to={href} className="transition hover:text-slate-900">{label}</Link>}
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-700">The study</h3>
+              <p className="mt-3">
+                {study
+                  ? 'A research prototype of De La Salle University–Dasmariñas, used only for the approved activities of the ForgeBlock study. Not for actual legal, financial or official documents.'
+                  : 'A capstone project of De La Salle University–Dasmariñas, by CloudNine.'}
+              </p>
+            </div>
           </div>
-          <div className="mt-6 max-w-3xl space-y-2">
-            <ScreeningNotice />
-            {study && <p>A research prototype of De La Salle University–Dasmariñas, used only for the approved activities of the ForgeBlock study. Not for actual legal, financial or official documents.</p>}
+          <div className="mt-12 flex flex-col gap-3 border-t border-slate-200 pt-6 md:flex-row md:items-start md:justify-between md:gap-10">
+            <p className="shrink-0">© 2026 CloudNine. All rights reserved.</p>
+            <ScreeningNotice className="max-w-2xl md:text-right" />
           </div>
-          <p className="mt-6 border-t border-slate-200 pt-5">© 2026 CloudNine. All rights reserved.</p>
         </div>
       </footer>
     </div>
