@@ -4,7 +4,6 @@ import {
   BookOpen,
   Briefcase,
   ChevronDown,
-  ChevronsLeft,
   ChevronsRight,
   ClipboardList,
   Gauge,
@@ -12,6 +11,8 @@ import {
   Link2,
   LogOut,
   Menu,
+  Pin,
+  PinOff,
   ScanSearch,
   Search,
   Settings2,
@@ -25,7 +26,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import Brand, { BrandMark } from './Brand'
+import { BrandMark } from './Brand'
 import Tour from './Tour'
 import { Avatar, fmtDate } from './ui'
 
@@ -88,12 +89,12 @@ function crumb(pathname, items) {
   return 'ForgeBlock'
 }
 
-const COLLAPSED_KEY = 'forgeblock_sidebar_collapsed'
+const PINNED_KEY = 'forgeblock_sidebar_pinned'
 const DESKTOP = '(min-width: 64rem)' // Tailwind's lg
 
-function readCollapsed() {
+function readPinned() {
   try {
-    return localStorage.getItem(COLLAPSED_KEY) === '1'
+    return localStorage.getItem(PINNED_KEY) === '1'
   } catch {
     return false
   }
@@ -266,20 +267,47 @@ export default function Layout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(readCollapsed)
+  const [pinned, setPinned] = useState(readPinned)
+  const [peek, setPeek] = useState(false)
   const [tip, setTip] = useState(null)
+  const timer = useRef(null)
   const desktop = useDesktop()
   const items = navFor(user.role)
   const staff = user.role !== 'client'
   const style = ROLE_STYLE[user.role] || ROLE_STYLE.examiner
-  // On phones the sidebar is always the full drawer; only desktop has the icon rail.
-  const rail = desktop && collapsed
+  const touring = tourOpen || !user.tour_completed
+  // Desktop starts as an icon rail that opens over the page; pinned, it stays open beside it.
+  // Phones always get the full drawer. The tour opens it so its labels can be pointed at.
+  const floating = desktop && !pinned
+  const expanded = !desktop || pinned || peek || touring
+  const rail = desktop && !expanded
+  useEffect(() => () => clearTimeout(timer.current), [])
 
-  const toggleCollapsed = () => {
-    setCollapsed(!collapsed)
+  const later = (fn, ms) => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(fn, ms)
+  }
+  // A short pause before opening, so moving the mouse across the rail does not open it.
+  const hoverProps = floating
+    ? {
+        onMouseEnter: () => later(() => setPeek(true), 450),
+        onMouseLeave: () => later(() => setPeek(false), 200),
+        onFocus: () => {
+          clearTimeout(timer.current)
+          setPeek(true)
+        },
+        onBlur: (e) => !e.currentTarget.contains(e.relatedTarget) && setPeek(false),
+        onKeyDown: (e) => e.key === 'Escape' && setPeek(false),
+      }
+    : {}
+
+  const togglePinned = () => {
+    const next = !pinned
+    setPinned(next)
+    setPeek(false)
     setTip(null)
     try {
-      localStorage.setItem(COLLAPSED_KEY, collapsed ? '0' : '1')
+      localStorage.setItem(PINNED_KEY, next ? '1' : '0')
     } catch { /* the choice just is not remembered */ }
   }
 
@@ -297,12 +325,26 @@ export default function Layout() {
       }
     : {})
 
+  // Labels fade rather than jump, and the icons keep their place as the sidebar opens.
+  const fade = `whitespace-nowrap transition-opacity duration-200 ${expanded ? 'opacity-100' : 'opacity-0'}`
   const link = ({ isActive }) =>
-    `group relative flex items-center rounded-xl py-1.5 text-base transition lg:rounded-l-2xl ${rail ? 'justify-center' : 'gap-3.5 px-3.5'} ${
+    `group relative flex items-center gap-3 rounded-xl py-0.5 pl-1 pr-3 text-base transition lg:rounded-l-2xl ${
       isActive
-        ? `nav-connected bg-white font-semibold ${style.active} shadow-sm lg:rounded-r-none lg:shadow-none ${rail ? 'lg:pr-3' : ''}`
-        : `text-white/90 hover:bg-white/15 hover:text-white lg:rounded-r-2xl ${rail ? 'lg:mr-3' : 'lg:mr-4'}`
+        ? `nav-connected bg-white font-semibold ${style.active} shadow-sm lg:rounded-r-none lg:shadow-none`
+        : `text-white/90 hover:text-white lg:mr-3 lg:rounded-r-2xl ${expanded ? 'hover:bg-white/15' : ''}`
     }`
+  // The hover tile fades in behind the icon, and the icon grows slightly.
+  const icon = (Icon, active) => (
+    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+      {!active && <span className="absolute inset-0 rounded-lg bg-white/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />}
+      <Icon className="relative h-6 w-6 transition-transform duration-200 group-hover:scale-[1.08]" />
+    </span>
+  )
+  const control = rail
+    ? { label: 'Expand the menu', Icon: ChevronsRight, onClick: () => setPeek(true) }
+    : pinned
+      ? { label: 'Unpin the menu', Icon: PinOff, onClick: togglePinned }
+      : { label: 'Pin the menu open', Icon: Pin, onClick: togglePinned }
 
   const doSignOut = () => {
     signOut()
@@ -311,36 +353,45 @@ export default function Layout() {
 
   return (
     <div className={`app-shell ${style.sidebar} min-h-screen lg:flex lg:h-screen lg:overflow-hidden`}>
+      <div className="app-blobs pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+        <div className="blob absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-400 opacity-35 blur-3xl" />
+        <div className="blob absolute -left-16 top-1/2 h-80 w-80 rounded-full bg-cyan-400 opacity-30 blur-3xl [animation-delay:-8s]" />
+        <div className="blob absolute -bottom-24 left-1/3 h-96 w-96 rounded-full bg-indigo-400 opacity-30 blur-3xl [animation-delay:-14s]" />
+      </div>
+      <div className={`hidden shrink-0 transition-[width] duration-200 lg:block ${pinned ? 'w-[19rem]' : 'w-[5.25rem]'}`} aria-hidden="true" />
       <aside
-        className={`${open ? 'translate-x-0' : '-translate-x-full max-lg:invisible'} ${style.sidebar} fixed inset-y-0 left-0 z-30 flex w-[19rem] max-w-[86vw] flex-col pb-4 pl-4 pr-4 pt-6 text-white transition-[transform,width,visibility] duration-200 lg:static lg:h-full lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:pr-0 ${rail ? 'lg:w-[5.75rem] lg:pl-3' : 'lg:w-[19rem]'}`}
+        {...hoverProps}
+        className={`${open ? 'translate-x-0' : '-translate-x-full max-lg:invisible'} ${style.sidebar} sidebar-glass ${!desktop || (floating && expanded) ? 'is-over' : ''} fixed inset-y-0 left-0 z-30 flex w-[19rem] max-w-[86vw] flex-col overflow-x-hidden pb-4 pl-[1.125rem] pr-4 pt-6 text-white transition-[transform,width,visibility,box-shadow] duration-200 lg:max-w-none lg:translate-x-0 lg:pr-0 ${
+          expanded ? 'lg:w-[19rem]' : 'lg:w-[5.25rem]'
+        } ${floating && expanded ? 'lg:shadow-[10px_0_30px_-12px_rgb(0_0_0/0.45)]' : ''}`}
       >
-        <div className={`mb-5 flex items-start justify-between ${rail ? 'justify-center pr-3' : 'px-2 lg:pr-6'}`}>
-          {rail ? (
-            <BrandMark light className="h-11 w-11" />
-          ) : (
-            <div>
-              <Brand light tagline={false} />
-              <div className="mt-3 inline-flex rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">{style.workspace}</div>
-            </div>
-          )}
+        <div className="flex h-10 items-center justify-between pl-1 lg:pr-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark light className="h-9 w-9 shrink-0" />
+            <span className={`text-xl font-semibold tracking-tight ${fade}`}>ForgeBlock</span>
+          </div>
           <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <nav className="nav-scroll flex-1 space-y-0.5 overflow-y-auto pb-5 pt-1" aria-label="Main menu" onClick={() => setOpen(false)}>
+        <div className={`mb-4 mt-2.5 h-7 pl-1 ${fade}`}>
+          <span className="inline-flex rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">{style.workspace}</span>
+        </div>
+        <nav className="nav-scroll flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden pb-5 pt-1" aria-label="Main menu" onClick={() => setOpen(false)}>
           {items.map((n, i) =>
             n.section ? (
-              rail ? (
-                <div key={`s${i}`} className="my-2 mr-3 flex justify-center first:hidden"><span className="h-px w-8 bg-white/25" /></div>
-              ) : (
-                <div key={`s${i}`} className="px-3.5 pb-1 pt-3 text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white/60 first:pt-0">
-                  {n.section}
-                </div>
-              )
+              <div key={`s${i}`} className="relative flex h-7 items-end pb-1 pl-2 first:h-6">
+                <span className={`text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white/60 ${fade}`}>{n.section}</span>
+                <span className={`absolute bottom-2.5 left-2 h-px w-8 bg-white/30 transition-opacity duration-200 ${rail ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
+              </div>
             ) : (
               <NavLink key={n.to} to={n.to} end={n.end} className={link} data-tour={n.tour} {...tipProps(n.label)}>
-                <n.icon className={`shrink-0 transition-transform ${rail ? 'h-6 w-6 group-hover:scale-125' : 'h-[22px] w-[22px]'}`} />
-                <span className={rail ? 'sr-only' : ''}>{n.label}</span>
+                {({ isActive }) => (
+                  <>
+                    {icon(n.icon, isActive)}
+                    <span className={fade}>{n.label}</span>
+                  </>
+                )}
               </NavLink>
             ),
           )}
@@ -351,7 +402,7 @@ export default function Layout() {
               <ShieldCheck className="h-5 w-5" />
             </div>
           ) : (
-            <div className="mt-2 border-t border-white/15 px-2 pt-4 text-xs text-white/70 lg:mr-4 [@media(max-height:960px)]:hidden">
+            <div className="mt-2 w-[16.5rem] border-t border-white/15 px-2 pt-4 text-xs text-white/70 [@media(max-height:960px)]:hidden">
               <div className="flex items-center gap-2 text-sm font-medium text-white">
                 <ShieldCheck className="h-4 w-4" /> Research use only
               </div>
@@ -360,13 +411,14 @@ export default function Layout() {
           )
         )}
         <button
-          onClick={toggleCollapsed}
-          aria-label={rail ? 'Expand the menu' : 'Collapse the menu'}
-          aria-expanded={!rail}
-          className={`mt-3 hidden items-center rounded-xl py-2 text-sm font-medium text-white/80 transition hover:bg-white/15 hover:text-white lg:flex ${rail ? 'mr-3 justify-center' : 'mr-4 gap-3.5 px-3.5'}`}
-          {...tipProps('Expand the menu')}
+          onClick={control.onClick}
+          aria-label={control.label}
+          aria-pressed={rail ? undefined : pinned}
+          className="group mt-2 hidden items-center gap-3 rounded-xl py-0.5 pl-1 pr-3 text-sm font-medium text-white/80 transition hover:text-white lg:mr-3 lg:flex"
+          {...tipProps(control.label)}
         >
-          {rail ? <ChevronsRight className="h-5 w-5" /> : <><ChevronsLeft className="h-5 w-5" /> Collapse</>}
+          {icon(control.Icon, false)}
+          <span className={fade}>{control.label}</span>
         </button>
       </aside>
       {rail && tip && (
@@ -375,7 +427,7 @@ export default function Layout() {
         </div>
       )}
       {open && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />}
-      <div className="app-panel min-h-screen min-w-0 flex-1 bg-white lg:my-3 lg:mr-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-[2rem] lg:shadow-2xl">
+      <div className="app-panel relative min-h-screen min-w-0 flex-1 bg-white lg:my-3 lg:bg-white/[0.92] lg:mr-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-[2rem] lg:shadow-2xl">
         <header className="topbar sticky top-0 z-10 flex h-[4.5rem] shrink-0 items-center gap-4 border-b border-slate-100 bg-white/95 px-4 backdrop-blur sm:px-8 lg:static lg:px-10">
           <button className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />

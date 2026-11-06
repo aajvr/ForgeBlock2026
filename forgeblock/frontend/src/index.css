@@ -84,9 +84,6 @@ body {
 
 /* App shell: the role colour runs behind a large rounded white panel. */
 @media (min-width: 64rem) {
-  .app-shell > aside {
-    background: none;
-  }
   /* The active item flows into the panel, with concave corners above and below. */
   .nav-connected::before,
   .nav-connected::after {
@@ -106,6 +103,28 @@ body {
     background: radial-gradient(circle at 0 100%, transparent 17.5px, #fff 18px);
   }
 }
+/* Glass sidebar: the role gradient, see-through, blurring the colour blobs behind it.
+   When it lies over the white page (opened over it, or the phone drawer) it turns
+   almost solid so the white labels stay readable. */
+.sidebar-glass {
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border-right: 1px solid rgb(255 255 255 / 0.16);
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.05);
+}
+.sidebar-glass.is-over {
+  --glass-a: 0.9;
+}
+.sidebar-glass.sidebar-examiner {
+  background: linear-gradient(180deg, rgb(15 108 189 / var(--glass-a, 0.5)) 0%, rgb(12 79 140 / var(--glass-a, 0.55)) 55%, rgb(12 59 94 / var(--glass-a, 0.6)) 100%);
+}
+.sidebar-glass.sidebar-admin {
+  background: linear-gradient(180deg, rgb(31 58 147 / var(--glass-a, 0.5)) 0%, rgb(23 47 115 / var(--glass-a, 0.55)) 55%, rgb(16 31 77 / var(--glass-a, 0.6)) 100%);
+}
+.sidebar-glass.sidebar-client {
+  background: linear-gradient(180deg, rgb(11 122 156 / var(--glass-a, 0.5)) 0%, rgb(10 94 122 / var(--glass-a, 0.55)) 55%, rgb(8 63 82 / var(--glass-a, 0.6)) 100%);
+}
+
 .nav-scroll {
   scrollbar-width: none;
   mask-image: linear-gradient(#000 calc(100% - 18px), transparent);
@@ -238,6 +257,7 @@ body {
 
 @media print {
   aside, header.topbar { display: none !important; }
+  .app-blobs { display: none !important; }
   .app-shell { display: block !important; height: auto !important; overflow: visible !important; background: none !important; }
   .app-panel, .app-scroll { overflow: visible !important; height: auto !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 }
