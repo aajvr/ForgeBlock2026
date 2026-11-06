@@ -82,26 +82,10 @@ body {
   to { opacity: 1; transform: none; }
 }
 
-/* App shell: the role colour runs behind a large rounded white panel. */
-@media (min-width: 64rem) {
-  /* The active item flows into the panel, with concave corners above and below. */
-  .nav-connected::before,
-  .nav-connected::after {
-    content: "";
-    position: absolute;
-    right: 0;
-    width: 18px;
-    height: 18px;
-    pointer-events: none;
-  }
-  .nav-connected::before {
-    top: -18px;
-    background: radial-gradient(circle at 0 0, transparent 17.5px, #fff 18px);
-  }
-  .nav-connected::after {
-    bottom: -18px;
-    background: radial-gradient(circle at 0 100%, transparent 17.5px, #fff 18px);
-  }
+/* One timing for every sidebar movement: its width, the content's padding, the label fades. */
+.motion-fb {
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 /* Glass sidebar: the role gradient, see-through, blurring the colour blobs behind it.
    When it lies over the white page (opened over it, or the phone drawer) it turns
@@ -114,6 +98,10 @@ body {
 }
 .sidebar-glass.is-over {
   --glass-a: 0.9;
+}
+/* Opened over the content: a soft shadow on its right edge. */
+.sidebar-glass.is-lifted {
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.05), 8px 0 28px -10px rgb(0 0 0 / 0.35);
 }
 .sidebar-glass.sidebar-examiner {
   background: linear-gradient(180deg, rgb(15 108 189 / var(--glass-a, 0.5)) 0%, rgb(12 79 140 / var(--glass-a, 0.55)) 55%, rgb(12 59 94 / var(--glass-a, 0.6)) 100%);
@@ -259,5 +247,6 @@ body {
   aside, header.topbar { display: none !important; }
   .app-blobs { display: none !important; }
   .app-shell { display: block !important; height: auto !important; overflow: visible !important; background: none !important; }
+  .app-content { padding: 0 !important; height: auto !important; }
   .app-panel, .app-scroll { overflow: visible !important; height: auto !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 }

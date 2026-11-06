@@ -325,21 +325,25 @@ export default function Layout() {
       }
     : {})
 
-  // Labels fade rather than jump, and the icons keep their place as the sidebar opens.
-  const fade = `whitespace-nowrap transition-opacity duration-200 ${expanded ? 'opacity-100' : 'opacity-0'}`
+  // Labels stay rendered and fade with a small slide; icons keep their place as the sidebar opens.
+  const fade = `transition-[opacity,translate] motion-fb ${expanded ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0'}`
+  // Active: a rounded tile in the sidebar's own colour with a white pill. Hover: a lighter tile.
   const link = ({ isActive }) =>
-    `group relative flex items-center gap-3 rounded-xl py-0.5 pl-1 pr-3 text-base transition lg:rounded-l-2xl ${
-      isActive
-        ? `nav-connected bg-white font-semibold ${style.active} shadow-sm lg:rounded-r-none lg:shadow-none`
-        : `text-white/90 hover:text-white lg:mr-3 lg:rounded-r-2xl ${expanded ? 'hover:bg-white/15' : ''}`
+    `group relative flex h-10 items-center rounded-xl transition-colors motion-fb ${
+      isActive ? 'bg-white/15 font-semibold text-white' : 'text-white/85 hover:bg-white/[0.08] hover:text-white'
     }`
-  // The hover tile fades in behind the icon, and the icon grows slightly.
-  const icon = (Icon, active) => (
-    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
-      {!active && <span className="absolute inset-0 rounded-lg bg-white/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />}
-      <Icon className="relative h-6 w-6 transition-transform duration-200 group-hover:scale-[1.08]" />
-    </span>
+  const pill = (on) => (
+    <span className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-white transition-opacity motion-fb ${on ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
   )
+  // The icon slot is as wide as the rail's inner width, so icons sit centred in the rail.
+  const icon = (glyph) => {
+    const Icon = glyph
+    return (
+      <span className="flex h-10 w-[3.75rem] shrink-0 items-center justify-center">
+        <Icon className="h-6 w-6 transition-transform motion-fb group-hover:scale-[1.08]" />
+      </span>
+    )
+  }
   const control = rail
     ? { label: 'Expand the menu', Icon: ChevronsRight, onClick: () => setPeek(true) }
     : pinned
@@ -352,44 +356,46 @@ export default function Layout() {
   }
 
   return (
-    <div className={`app-shell ${style.sidebar} min-h-screen lg:flex lg:h-screen lg:overflow-hidden`}>
+    <div className={`app-shell ${style.sidebar} min-h-screen lg:h-screen lg:overflow-hidden`}>
       <div className="app-blobs pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
         <div className="blob absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-400 opacity-35 blur-3xl" />
         <div className="blob absolute -left-16 top-1/2 h-80 w-80 rounded-full bg-cyan-400 opacity-30 blur-3xl [animation-delay:-8s]" />
         <div className="blob absolute -bottom-24 left-1/3 h-96 w-96 rounded-full bg-indigo-400 opacity-30 blur-3xl [animation-delay:-14s]" />
       </div>
-      <div className={`hidden shrink-0 transition-[width] duration-200 lg:block ${pinned ? 'w-[19rem]' : 'w-[5.25rem]'}`} aria-hidden="true" />
       <aside
         {...hoverProps}
-        className={`${open ? 'translate-x-0' : '-translate-x-full max-lg:invisible'} ${style.sidebar} sidebar-glass ${!desktop || (floating && expanded) ? 'is-over' : ''} fixed inset-y-0 left-0 z-30 flex w-[19rem] max-w-[86vw] flex-col overflow-x-hidden pb-4 pl-[1.125rem] pr-4 pt-6 text-white transition-[transform,width,visibility,box-shadow] duration-200 lg:max-w-none lg:translate-x-0 lg:pr-0 ${
+        className={`${open ? 'translate-x-0' : '-translate-x-full max-lg:invisible'} ${style.sidebar} sidebar-glass ${!desktop || (floating && expanded) ? 'is-over' : ''} fixed inset-y-0 left-0 z-30 flex w-[19rem] max-w-[86vw] flex-col overflow-hidden px-3 py-5 text-white transition-[translate,width,visibility,box-shadow] motion-fb lg:max-w-none lg:translate-x-0 ${
           expanded ? 'lg:w-[19rem]' : 'lg:w-[5.25rem]'
-        } ${floating && expanded ? 'lg:shadow-[10px_0_30px_-12px_rgb(0_0_0/0.45)]' : ''}`}
+        } ${floating && expanded ? 'is-lifted' : ''}`}
       >
-        <div className="flex h-10 items-center justify-between pl-1 lg:pr-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <BrandMark light className="h-9 w-9 shrink-0" />
-            <span className={`text-xl font-semibold tracking-tight ${fade}`}>ForgeBlock</span>
-          </div>
-          <button className="lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
+        <div className="flex h-10 shrink-0 items-center">
+          <span className="flex w-[3.75rem] shrink-0 justify-center"><BrandMark light className="h-9 w-9" /></span>
+          <span className={`whitespace-nowrap text-xl font-semibold tracking-tight ${fade}`}>ForgeBlock</span>
+          <button className="ml-auto mr-1 lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className={`mb-4 mt-2.5 h-7 pl-1 ${fade}`}>
+        <div className={`mb-3 mt-2 h-7 shrink-0 whitespace-nowrap pl-3 ${fade}`}>
           <span className="inline-flex rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">{style.workspace}</span>
         </div>
-        <nav className="nav-scroll flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden pb-5 pt-1" aria-label="Main menu" onClick={() => setOpen(false)}>
+        <nav className="nav-scroll flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden pb-4 pt-1" aria-label="Main menu" onClick={() => setOpen(false)}>
           {items.map((n, i) =>
             n.section ? (
-              <div key={`s${i}`} className="relative flex h-7 items-end pb-1 pl-2 first:h-6">
-                <span className={`text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white/60 ${fade}`}>{n.section}</span>
-                <span className={`absolute bottom-2.5 left-2 h-px w-8 bg-white/30 transition-opacity duration-200 ${rail ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
+              <div key={`s${i}`} className={`relative flex items-end pb-1.5 ${i === 0 ? 'h-5' : 'h-7'}`}>
+                <span className={`whitespace-nowrap pl-[1.125rem] text-[12.5px] font-semibold uppercase tracking-[0.12em] text-white/60 ${fade}`}>{n.section}</span>
+                {i > 0 && (
+                  <span className={`absolute top-1/2 flex w-[3.75rem] justify-center transition-opacity motion-fb ${rail ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true">
+                    <span className="h-px w-6 bg-white/30" />
+                  </span>
+                )}
               </div>
             ) : (
               <NavLink key={n.to} to={n.to} end={n.end} className={link} data-tour={n.tour} {...tipProps(n.label)}>
                 {({ isActive }) => (
                   <>
-                    {icon(n.icon, isActive)}
-                    <span className={fade}>{n.label}</span>
+                    {pill(isActive)}
+                    {icon(n.icon)}
+                    <span className={`whitespace-nowrap pr-3 text-base ${fade}`}>{n.label}</span>
                   </>
                 )}
               </NavLink>
@@ -397,28 +403,25 @@ export default function Layout() {
           )}
         </nav>
         {user.study_mode && (
-          rail ? (
-            <div className="mr-3 mt-2 flex justify-center rounded-lg p-2 text-white/80" tabIndex={0} aria-label="Research use only" {...tipProps('Research use only')}>
-              <ShieldCheck className="h-5 w-5" />
+          <div className="mt-2 shrink-0 border-t border-white/15 pt-2 text-white/80" tabIndex={rail ? 0 : -1} aria-label="Research use only" {...tipProps('Research use only')}>
+            <div className="flex h-10 items-center">
+              {icon(ShieldCheck)}
+              <span className={`whitespace-nowrap text-sm font-medium text-white ${fade}`}>Research use only</span>
             </div>
-          ) : (
-            <div className="mt-2 w-[16.5rem] border-t border-white/15 px-2 pt-4 text-xs text-white/70 [@media(max-height:960px)]:hidden">
-              <div className="flex items-center gap-2 text-sm font-medium text-white">
-                <ShieldCheck className="h-4 w-4" /> Research use only
-              </div>
-              <p className="mt-1 leading-relaxed">For the approved ForgeBlock study activities. Not for actual legal, financial or official documents.</p>
-            </div>
-          )
+            <p className={`w-[16rem] pl-[1.125rem] text-xs leading-relaxed text-white/70 [@media(max-height:960px)]:hidden ${fade}`}>
+              For the approved ForgeBlock study activities. Not for actual legal, financial or official documents.
+            </p>
+          </div>
         )}
         <button
           onClick={control.onClick}
           aria-label={control.label}
           aria-pressed={rail ? undefined : pinned}
-          className="group mt-2 hidden items-center gap-3 rounded-xl py-0.5 pl-1 pr-3 text-sm font-medium text-white/80 transition hover:text-white lg:mr-3 lg:flex"
+          className="group mt-2 hidden h-10 shrink-0 items-center rounded-xl text-sm font-medium text-white/85 transition-colors motion-fb hover:bg-white/[0.08] hover:text-white lg:flex"
           {...tipProps(control.label)}
         >
-          {icon(control.Icon, false)}
-          <span className={fade}>{control.label}</span>
+          {icon(control.Icon)}
+          <span className={`whitespace-nowrap ${fade}`}>{control.label}</span>
         </button>
       </aside>
       {rail && tip && (
@@ -427,7 +430,8 @@ export default function Layout() {
         </div>
       )}
       {open && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />}
-      <div className="app-panel relative min-h-screen min-w-0 flex-1 bg-white lg:my-3 lg:bg-white/[0.92] lg:mr-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-[2rem] lg:shadow-2xl">
+      <div className={`app-content transition-[padding-left] motion-fb lg:h-full ${pinned ? 'lg:pl-[19.5rem]' : 'lg:pl-[5.75rem]'}`}>
+      <div className="app-panel relative min-h-screen min-w-0 bg-white lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-l-[16px] lg:bg-white/[0.92]">
         <header className="topbar sticky top-0 z-10 flex h-[4.5rem] shrink-0 items-center gap-4 border-b border-slate-100 bg-white/95 px-4 backdrop-blur sm:px-8 lg:static lg:px-10">
           <button className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />
@@ -449,6 +453,7 @@ export default function Layout() {
           </main>
         </div>
         {(tourOpen || !user.tour_completed) && <Tour />}
+      </div>
       </div>
     </div>
   )
