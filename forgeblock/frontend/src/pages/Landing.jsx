@@ -28,7 +28,9 @@ import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import Brand, { BrandMark } from '../components/Brand'
+import SignatureTrace from '../components/SignatureTrace'
 import { SIGNATURE_PATHS } from '../components/signaturePaths'
+import useOnScreen from '../components/useOnScreen'
 import { ScreeningNotice } from '../components/ui'
 import { homeFor, ReceiptCheck } from './SignIn'
 
@@ -107,7 +109,7 @@ const FLOURISHES = [
 ]
 
 // Faint hand-written strokes behind the hero that draw themselves in and slowly drift.
-function HeroStrokes() {
+function HeroStrokes({ color = '#fff', words = true }) {
   const written = (x, y, scale, opacity, delay) => (
     <g transform={`translate(${x} ${y}) scale(${scale}) skewX(-6)`} strokeWidth={1.7 / scale + 0.45} opacity={opacity}>
       {SIGNATURE_PATHS.map((p, i) => (
@@ -117,9 +119,9 @@ function HeroStrokes() {
   )
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      <svg viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" className="hero-strokes trace absolute -inset-[4%] h-[108%] w-[108%]" fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round">
-        {written(50, 330, 2.5, 0.13, 0.4)}
-        {written(1030, 300, 2.3, 0.11, 1.4)}
+      <svg viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" className="hero-strokes trace absolute -inset-[4%] h-[108%] w-[108%]" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
+        {words && written(50, 330, 2.5, 0.13, 0.4)}
+        {words && written(1030, 300, 2.3, 0.11, 1.4)}
         {FLOURISHES.map((f) => (
           <path key={f.d} d={f.d} pathLength="1" strokeWidth={f.width} opacity={f.opacity} style={{ '--len': 1, '--dur': `${f.dur}s`, '--delay': `${f.delay}s` }} />
         ))}
@@ -155,6 +157,74 @@ function SectionTitle({ eyebrow, title, text }) {
       <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-600">{eyebrow}</div>
       <h2 className="mt-2 text-3xl font-semibold tracking-[-0.01em] sm:text-4xl">{title}</h2>
       {text && <p className="mt-3 text-slate-600">{text}</p>}
+    </div>
+  )
+}
+
+// The hero's looping scene: a slip is signed, scanned, screened and sealed. Sample values only.
+function ScreeningScene() {
+  const box = useRef(null)
+  const onScreen = useOnScreen(box)
+  return (
+    <div ref={box} className={`relative mx-auto h-[27rem] w-full max-w-[31rem] ${onScreen ? '' : 'motion-paused'}`} role="img" aria-label="A signed withdrawal slip is scanned, screened as Consistent with an 82% confidence score, and sealed in ledger block #1249">
+      <div className="scene absolute inset-0" aria-hidden="true">
+        <div className="absolute left-0 top-2 w-[15.5rem] -rotate-3">
+          <div className="scene-doc relative h-[15rem] overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-lift">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Withdrawal slip</span>
+              <span className="font-mono text-[10px] text-slate-400">No. 0042</span>
+            </div>
+            {['Account name', 'Account no.', 'Amount'].map((f) => (
+              <div key={f} className="mt-3">
+                <div className="text-[9px] uppercase tracking-wide text-slate-400">{f}</div>
+                <div className="mt-1 h-1.5 w-full rounded bg-slate-100" />
+              </div>
+            ))}
+            <div className="relative mt-4 h-12 overflow-hidden">
+              <svg viewBox="0 0 160 40" className="absolute inset-0 h-full w-full" fill="none" stroke="#1e3a8a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 30 C 14 8, 22 40, 30 20 S 42 6, 48 24 S 58 34, 64 18 C 70 6, 76 30, 84 22 S 98 14, 108 26 C 118 36, 130 10, 152 16" />
+              </svg>
+              <div className="scene-ink-cover absolute inset-0 bg-white" />
+            </div>
+            <div className="border-t border-slate-300 pt-1 text-[9px] text-slate-400">Signature over printed name</div>
+            <div className="scene-scan pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-transparent via-brand-400/25 to-transparent">
+              <div className="absolute inset-x-0 top-1/2 h-0.5 bg-brand-500 shadow-[0_0_12px_rgb(15_108_189/0.7)]" />
+            </div>
+          </div>
+        </div>
+        <div className="scene-card absolute right-0 top-[7.5rem] w-[19.5rem] rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-brand-900/10">
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>Static screening · CL-0042</span>
+            <span className="font-mono">FB-7KQ2-M9TX</span>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ok-50 text-ok-600"><CheckCircle2 className="h-6 w-6" /></span>
+            <div>
+              <div className="text-lg font-semibold text-ok-700">Consistent</div>
+              <div className="text-xs text-slate-500">Matches the client’s signatures on file</div>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-between text-sm">
+            <span className="text-slate-600">Confidence score</span>
+            <span className="scene-num font-semibold tabular-nums">82%</span>
+          </div>
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="scene-bar h-full w-full rounded-full bg-ok-600" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+            {['Cosine', 'Euclidean', 'Manhattan'].map((m, i) => (
+              <div key={m} className="scene-pass rounded-lg bg-slate-50 px-2 py-2" style={{ '--delay': `${i * 0.36}s` }}>
+                <div className="text-slate-500">{m}</div>
+                <div className="mt-0.5 font-medium text-ok-700">Pass</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="scene-seal absolute bottom-0 right-6 flex items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-3.5 py-2.5 text-sm font-medium text-brand-800 shadow-soft">
+          <Link2 className="h-4 w-4" /> Sealed in ledger block #1249
+          <CheckCircle2 className="scene-check h-4 w-4 text-ok-600" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -424,34 +494,45 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="hero-bg relative flow-root text-white">
-        <HeroStrokes />
-        <div className="relative mx-auto max-w-6xl px-5 pt-32 text-center sm:pt-36">
-          <h1 className="fade-up text-[2.6rem] font-semibold leading-[1.08] tracking-[-0.01em] sm:text-6xl">
-            Screen signatures.
-            <br />
-            <span className="text-brand-200">Seal every decision.</span>
-          </h1>
-          <p className="fade-up mx-auto mt-5 max-w-2xl text-lg text-white/85" style={{ '--delay': '0.15s' }}>
-            ForgeBlock checks a questioned signature against the signatures a client keeps on file, from a scanned page or live on a tablet, and
-            keeps a tamper-evident record of every screening and every examiner’s finding.
-          </p>
-          <div className="fade-up mt-8 flex flex-wrap justify-center gap-3" style={{ '--delay': '0.3s' }}>
-            <Link to="/signin" className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 font-medium text-brand-700 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
-              Sign in <ArrowRight className="h-4 w-4" />
-            </Link>
-            <a href="#how" className="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/10 px-5 py-3 font-medium text-white backdrop-blur transition hover:bg-white/20">
-              How it works
-            </a>
+      <section className="relative overflow-hidden bg-gradient-to-b from-brand-50 via-white to-white">
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="blob absolute -left-24 -top-16 h-96 w-96 rounded-full bg-brand-200 opacity-60 blur-3xl" />
+          <div className="blob absolute right-[-6rem] top-24 h-80 w-80 rounded-full bg-cyan-200 opacity-50 blur-3xl [animation-delay:-8s]" />
+          <div className="blob absolute bottom-[-8rem] left-1/3 h-96 w-96 rounded-full bg-indigo-200 opacity-45 blur-3xl [animation-delay:-14s]" />
+        </div>
+        <HeroStrokes color="#0f6cbd" words={false} />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-28 lg:grid-cols-[1.1fr_1fr] lg:pt-32">
+          <div>
+            <SignatureTrace className="w-full max-w-xl text-brand-800" strokeWidth={1.9} duration={3.6} />
+            <h1 className="fade-up mt-4 text-4xl font-semibold leading-tight tracking-[-0.01em] sm:text-5xl" style={{ '--delay': '0.4s' }}>
+              Screen signatures.
+              <br />
+              <span className="text-brand-600">Seal every decision.</span>
+            </h1>
+            <p className="fade-up mt-5 max-w-xl text-lg text-slate-600" style={{ '--delay': '0.6s' }}>
+              ForgeBlock checks a questioned signature against the signatures a client keeps on file, from a scanned page or live on a tablet, and
+              keeps a tamper-evident record of every screening and every examiner’s finding.
+            </p>
+            <div className="fade-up mt-8 flex flex-wrap gap-3" style={{ '--delay': '0.8s' }}>
+              <Link to="/signin" className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 font-medium text-white shadow-sm transition hover:bg-brand-700 hover:shadow-md">
+                Sign in <ArrowRight className="h-4 w-4" />
+              </Link>
+              <a href="#how" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 font-medium text-slate-800 transition hover:bg-slate-50">
+                How it works
+              </a>
+            </div>
           </div>
-          <div className="relative z-10 -mb-24 sm:-mb-36">
-            <ProductWindow />
-          </div>
+          <ScreeningScene />
         </div>
       </section>
 
+      {/* Product window (it becomes part of the scroll story later). */}
+      <section className="px-5 pb-6">
+        <ProductWindow />
+      </section>
+
       {/* Ledger */}
-      <section className="px-5 pb-6 pt-36 sm:pt-52">
+      <section className="px-5 pb-6 pt-16">
         <RevealOnScroll><LedgerCard /></RevealOnScroll>
       </section>
 

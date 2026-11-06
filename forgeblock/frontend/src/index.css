@@ -226,6 +226,30 @@ body {
   animation-play-state: paused !important;
 }
 
+/* Landing hero scene: one 9 s loop. Every part shares the timeline and animates only
+   transform and opacity. The resting styles are the finished scene, which is what
+   reduced motion shows. */
+.scene { animation: sc-scene 9s linear infinite both; }
+.scene-doc { animation: sc-doc 9s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+.scene-ink-cover { transform: translateX(101%); animation: sc-ink 9s linear infinite both; }
+.scene-scan { opacity: 0; animation: sc-scan 9s ease-in-out infinite both; }
+.scene-card { animation: sc-card 9s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+.scene-bar { transform: scaleX(0.82); transform-origin: left; animation: sc-bar 9s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+.scene-num { animation: sc-num 9s linear infinite both; }
+.scene-pass { animation: sc-pass 9s cubic-bezier(0.2, 0, 0, 1) var(--delay, 0s) infinite both; }
+.scene-seal { animation: sc-seal 9s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+.scene-check { animation: sc-check 9s cubic-bezier(0.2, 0, 0, 1) infinite both; }
+@keyframes sc-scene { 0% { opacity: 0; } 4%, 90% { opacity: 1; } 97%, 100% { opacity: 0; } }
+@keyframes sc-doc { 0% { opacity: 0; transform: translateX(-28px); } 10%, 100% { opacity: 1; transform: none; } }
+@keyframes sc-ink { 0%, 12% { transform: translateX(0); } 30%, 100% { transform: translateX(101%); } }
+@keyframes sc-scan { 0%, 32% { opacity: 0; transform: translateY(0); } 34% { opacity: 1; } 42% { opacity: 1; } 45%, 100% { opacity: 0; transform: translateY(11rem); } }
+@keyframes sc-card { 0%, 46% { opacity: 0; transform: translateY(14px) scale(0.94); } 52%, 100% { opacity: 1; transform: none; } }
+@keyframes sc-bar { 0%, 52% { transform: scaleX(0); } 62%, 100% { transform: scaleX(0.82); } }
+@keyframes sc-num { 0%, 56% { opacity: 0; } 62%, 100% { opacity: 1; } }
+@keyframes sc-pass { 0%, 62% { opacity: 0; transform: translateY(6px); } 66%, 100% { opacity: 1; transform: none; } }
+@keyframes sc-seal { 0%, 75% { opacity: 0; transform: translateX(24px); } 80%, 100% { opacity: 1; transform: none; } }
+@keyframes sc-check { 0%, 80% { opacity: 0; transform: scale(0.4); } 84%, 100% { opacity: 1; transform: none; } }
+
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
@@ -235,6 +259,7 @@ body {
   .trace path { animation: none; stroke-dashoffset: 0; }
   .fade-up { animation: none; opacity: 1; transform: none; }
   .hero-strokes, .blob, .bob { animation: none; }
+  .scene, .scene-doc, .scene-ink-cover, .scene-scan, .scene-card, .scene-bar, .scene-num, .scene-pass, .scene-seal, .scene-check { animation: none; }
   .hero-window { animation: none; opacity: 1; transform: none; }
   .play-pulse::before { animation: none; opacity: 0; }
   .chain-pulse { display: none; }
