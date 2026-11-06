@@ -1,5 +1,4 @@
 import {
-  ArrowDown,
   ArrowRight,
   Briefcase,
   Check,
@@ -13,15 +12,11 @@ import {
   LayoutDashboard,
   Link2,
   Lock,
-  PenTool,
   Play,
-  ScanLine,
   ScanSearch,
   Shield,
   ShieldCheck,
   ShieldHalf,
-  Upload,
-  UserCheck,
   UserPlus,
   Users,
 } from 'lucide-react'
@@ -29,7 +24,7 @@ import Lenis from 'lenis'
 import 'lenis/dist/lenis.css'
 import { cancelFrame, cubicBezier, frame, transform } from 'motion'
 import { motion as Motion, useMotionValueEvent, useScroll, useTransform } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -38,16 +33,9 @@ import SignatureTrace from '../components/SignatureTrace'
 import { SIGNATURE_HEIGHT, SIGNATURE_PATHS, SIGNATURE_WIDTH } from '../components/signaturePaths'
 import useOnScreen from '../components/useOnScreen'
 import { ScreeningNotice } from '../components/ui'
-import { homeFor, ReceiptCheck } from './SignIn'
+import { homeFor } from './SignIn'
 
 const DEMO_VIDEO = `${import.meta.env.BASE_URL}forgeblock-demo.mp4`
-
-const STEPS = [
-  { icon: Upload, title: 'Enroll references', text: 'An examiner keeps 5 to 20 genuine signatures of each client on file.' },
-  { icon: ScanSearch, title: 'Screen the questioned signature', text: 'ForgeBlock gives Consistent, Inconclusive or Inconsistent, with a confidence score.' },
-  { icon: UserCheck, title: 'The examiner decides', text: 'Anything not clearly Consistent opens a case for a Genuine or Forged finding.' },
-  { icon: Link2, title: 'Every result is sealed', text: 'Screenings and findings are sealed in a hash-linked ledger.' },
-]
 
 const ROLES = [
   {
@@ -93,7 +81,7 @@ const PRIVACY = [
 ]
 
 const FOOTER_COLUMNS = [
-  { title: 'Product', links: [['#how', 'How it works'], ['#who', 'Who uses it'], ['#access', 'Getting an account'], ['#access', 'Check a receipt']] },
+  { title: 'Product', links: [['#how', 'How it works'], ['#who', 'Who uses it'], ['#access', 'Getting an account']] },
   { title: 'Privacy and Help', links: [['#privacy', 'Privacy and security'], ['/app/help', 'Help Center (after sign-in)'], ['/signin', 'Sign in']] },
 ]
 
@@ -108,7 +96,8 @@ const SECTIONS = [
 const STORY = [
   { title: 'Register the client’s signatures', text: 'An examiner enrolls 5 to 20 genuine signatures for each client.' },
   { title: 'Screen a questioned signature', text: 'ForgeBlock compares it and gives a result with a confidence score.' },
-  { title: 'The examiner decides; the ledger seals it', text: 'Anything not clearly Consistent goes to the examiner, and every result is sealed.' },
+  { title: 'The examiner decides', text: 'Anything not clearly Consistent goes to the examiner for a Genuine or Forged finding.' },
+  { title: 'Every result is sealed in the ledger', text: 'Each screening and decision is sealed in a hash-linked block with a receipt code.' },
 ]
 
 // Illustrative values, not real records.
@@ -116,31 +105,20 @@ const LEDGER_TONES = ['border-t-brand-500', 'border-t-cyan-500', 'border-t-indig
 const LEDGER = ['3f9a…b71c', '7a10…c5b3', '58e2…a0f7', 'c4d1…09ee', '1b7f…63a2', 'e90c…d415', '62ab…f7c8', '0d3e…8b91', 'a5f2…2c07', '9c18…e6d3', '47e6…1fa0', 'b2c9…7d5e']
   .map((hash, i) => ({ index: 1240 + i, hash, kind: i % 3 === 2 ? 'Decision' : 'Screening', tone: LEDGER_TONES[i % LEDGER_TONES.length] }))
 
-// Free pen flourishes that join the written "ForgeBlock" strokes in the hero background.
+// Free pen flourishes behind the hero and the privacy section.
 const FLOURISHES = [
-  { d: 'M-40 210 C 90 120, 170 300, 300 190 S 460 90, 560 180 S 700 260, 820 150', width: 2, opacity: 0.2, delay: 0.2, dur: 5 },
-  { d: 'M930 120 C 1010 40, 1080 190, 1160 110 S 1300 40, 1500 130', width: 1.6, opacity: 0.16, delay: 1.2, dur: 4.4 },
-  { d: 'M-30 640 C 120 560, 240 700, 380 610 S 540 520, 620 610 C 660 660, 590 700, 560 650 S 690 530, 860 600', width: 1.8, opacity: 0.16, delay: 0.8, dur: 5.4 },
-  { d: 'M1010 690 C 1090 610, 1170 720, 1250 640 S 1390 590, 1500 660', width: 1.5, opacity: 0.14, delay: 1.8, dur: 4 },
+  { d: 'M-40 210 C 90 120, 170 300, 300 190 S 460 90, 560 180 S 700 260, 820 150', width: 2, delay: 0.2, dur: 5 },
+  { d: 'M930 120 C 1010 40, 1080 190, 1160 110 S 1300 40, 1500 130', width: 1.6, delay: 1.2, dur: 4.4 },
+  { d: 'M-30 640 C 120 560, 240 700, 380 610 S 540 520, 620 610 C 660 660, 590 700, 560 650 S 690 530, 860 600', width: 1.8, delay: 0.8, dur: 5.4 },
 ]
 
-// Faint hand-written strokes behind the hero that draw themselves in and slowly drift.
-function HeroStrokes({ color = '#fff', words = true, calm = false }) {
-  const lines = calm ? FLOURISHES.slice(0, 3) : FLOURISHES
-  const written = (x, y, scale, opacity, delay) => (
-    <g transform={`translate(${x} ${y}) scale(${scale}) skewX(-6)`} strokeWidth={1.7 / scale + 0.45} opacity={opacity}>
-      {SIGNATURE_PATHS.map((p, i) => (
-        <path key={i} d={p.d} pathLength="1" style={{ '--len': 1, '--dur': '1.1s', '--delay': `${delay + i * 0.32}s` }} />
-      ))}
-    </g>
-  )
+// Three faint white pen lines that draw themselves in and drift very slowly.
+function HeroStrokes() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      <svg viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" className={`hero-strokes trace absolute -inset-[4%] h-[108%] w-[108%] ${calm ? 'hero-strokes-slow' : ''}`} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
-        {words && written(50, 330, 2.5, 0.13, 0.4)}
-        {words && written(1030, 300, 2.3, 0.11, 1.4)}
-        {lines.map((f) => (
-          <path key={f.d} d={f.d} pathLength="1" strokeWidth={f.width} opacity={calm ? Math.min(f.opacity, 0.1) : f.opacity} style={{ '--len': 1, '--dur': `${f.dur}s`, '--delay': `${f.delay}s` }} />
+      <svg viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" className="hero-strokes hero-strokes-slow trace absolute -inset-[4%] h-[108%] w-[108%]" fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round">
+        {FLOURISHES.map((f) => (
+          <path key={f.d} d={f.d} pathLength="1" strokeWidth={f.width} opacity="0.1" style={{ '--len': 1, '--dur': `${f.dur}s`, '--delay': `${f.delay}s` }} />
         ))}
       </svg>
     </div>
@@ -161,22 +139,22 @@ function useMedia(query) {
 function RevealOnScroll({ as = 'div', delay = 0, className = '', children }) {
   const Tag = as
   const ref = useRef(null)
-  const [seen, setSeen] = useState(false)
-  useEffect(() => {
-    if (!('IntersectionObserver' in window)) {
-      setSeen(true)
-      return
-    }
+  const [waiting, setWaiting] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (still || !('IntersectionObserver' in window) || el.getBoundingClientRect().top < window.innerHeight) return
+    setWaiting(true)
     const io = new IntersectionObserver(([e]) => {
       if (e.isIntersecting) {
-        setSeen(true)
+        setWaiting(false)
         io.disconnect()
       }
-    }, { threshold: 0.12 })
-    io.observe(ref.current)
+    }, { threshold: 0.1 })
+    io.observe(el)
     return () => io.disconnect()
   }, [])
-  return <Tag ref={ref} className={`reveal ${seen ? 'is-visible' : ''} ${className}`} style={{ '--delay': `${delay}s` }}>{children}</Tag>
+  return <Tag ref={ref} className={`reveal ${waiting ? 'is-waiting' : ''} ${className}`} style={{ '--delay': `${delay}s` }}>{children}</Tag>
 }
 
 function SectionTitle({ eyebrow, title, text }) {
@@ -259,7 +237,7 @@ function ScreeningScene() {
 
 // A still preview of the workspace. All of it is made-up sample data.
 function WorkspacePreview({ focus = 0 }) {
-  const part = (n) => `story-step ${focus && focus !== n ? 'opacity-40' : 'opacity-100'}`
+  const part = (n, also = 0) => `story-step ${focus && focus !== n && focus !== also ? 'opacity-40' : 'opacity-100'}`
   const ring = (n) => (
     <span className={`story-step pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-brand-500 ${focus === n ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
   )
@@ -316,7 +294,7 @@ function WorkspacePreview({ focus = 0 }) {
           ))}
         </div>
         <div className="mt-2 grid gap-2 sm:mt-3 sm:grid-cols-[1fr_1.2fr] sm:gap-3">
-          <div className={`${part(2)} relative rounded-xl border border-ok-100 bg-gradient-to-br from-ok-100/80 via-ok-50 to-white p-3`}>
+          <div className={`${part(2, 4)} relative rounded-xl border border-ok-100 bg-gradient-to-br from-ok-100/80 via-ok-50 to-white p-3`}>
             {ring(2)}
             <div className="text-[10px] uppercase tracking-wider text-slate-500">Screening result</div>
             <div className="mt-0.5 flex items-center justify-between gap-2">
@@ -327,7 +305,7 @@ function WorkspacePreview({ focus = 0 }) {
             <div className="mt-1.5 flex items-center justify-between gap-2">
               <span className="font-mono text-[10px] text-slate-500">FB-7KQ2-M9TX</span>
               <span className="relative flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-800">
-                <Link2 className="h-3 w-3" /> Sealed #1249{ring(3)}
+                <Link2 className="h-3 w-3" /> Sealed #1249{ring(4)}
               </span>
             </div>
           </div>
@@ -458,32 +436,35 @@ function StoryStep({ step, n, state }) {
   )
 }
 
-// Which step the story is on, from the scroll progress (0 = the card, before step highlights).
-const storyStage = (v) => (v < 0.62 ? 0 : v < 0.74 ? 1 : v < 0.87 ? 2 : 3)
+// Which step the story is on, from the progress of its pinned part (0 = the card).
+const storyStage = (v) => (v < 0.16 ? 0 : v < 0.36 ? 1 : v < 0.56 ? 2 : v < 0.76 ? 3 : 4)
 
 // Desktop: the section starts right after the hero and pins just under the navbar. While
 // it scrolls in, the card grows and moves into place, fully visible beside the heading and
-// step 1. Once pinned, the card slides up out of the window, uncovering the dashboard that
-// is already fully drawn underneath (no see-through moment),
-// and steps 2 and 3 slide up one at a time, each lighting its part of the dashboard. The
-// moving parts follow the scroll (so they reverse when scrolling up); step changes are a
-// 250ms slide on the same easing.
+// step 1. Once pinned (for 760px of scrolling, what four steps need), the card slides up out
+// of the window, uncovering the dashboard that is already fully drawn underneath, and steps
+// 2 to 4 slide up one at a time, each lighting its part of the dashboard. The moving parts
+// follow the scroll (so they reverse when scrolling up); step changes are a 250ms slide.
 function LiveStory() {
   const section = useRef(null)
-  const { scrollYProgress: p } = useScroll({ target: section, offset: ['start end', 'end end'] })
+  // Scrolling in: until the section reaches the navbar line (5.25rem, about 89px).
+  const { scrollYProgress: enter } = useScroll({ target: section, offset: ['start end', 'start 89px'] })
+  // Pinned: from there to the end of the section.
+  const { scrollYProgress: pinned } = useScroll({ target: section, offset: ['start 89px', 'end end'] })
+  const { scrollYProgress: whole } = useScroll({ target: section, offset: ['start end', 'end start'] })
   // A mapping function keeps every value in step with the scroll position. Given plain
   // ranges, motion hands opacity to the browser's scroll timeline, which drifted ahead here.
-  const useT = (input, output) => useTransform(p, (v) => transform(v, input, output, { ease: STORY_EASE }))
-  const x = useT([0.08, 0.48], ['-34%', '0%'])
-  const y = useT([0.08, 0.48], [90, 0])
-  const scale = useT([0.08, 0.48], [0.62, 1])
-  const cardStyle = { y: useT([0.54, 0.62], ['0%', '-101%']) }
-  const drift = useT([0, 1], [14, -14])
-  const [stage, setStage] = useState(() => storyStage(p.get()))
-  useMotionValueEvent(p, 'change', (v) => setStage(storyStage(v)))
+  const useT = (value, input, output) => useTransform(value, (v) => transform(v, input, output, { ease: STORY_EASE }))
+  const x = useT(enter, [0.15, 1], ['-34%', '0%'])
+  const y = useT(enter, [0.15, 1], [90, 0])
+  const scale = useT(enter, [0.15, 1], [0.62, 1])
+  const cardStyle = { y: useT(pinned, [0.02, 0.14], ['0%', '-101%']) }
+  const drift = useT(whole, [0, 1], [14, -14])
+  const [stage, setStage] = useState(() => storyStage(pinned.get()))
+  useMotionValueEvent(pinned, 'change', (v) => setStage(storyStage(v)))
   const shown = Math.max(1, stage)
   return (
-    <section ref={section} className="story-overlap relative h-[180vh]" aria-label="How a screening works">
+    <section ref={section} id="how" className="story-overlap relative h-[calc(100vh-5.25rem+760px)] scroll-mt-[5.25rem]" aria-label="How it works">
       <div className="sticky top-[5.25rem] flex h-[calc(100vh-5.25rem)] flex-col justify-center overflow-hidden">
         <div className="story-dots pointer-events-none absolute inset-0" aria-hidden="true" />
         <Motion.svg
@@ -496,9 +477,9 @@ function LiveStory() {
           <g transform="skewX(-6) translate(4 0)">{SIGNATURE_PATHS.map((s, i) => <path key={i} d={s.d} />)}</g>
         </Motion.svg>
         <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[36%_1fr] items-start gap-12 px-5 pb-6">
-          <div className="space-y-8">
+          <div className="space-y-6">
             <StoryHeading />
-            <ol className="space-y-7">
+            <ol className="space-y-5">
               {STORY.map((s, i) => (
                 <StoryStep key={s.title} step={s} n={i + 1} state={i + 1 > shown ? 'hidden' : i + 1 === shown ? 'active' : 'past'} />
               ))}
@@ -519,7 +500,7 @@ function ScrollStory() {
   const still = useMedia('(prefers-reduced-motion: reduce)')
   if (wide && !still) return <LiveStory />
   return (
-    <section className="mx-auto max-w-6xl px-5 py-16" aria-label="How a screening works">
+    <section id="how" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-[64px] lg:py-[96px]" aria-label="How it works">
       <div className="grid items-center gap-10 lg:grid-cols-[2fr_3fr]">
         <div className="space-y-8">
           <StoryHeading />
@@ -567,7 +548,7 @@ function LedgerStrip() {
   const onScreen = useOnScreen(box)
   const row = [...LEDGER, ...LEDGER]
   return (
-    <section className="py-16">
+    <section className="story-after py-[64px] lg:py-[96px]">
       <div className="mx-auto mb-8 flex max-w-6xl flex-wrap items-end justify-between gap-x-6 gap-y-2 px-5">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-600">Hash-linked ledger</div>
@@ -770,7 +751,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="hero-blue relative overflow-hidden text-white">
-        <HeroStrokes words={false} calm />
+        <HeroStrokes />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-[300px] pt-28 lg:grid-cols-[1.1fr_1fr] lg:pt-32">
           <div>
             <SignatureTrace className="w-full max-w-xl text-white" strokeWidth={1.9} duration={3.6} />
@@ -800,55 +781,8 @@ export default function Landing() {
 
       <LedgerStrip />
 
-      {/* How it works */}
-      <section id="how" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-20">
-        <SectionTitle eyebrow="How it works" title="From questioned signature to sealed finding" />
-        <ol className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((s, i) => (
-            <RevealOnScroll as="li" key={s.title} delay={i * 0.14} className="relative">
-              <div className="lift group h-full rounded-2xl border border-slate-200/70 bg-white p-6 shadow-soft hover:border-brand-200">
-                <div className="flex items-start justify-between">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-600 group-hover:text-white">
-                    <s.icon className="h-6 w-6" />
-                  </span>
-                  <span className="text-5xl font-semibold leading-none tracking-[-0.01em] text-brand-100 transition-colors group-hover:text-brand-200">{i + 1}</span>
-                </div>
-                <h3 className="mt-5 text-lg font-semibold leading-snug">{s.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{s.text}</p>
-              </div>
-              {i < STEPS.length - 1 && (
-                <span className="absolute -right-[1.15rem] top-1/2 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-brand-100 bg-white text-brand-600 shadow-sm lg:flex" aria-hidden="true">
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              )}
-              {i < STEPS.length - 1 && (
-                <span className="absolute -bottom-[1.15rem] left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-brand-100 bg-white text-brand-600 shadow-sm md:hidden" aria-hidden="true">
-                  <ArrowDown className="h-4 w-4" />
-                </span>
-              )}
-            </RevealOnScroll>
-          ))}
-        </ol>
-        <div className="mt-6 grid gap-5 md:grid-cols-2">
-          <div className="flex gap-4 rounded-2xl bg-slate-50 p-6">
-            <ScanLine className="h-6 w-6 shrink-0 text-brand-600" />
-            <div>
-              <h3 className="font-semibold">Static module</h3>
-              <p className="mt-1 text-sm text-slate-600">For signatures on paper. A scanned or photographed signature is compared by its shape with three similarity measures.</p>
-            </div>
-          </div>
-          <div className="flex gap-4 rounded-2xl bg-slate-50 p-6">
-            <PenTool className="h-6 w-6 shrink-0 text-brand-600" />
-            <div>
-              <h3 className="font-semibold">Dynamic module</h3>
-              <p className="mt-1 text-sm text-slate-600">For signatures written live with a pen on a tablet. Speed, pressure and pen angle are compared, not only the shape.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Who uses it */}
-      <section id="who" className="scroll-mt-20 bg-slate-50 py-20">
+      <section id="who" className="scroll-mt-20 bg-slate-50 py-[64px] lg:py-[96px]">
         <div className="mx-auto max-w-6xl px-5">
           <SectionTitle eyebrow="Who uses it" title="Three roles, each with its own workspace" />
           <div className="mt-12 grid gap-6 md:grid-cols-3">
@@ -875,7 +809,7 @@ export default function Landing() {
       </section>
 
       {/* Getting an account */}
-      <section id="access" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-20">
+      <section id="access" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-[64px] lg:py-[96px]">
         <SectionTitle eyebrow="Getting an account" title="Accounts are created by your administrator" text="There is no public sign-up. This keeps signature records limited to the people who need them." />
         <ol className="mt-12 grid gap-6 md:grid-cols-3">
           {ACCOUNT_STEPS.map((s, i) => (
@@ -889,19 +823,12 @@ export default function Landing() {
             </RevealOnScroll>
           ))}
         </ol>
-        <div className="mx-auto mt-16 max-w-2xl rounded-3xl border border-slate-200/70 bg-white p-7 shadow-soft">
-          <h3 className="text-lg font-semibold">Check a receipt</h3>
-          <p className="mb-4 mt-1 text-sm text-slate-500">
-            Every screening has a receipt code such as FB-7KQ2-M9TX. Enter it to confirm the record has not been changed since it was sealed. No sign-in
-            needed.
-          </p>
-          <ReceiptCheck />
-        </div>
       </section>
 
-      {/* Privacy */}
-      <section id="privacy" className="relative scroll-mt-20 overflow-hidden bg-[linear-gradient(180deg,#0a2540_0%,#0c3b5e_60%,#0a3f73_100%)] py-20 text-white">
-        <HeroStrokes words={false} calm />
+      {/* Privacy and closing banner, on one blue band */}
+      <div className="blue-band relative overflow-hidden pt-[240px] text-white">
+      <HeroStrokes />
+      <section id="privacy" className="relative scroll-mt-20 pb-[64px] pt-6 lg:pb-[96px]">
         <div className="relative mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-2xl text-center">
             <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-300">Privacy and security</div>
@@ -924,10 +851,9 @@ export default function Landing() {
       </section>
 
       {/* Closing banner */}
-      <section className="px-5 py-20">
+      <section className="relative px-5 pb-[64px] lg:pb-[96px]">
         <div className="relative mx-auto max-w-6xl">
-          <div className="pointer-events-none absolute -inset-4 rounded-[2.5rem] bg-brand-400/25 blur-3xl" aria-hidden="true" />
-          <div className="relative grid items-center gap-10 overflow-hidden rounded-3xl border border-white/20 bg-[radial-gradient(40rem_22rem_at_90%_0%,rgb(71_158_245/0.45),transparent_60%),radial-gradient(30rem_20rem_at_0%_100%,rgb(99_102_241/0.35),transparent_60%),linear-gradient(135deg,#0a3f73,#0f6cbd)] px-8 py-12 text-white shadow-[0_30px_80px_-30px_rgb(15_108_189/0.6)] sm:px-12 lg:grid-cols-[1.1fr_1fr]">
+          <div className="relative grid items-center gap-10 overflow-hidden rounded-3xl border border-white/20 bg-white/[0.07] px-8 py-12 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_30px_80px_-30px_rgb(4_20_40/0.6)] backdrop-blur-md sm:px-12 lg:grid-cols-[1.1fr_1fr]">
             <span className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" aria-hidden="true" />
             <div>
               <h2 className="text-3xl font-semibold tracking-[-0.01em] sm:text-4xl">Your workspace is ready when you are.</h2>
@@ -940,6 +866,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </div>
 
       <footer className="border-t border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-6xl px-5 pb-8 pt-14 text-sm text-slate-500">
@@ -967,7 +894,7 @@ export default function Landing() {
               <p className="mt-3">
                 {study
                   ? 'A research prototype of De La Salle University–Dasmariñas, used only for the approved activities of the ForgeBlock study. Not for actual legal, financial or official documents.'
-                  : 'A capstone project of De La Salle University–Dasmariñas, by CloudNine.'}
+                  : 'A thesis project of De La Salle University–Dasmariñas, by CloudNine.'}
               </p>
             </div>
           </div>
