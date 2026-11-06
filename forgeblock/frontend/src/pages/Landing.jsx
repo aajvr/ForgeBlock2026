@@ -476,8 +476,8 @@ function LiveStory() {
   useMotionValueEvent(p, 'change', (v) => setStage(storyStage(v)))
   const shown = Math.max(1, stage)
   return (
-    <section ref={section} className="relative -mt-28 h-[180vh]" aria-label="How a screening works">
-      <div className="sticky top-[5.25rem] h-[calc(100vh-5.25rem)] overflow-hidden">
+    <section ref={section} className="story-overlap relative h-[180vh]" aria-label="How a screening works">
+      <div className="sticky top-[5.25rem] flex h-[calc(100vh-5.25rem)] flex-col justify-center overflow-hidden">
         <div className="story-dots pointer-events-none absolute inset-0" aria-hidden="true" />
         <Motion.svg
           style={{ y: drift }}
@@ -488,7 +488,7 @@ function LiveStory() {
         >
           <g transform="skewX(-6) translate(4 0)">{SIGNATURE_PATHS.map((s, i) => <path key={i} d={s.d} />)}</g>
         </Motion.svg>
-        <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[36%_1fr] items-start gap-12 px-5 pt-2">
+        <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[36%_1fr] items-start gap-12 px-5 pb-6">
           <div className="space-y-8">
             <StoryHeading />
             <ol className="space-y-7">
@@ -565,6 +565,7 @@ function LedgerStrip() {
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-600">Hash-linked ledger</div>
           <h2 className="mt-2 text-2xl font-semibold tracking-[-0.01em] sm:text-3xl">Every screening is sealed into a tamper-evident chain.</h2>
+          <p className="mt-2 max-w-2xl text-slate-600">Each block holds one screening or examiner decision and the hash of the block before it, so changing any past record breaks every link after it.</p>
         </div>
         <span className="text-xs text-slate-500">Example values</span>
       </div>
