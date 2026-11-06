@@ -476,18 +476,23 @@ function LiveStory() {
         >
           <g transform="skewX(-6) translate(4 0)">{SIGNATURE_PATHS.map((s, i) => <path key={i} d={s.d} />)}</g>
         </Motion.svg>
-        <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[36%_1fr] items-start gap-12 px-5 pb-6">
-          <div className="space-y-6">
+        {/* The heading sits above the steps; the window is centred on the four steps. */}
+        <div className="story-compact relative mx-auto grid w-full max-w-6xl grid-cols-[36%_1fr] gap-x-12 gap-y-6 px-5 pb-6">
+          <div className="col-start-1 row-start-1">
             <StoryHeading />
-            <ol className="space-y-5">
-              {STORY.map((s, i) => (
-                <StoryStep key={s.title} step={s} n={i + 1} state={i + 1 > shown ? 'hidden' : i + 1 === shown ? 'active' : 'past'} />
-              ))}
-            </ol>
           </div>
-          <Motion.div style={{ x, y, scale }} className="origin-center will-change-transform">
-            <StoryWindow focus={stage} cardStyle={cardStyle} />
-          </Motion.div>
+          <ol className="col-start-1 row-start-2 space-y-5">
+            {STORY.map((s, i) => (
+              <StoryStep key={s.title} step={s} n={i + 1} state={i + 1 > shown ? 'hidden' : i + 1 === shown ? 'active' : 'past'} />
+            ))}
+          </ol>
+          {/* Steps 3 and 4 run to more lines than 1 and 2, so centring on the list sits a
+              little low; a small lift lines the window up with the gap between steps 2 and 3. */}
+          <div className="col-start-2 row-start-2 -translate-y-5 self-center">
+            <Motion.div style={{ x, y, scale }} className="origin-center will-change-transform">
+              <StoryWindow focus={stage} cardStyle={cardStyle} />
+            </Motion.div>
+          </div>
         </div>
       </div>
     </section>
