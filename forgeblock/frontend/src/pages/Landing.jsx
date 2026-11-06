@@ -23,13 +23,17 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
+import Lenis from 'lenis'
+import 'lenis/dist/lenis.css'
+import { cancelFrame, cubicBezier, frame, transform } from 'motion'
+import { motion as Motion, useMotionValueEvent, useScroll, useTransform } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import Brand, { BrandMark } from '../components/Brand'
 import SignatureTrace from '../components/SignatureTrace'
-import { SIGNATURE_PATHS } from '../components/signaturePaths'
+import { SIGNATURE_HEIGHT, SIGNATURE_PATHS, SIGNATURE_WIDTH } from '../components/signaturePaths'
 import useOnScreen from '../components/useOnScreen'
 import { ScreeningNotice } from '../components/ui'
 import { homeFor, ReceiptCheck } from './SignIn'
@@ -114,7 +118,8 @@ const FLOURISHES = [
 ]
 
 // Faint hand-written strokes behind the hero that draw themselves in and slowly drift.
-function HeroStrokes({ color = '#fff', words = true }) {
+function HeroStrokes({ color = '#fff', words = true, calm = false }) {
+  const lines = calm ? FLOURISHES.slice(0, 3) : FLOURISHES
   const written = (x, y, scale, opacity, delay) => (
     <g transform={`translate(${x} ${y}) scale(${scale}) skewX(-6)`} strokeWidth={1.7 / scale + 0.45} opacity={opacity}>
       {SIGNATURE_PATHS.map((p, i) => (
@@ -124,11 +129,11 @@ function HeroStrokes({ color = '#fff', words = true }) {
   )
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      <svg viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" className="hero-strokes trace absolute -inset-[4%] h-[108%] w-[108%]" fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" className={`hero-strokes trace absolute -inset-[4%] h-[108%] w-[108%] ${calm ? 'hero-strokes-slow' : ''}`} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
         {words && written(50, 330, 2.5, 0.13, 0.4)}
         {words && written(1030, 300, 2.3, 0.11, 1.4)}
-        {FLOURISHES.map((f) => (
-          <path key={f.d} d={f.d} pathLength="1" strokeWidth={f.width} opacity={f.opacity} style={{ '--len': 1, '--dur': `${f.dur}s`, '--delay': `${f.delay}s` }} />
+        {lines.map((f) => (
+          <path key={f.d} d={f.d} pathLength="1" strokeWidth={f.width} opacity={calm ? Math.min(f.opacity, 0.1) : f.opacity} style={{ '--len': 1, '--dur': `${f.dur}s`, '--delay': `${f.delay}s` }} />
         ))}
       </svg>
     </div>
@@ -247,9 +252,9 @@ function ScreeningScene() {
 
 // A still preview of the workspace. All of it is made-up sample data.
 function WorkspacePreview({ focus = 0 }) {
-  const dim = (n) => `relative transition-opacity duration-300 ${focus && focus !== n ? 'opacity-40' : 'opacity-100'}`
+  const part = (n) => `story-step ${focus && focus !== n ? 'opacity-40' : 'opacity-100'}`
   const ring = (n) => (
-    <span className={`pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-brand-500 transition-opacity duration-300 ${focus === n ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
+    <span className={`story-step pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-brand-500 ${focus === n ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
   )
   const nav = [
     { icon: Home, label: 'My work', on: true },
@@ -278,7 +283,7 @@ function WorkspacePreview({ focus = 0 }) {
         {nav.map((n) => (
           <div key={n.label} className={`relative mb-0.5 flex items-center gap-1.5 rounded-l-lg px-2 py-1.5 text-[11px] ${n.on ? 'bg-white font-semibold text-brand-700' : 'text-white/85'}`}>
             <n.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{n.label}</span>
-            {n.label === 'Clients' && <span className={`pointer-events-none absolute inset-0 rounded-l-lg bg-white/20 ring-2 ring-inset ring-white transition-opacity duration-300 ${focus === 1 ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />}
+            {n.label === 'Clients' && <span className={`story-step pointer-events-none absolute inset-0 rounded-l-lg bg-white/20 ring-2 ring-inset ring-white ${focus === 1 ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />}
           </div>
         ))}
       </div>
@@ -288,11 +293,11 @@ function WorkspacePreview({ focus = 0 }) {
             <div className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">Examiner</div>
             <div className="text-base font-semibold tracking-[-0.01em] sm:text-xl">My work</div>
           </div>
-          <span className={`${dim(1)} flex items-center gap-1 rounded-md bg-brand-600 px-2 py-1 text-[10px] font-medium text-white`}>
+          <span className={`${part(1)} relative flex items-center gap-1 rounded-md bg-brand-600 px-2 py-1 text-[10px] font-medium text-white`}>
             <UserPlus className="h-3 w-3" /> Register client{ring(1)}
           </span>
         </div>
-        <div className={`mt-2 grid grid-cols-3 gap-2 transition-opacity duration-300 sm:mt-3 sm:gap-3 ${focus ? 'opacity-40' : ''}`}>
+        <div className={`story-step mt-2 grid grid-cols-3 gap-2 sm:mt-3 sm:gap-3 ${focus ? 'opacity-40' : ''}`}>
           {stats.map((s) => (
             <div key={s.label} className="rounded-xl border border-slate-100 p-2 shadow-soft sm:p-3">
               <div className="flex items-start justify-between gap-1">
@@ -304,7 +309,7 @@ function WorkspacePreview({ focus = 0 }) {
           ))}
         </div>
         <div className="mt-2 grid gap-2 sm:mt-3 sm:grid-cols-[1fr_1.2fr] sm:gap-3">
-          <div className={`${dim(2)} rounded-xl border border-ok-100 bg-gradient-to-br from-ok-100/80 via-ok-50 to-white p-3`}>
+          <div className={`${part(2)} relative rounded-xl border border-ok-100 bg-gradient-to-br from-ok-100/80 via-ok-50 to-white p-3`}>
             {ring(2)}
             <div className="text-[10px] uppercase tracking-wider text-slate-500">Screening result</div>
             <div className="mt-0.5 flex items-center justify-between gap-2">
@@ -314,12 +319,12 @@ function WorkspacePreview({ focus = 0 }) {
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full w-[82%] rounded-full bg-ok-600" /></div>
             <div className="mt-1.5 flex items-center justify-between gap-2">
               <span className="font-mono text-[10px] text-slate-500">FB-7KQ2-M9TX</span>
-              <span className={`relative flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-800 transition-opacity duration-300 ${focus === 2 ? 'opacity-40' : ''}`}>
+              <span className="relative flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-800">
                 <Link2 className="h-3 w-3" /> Sealed #1249{ring(3)}
               </span>
             </div>
           </div>
-          <div className={`${dim(3)} hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block`}>
+          <div className={`${part(3)} relative hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block`}>
             {ring(3)}
             <div className="text-[11px] font-semibold">Needs your decision</div>
             {cases.map(([initials, code, result, tone]) => (
@@ -331,7 +336,7 @@ function WorkspacePreview({ focus = 0 }) {
             ))}
           </div>
         </div>
-        <div className={`${dim(2)} mt-3 hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block`}>
+        <div className={`${part(2)} relative mt-3 hidden rounded-xl border border-slate-100 p-3 shadow-soft sm:block`}>
           <div className="text-[11px] font-semibold">Latest screenings</div>
           {latest.map(([receipt, client, module, result, tone, score]) => (
             <div key={receipt} className="mt-1.5 grid grid-cols-[1.2fr_1fr_1fr_1.1fr_auto] items-center gap-2 border-t border-slate-50 pt-1.5 text-[11px]">
@@ -350,7 +355,7 @@ function WorkspacePreview({ focus = 0 }) {
 
 // The dashboard window of the scroll story. The play button appears once the demo
 // video file exists; until then the still preview stays on its own.
-function StoryWindow({ focus, live, cardRef, dashRef }) {
+function StoryWindow({ focus = 0, cardStyle }) {
   const [hasVideo, setHasVideo] = useState(false)
   const [playing, setPlaying] = useState(false)
   useEffect(() => {
@@ -367,7 +372,7 @@ function StoryWindow({ focus, live, cardRef, dashRef }) {
   }
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-brand-900/15">
-      <div ref={dashRef} style={live ? { opacity: 0, visibility: 'hidden' } : undefined}>
+      <div>
         <div className="flex h-9 items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-4" aria-hidden="true">
           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
           <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
@@ -393,9 +398,9 @@ function StoryWindow({ focus, live, cardRef, dashRef }) {
           </div>
         )}
       </div>
-      {live && (
+      {cardStyle && (
         // The hero's result card, drawn large because the window starts small and grows.
-        <div ref={cardRef} className="pointer-events-none absolute inset-0 flex flex-col justify-center bg-white px-14" aria-hidden="true">
+        <Motion.div style={cardStyle} className="pointer-events-none absolute inset-0 flex flex-col justify-center bg-white px-14 will-change-transform" aria-hidden="true">
           <div className="flex items-center justify-between text-2xl text-slate-500">
             <span>Static screening · CL-0042</span>
             <span className="font-mono">FB-7KQ2-M9TX</span>
@@ -414,131 +419,139 @@ function StoryWindow({ focus, live, cardRef, dashRef }) {
               </div>
             ))}
           </div>
-        </div>
+        </Motion.div>
       )}
     </div>
   )
 }
 
-const clamp01 = (v) => Math.min(1, Math.max(0, v))
-const lerp = (a, b, t) => a + (b - a) * t
-const easeOut = (t) => 1 - (1 - t) ** 3
+// One easing for every scroll-driven change in the story.
+const STORY_EASE = cubicBezier(0.2, 0, 0, 1)
 
-function StoryStep({ step, n, stepRef, live }) {
+function StoryHeading() {
   return (
-    <li ref={stepRef} className="flex gap-4" style={live ? { opacity: 0 } : undefined}>
+    <div>
+      <div className="text-sm font-semibold uppercase tracking-[0.14em] text-brand-600">How a screening works</div>
+      <h2 className="mt-2 text-3xl font-semibold tracking-[-0.01em] sm:text-4xl">From signature to sealed result</h2>
+    </div>
+  )
+}
+
+function StoryStep({ step, n, state }) {
+  // state: 'hidden' (not reached), 'active', 'past' (dimmed); undefined in the still layout.
+  const look = state === 'hidden' ? 'translate-y-4 opacity-0' : state === 'past' ? 'opacity-50' : 'opacity-100'
+  return (
+    <li className={`flex gap-4 ${state ? `story-step will-change-[opacity,transform] ${look}` : ''}`}>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-lg font-semibold text-white">{n}</span>
       <div>
-        <h3 className="text-xl font-semibold leading-snug sm:text-2xl">{step.title}</h3>
-        <p className="mt-1.5 text-slate-600">{step.text}</p>
+        <h3 className="text-xl font-semibold leading-snug">{step.title}</h3>
+        <p className="mt-1 text-slate-600">{step.text}</p>
       </div>
     </li>
   )
 }
 
-// Scroll story: the hero's result card moves to the centre and grows into the examiner
-// dashboard, which then slides right while the three steps appear on the left. It is
-// driven by the scroll position, moves only transform and opacity, and listens only
-// while the section is on screen. Phones and reduced motion get a still layout.
-function ScrollStory() {
-  const wide = useMedia('(min-width: 64rem)')
-  const still = useMedia('(prefers-reduced-motion: reduce)')
-  const live = wide && !still
-  const [focus, setFocus] = useState(0)
+// Which step the story is on, from the scroll progress (0 = the card, before step highlights).
+const storyStage = (v) => (v < 0.62 ? 0 : v < 0.74 ? 1 : v < 0.87 ? 2 : 3)
+
+// Desktop: the section starts right after the hero and pins just under the navbar. While
+// it scrolls in, the card grows and moves into place, fully visible beside the heading and
+// step 1. Once pinned, the card slides up out of the window, uncovering the dashboard that
+// is already fully drawn underneath (no see-through moment),
+// and steps 2 and 3 slide up one at a time, each lighting its part of the dashboard. The
+// moving parts follow the scroll (so they reverse when scrolling up); step changes are a
+// 250ms slide on the same easing.
+function LiveStory() {
   const section = useRef(null)
-  const stage = useRef(null)
-  const slot = useRef(null)
-  const frame = useRef(null)
-  const card = useRef(null)
-  const dash = useRef(null)
-  const steps = useRef([])
-  const shown = useRef(0)
-
-  useEffect(() => {
-    if (!live) return
-    let raf = 0
-    const render = () => {
-      raf = 0
-      const r = section.current.getBoundingClientRect()
-      const p = clamp01(-r.top / (r.height - window.innerHeight))
-      const seg = (a, b) => clamp01((p - a) / (b - a))
-      // Horizontal distance from the window's resting place (right) to the centre of the stage.
-      const st = stage.current.getBoundingClientRect()
-      const sl = slot.current.getBoundingClientRect()
-      const toCentre = st.left + st.width / 2 - (sl.left + sl.width / 2)
-      const grow = easeOut(seg(0.14, 0.3))
-      const slide = easeOut(seg(0.3, 0.42))
-      const scale = slide > 0 ? lerp(1.4, 1, slide) : lerp(0.55, 1.4, grow)
-      frame.current.style.transform = `translateX(${lerp(toCentre, 0, slide)}px) scale(${scale})`
-      card.current.style.opacity = String(1 - seg(0.07, 0.13))
-      const d = seg(0.08, 0.15)
-      dash.current.style.opacity = String(d)
-      dash.current.style.visibility = d > 0.01 ? 'visible' : 'hidden'
-      let current = 0
-      STORY.forEach((_, i) => {
-        const t = seg(0.42 + i * 0.16, 0.48 + i * 0.16)
-        if (t >= 0.5) current = i + 1
-        steps.current[i].dataset.t = t
-      })
-      STORY.forEach((_, i) => {
-        const el = steps.current[i]
-        const t = Number(el.dataset.t)
-        el.style.opacity = String(t * (current === i + 1 ? 1 : 0.45))
-        el.style.transform = `translateY(${lerp(16, 0, t)}px)`
-      })
-      if (current !== shown.current) {
-        shown.current = current
-        setFocus(current)
-      }
-    }
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(render) }
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) {
-        window.addEventListener('scroll', onScroll, { passive: true })
-        window.addEventListener('resize', onScroll)
-        onScroll()
-      } else {
-        window.removeEventListener('scroll', onScroll)
-        window.removeEventListener('resize', onScroll)
-      }
-    })
-    io.observe(section.current)
-    return () => {
-      io.disconnect()
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-      cancelAnimationFrame(raf)
-    }
-  }, [live])
-
-  if (!live) {
-    return (
-      <section className="mx-auto max-w-6xl px-5 py-16" aria-label="How a screening works">
-        <div className="grid items-center gap-10 lg:grid-cols-[2fr_3fr]">
-          <ol className="space-y-7">
-            {STORY.map((s, i) => <StoryStep key={s.title} step={s} n={i + 1} />)}
-          </ol>
-          <RevealOnScroll><StoryWindow focus={0} /></RevealOnScroll>
-        </div>
-      </section>
-    )
-  }
+  const { scrollYProgress: p } = useScroll({ target: section, offset: ['start end', 'end end'] })
+  // A mapping function keeps every value in step with the scroll position. Given plain
+  // ranges, motion hands opacity to the browser's scroll timeline, which drifted ahead here.
+  const useT = (input, output) => useTransform(p, (v) => transform(v, input, output, { ease: STORY_EASE }))
+  const x = useT([0.08, 0.48], ['-34%', '0%'])
+  const y = useT([0.08, 0.48], [90, 0])
+  const scale = useT([0.08, 0.48], [0.62, 1])
+  const cardStyle = { y: useT([0.54, 0.62], ['0%', '-101%']) }
+  const drift = useT([0, 1], [14, -14])
+  const [stage, setStage] = useState(() => storyStage(p.get()))
+  useMotionValueEvent(p, 'change', (v) => setStage(storyStage(v)))
+  const shown = Math.max(1, stage)
   return (
-    <section ref={section} className="relative h-[300vh]" aria-label="How a screening works">
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-        <div ref={stage} className="relative mx-auto h-[36rem] w-full max-w-6xl px-5">
-          <ol className="absolute left-5 top-1/2 w-[36%] -translate-y-1/2 space-y-9">
-            {STORY.map((s, i) => <StoryStep key={s.title} step={s} n={i + 1} live stepRef={(el) => { steps.current[i] = el }} />)}
-          </ol>
-          <div ref={slot} className="absolute inset-y-0 right-5 flex w-[56%] items-center">
-            <div ref={frame} className="w-full will-change-transform" style={{ transform: 'scale(0.55)' }}>
-              <StoryWindow focus={focus} live cardRef={card} dashRef={dash} />
-            </div>
+    <section ref={section} className="relative -mt-28 h-[180vh]" aria-label="How a screening works">
+      <div className="sticky top-[5.25rem] h-[calc(100vh-5.25rem)] overflow-hidden">
+        <div className="story-dots pointer-events-none absolute inset-0" aria-hidden="true" />
+        <Motion.svg
+          style={{ y: drift }}
+          viewBox={`-6 -4 ${SIGNATURE_WIDTH + 16} ${SIGNATURE_HEIGHT + 20}`}
+          className="pointer-events-none absolute -right-[4%] bottom-[6%] w-[62%] will-change-transform"
+          fill="none" stroke="#0f172a" strokeOpacity="0.035" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <g transform="skewX(-6) translate(4 0)">{SIGNATURE_PATHS.map((s, i) => <path key={i} d={s.d} />)}</g>
+        </Motion.svg>
+        <div className="relative mx-auto grid w-full max-w-6xl grid-cols-[36%_1fr] items-start gap-12 px-5 pt-2">
+          <div className="space-y-8">
+            <StoryHeading />
+            <ol className="space-y-7">
+              {STORY.map((s, i) => (
+                <StoryStep key={s.title} step={s} n={i + 1} state={i + 1 > shown ? 'hidden' : i + 1 === shown ? 'active' : 'past'} />
+              ))}
+            </ol>
           </div>
+          <Motion.div style={{ x, y, scale }} className="origin-center will-change-transform">
+            <StoryWindow focus={stage} cardStyle={cardStyle} />
+          </Motion.div>
         </div>
       </div>
     </section>
   )
+}
+
+// Phones and reduced motion: a plain stacked layout, nothing sticky or moving.
+function ScrollStory() {
+  const wide = useMedia('(min-width: 64rem)')
+  const still = useMedia('(prefers-reduced-motion: reduce)')
+  if (wide && !still) return <LiveStory />
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-16" aria-label="How a screening works">
+      <div className="grid items-center gap-10 lg:grid-cols-[2fr_3fr]">
+        <div className="space-y-8">
+          <StoryHeading />
+          <ol className="space-y-7">
+            {STORY.map((s, i) => <StoryStep key={s.title} step={s} n={i + 1} />)}
+          </ol>
+        </div>
+        <StoryWindow />
+      </div>
+    </section>
+  )
+}
+
+// Smooth scrolling for the landing page only, run on motion's frame loop so the scroll
+// animations follow it. Off on touch devices and with reduced motion. Anchor links are
+// handed to Lenis, which honours each section's scroll-margin-top below the navbar.
+function useSmoothScroll() {
+  useEffect(() => {
+    const touch = window.matchMedia('(hover: none), (pointer: coarse)').matches
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (touch || reduced) return
+    const lenis = new Lenis({ autoRaf: false })
+    const tick = ({ timestamp }) => lenis.raf(timestamp)
+    frame.update(tick, true)
+    const onClick = (e) => {
+      const a = e.target.closest?.('a[href^="#"]')
+      const target = a && a.hash.length > 1 && document.querySelector(a.hash)
+      if (!target) return
+      e.preventDefault()
+      lenis.scrollTo(target)
+      window.history.pushState(null, '', a.hash)
+    }
+    document.addEventListener('click', onClick)
+    return () => {
+      document.removeEventListener('click', onClick)
+      cancelFrame(tick)
+      lenis.destroy()
+    }
+  }, [])
 }
 
 // An endless strip of ledger blocks joined by a thin line, with a soft pulse running along it.
@@ -639,6 +652,7 @@ function RoleMockup({ role }) {
 export default function Landing() {
   const { user } = useAuth()
   const [study, setStudy] = useState(false)
+  useSmoothScroll()
   useEffect(() => {
     api.get('/api/auth/providers').then((p) => setStudy(!!p.study_mode)).catch(() => {})
   }, [])
@@ -659,30 +673,25 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-brand-50 via-white to-white">
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="blob absolute -left-24 -top-16 h-96 w-96 rounded-full bg-brand-200 opacity-60 blur-3xl" />
-          <div className="blob absolute right-[-6rem] top-24 h-80 w-80 rounded-full bg-cyan-200 opacity-50 blur-3xl [animation-delay:-8s]" />
-          <div className="blob absolute bottom-[-8rem] left-1/3 h-96 w-96 rounded-full bg-indigo-200 opacity-45 blur-3xl [animation-delay:-14s]" />
-        </div>
-        <HeroStrokes color="#0f6cbd" words={false} />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-28 lg:grid-cols-[1.1fr_1fr] lg:pt-32">
+      <section className="hero-blue relative overflow-hidden text-white">
+        <HeroStrokes words={false} calm />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-[300px] pt-28 lg:grid-cols-[1.1fr_1fr] lg:pt-32">
           <div>
-            <SignatureTrace className="w-full max-w-xl text-brand-800" strokeWidth={1.9} duration={3.6} />
+            <SignatureTrace className="w-full max-w-xl text-white" strokeWidth={1.9} duration={3.6} />
             <h1 className="fade-up mt-4 text-4xl font-semibold leading-tight tracking-[-0.01em] sm:text-5xl" style={{ '--delay': '0.4s' }}>
               Screen signatures.
               <br />
-              <span className="text-brand-600">Seal every decision.</span>
+              <span className="text-brand-200">Seal every decision.</span>
             </h1>
-            <p className="fade-up mt-5 max-w-xl text-lg text-slate-600" style={{ '--delay': '0.6s' }}>
+            <p className="fade-up mt-5 max-w-xl text-lg text-white/85" style={{ '--delay': '0.6s' }}>
               ForgeBlock checks a questioned signature against the signatures a client keeps on file, from a scanned page or live on a tablet, and
               keeps a tamper-evident record of every screening and every examiner’s finding.
             </p>
             <div className="fade-up mt-8 flex flex-wrap gap-3" style={{ '--delay': '0.8s' }}>
-              <Link to="/signin" className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-5 py-3 font-medium text-white shadow-sm transition hover:bg-brand-700 hover:shadow-md">
+              <Link to="/signin" className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 font-medium text-brand-800 shadow-sm transition hover:bg-brand-50 hover:shadow-md">
                 Sign in <ArrowRight className="h-4 w-4" />
               </Link>
-              <a href="#how" className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 font-medium text-slate-800 transition hover:bg-slate-50">
+              <a href="#how" className="inline-flex items-center gap-2 rounded-xl border border-white/45 bg-white/10 px-5 py-3 font-medium text-white transition hover:bg-white/20">
                 How it works
               </a>
             </div>

@@ -156,6 +156,58 @@ body {
 .hero-strokes {
   animation: hero-drift 38s ease-in-out infinite alternate;
 }
+.hero-strokes-slow {
+  animation-duration: 80s;
+}
+/* Landing hero: deep brand blue, then a long, gently eased fade (480px, sine curve) through
+   a light blue tint into the white page, so there is no band or edge before the next section. */
+.hero-blue {
+  background: linear-gradient(
+    180deg,
+    #0f6cbd 0%,
+    rgb(10 63 115) calc(100% - 480px),
+    rgb(10 64 116) calc(100% - 460px),
+    rgb(12 66 119) calc(100% - 440px),
+    rgb(16 69 124) calc(100% - 420px),
+    rgb(21 74 129) calc(100% - 400px),
+    rgb(28 81 135) calc(100% - 380px),
+    rgb(37 89 142) calc(100% - 360px),
+    rgb(48 98 150) calc(100% - 340px),
+    rgb(60 108 158) calc(100% - 320px),
+    rgb(73 119 167) calc(100% - 300px),
+    rgb(88 131 175) calc(100% - 280px),
+    rgb(104 143 184) calc(100% - 260px),
+    rgb(120 156 193) calc(100% - 240px),
+    rgb(137 168 201) calc(100% - 220px),
+    rgb(154 181 209) calc(100% - 200px),
+    rgb(170 193 217) calc(100% - 180px),
+    rgb(186 205 225) calc(100% - 160px),
+    rgb(201 216 231) calc(100% - 140px),
+    rgb(214 226 237) calc(100% - 120px),
+    rgb(226 234 243) calc(100% - 100px),
+    rgb(236 242 247) calc(100% - 80px),
+    rgb(244 247 250) calc(100% - 60px),
+    rgb(250 252 253) calc(100% - 40px),
+    rgb(254 254 254) calc(100% - 20px),
+    rgb(255 255 255) 100%
+  );
+}
+/* Scroll story: a very faint dot grid that fades out toward the edges. */
+.story-dots {
+  background-image: radial-gradient(circle, rgb(15 23 42 / 0.09) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  opacity: 0.35;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 25%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000 25%, transparent 75%);
+}
+/* Steps and dashboard highlights change with one short move, on the story's easing. */
+.story-step {
+  transition: opacity 250ms cubic-bezier(0.2, 0, 0, 1), transform 250ms cubic-bezier(0.2, 0, 0, 1);
+}
+/* Lenis does the smoothing on the landing page, so the CSS smooth scroll must stay off. */
+html.lenis {
+  scroll-behavior: auto !important;
+}
 @keyframes hero-drift {
   from { transform: translate3d(-1.5%, -1%, 0); }
   to { transform: translate3d(1.5%, 1.5%, 0); }
