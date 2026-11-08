@@ -5,9 +5,9 @@ the client signs once in each of the 10 boxes (2 columns x 5 rows), and the
 sheet is photographed with a phone or scanned. On import the four black
 corner squares are found, the photo is straightened onto the sheet's own
 geometry (perspective warp), and every box is cropped with a small inset so
-the printed border never reaches the crop. Each crop is cleaned the same way
-(flat white paper, grey-tone ink, specks removed), so phone photos and flatbed
-scans give comparable references.
+the printed border never reaches the crop. Crops keep their natural paper and
+ink (not whitened), exactly like a questioned photo, so references and
+questioned signatures look alike to the model (see capture.py).
 
 Why 10 boxes: Chapter 3 needs at least 5 genuine references for a personal
 threshold (MIN_ADAPTIVE_SAMPLES); 10 is the recommended number on the
@@ -217,16 +217,25 @@ def clean_signature(cell: np.ndarray) -> np.ndarray:
 
 
 def crop_boxes(sheet: np.ndarray, dpi: int = WORK_DPI) -> list[dict]:
-    """Crop the 10 boxes. Each item: index, image (cleaned grayscale), empty."""
+    """Crop the 10 boxes. Each item: index, image (natural grayscale crop), empty.
+
+    The crop keeps the paper and ink as photographed (only the box number is
+    painted over with the paper colour). It is not whitened: questioned photos
+    are not whitened either, and the model scores best when references and
+    questioned images look alike (see capture.py). The cleaned copy is only used
+    to decide whether a box is empty."""
     out = []
     for i in range(1, BOXES + 1):
         x, y, w, h = box_rect(i)
         x0, y0 = round((x + INSET) * dpi), round((y + INSET) * dpi)
         x1, y1 = round((x + w - INSET) * dpi), round((y + h - INSET) * dpi)
         crop = sheet[y0:y1, x0:x1].copy()
-        crop[: round((LABEL_H - INSET + 0.04) * dpi), : round((LABEL_W - INSET + 0.04) * dpi)] = 255
-        crop = clean_signature(crop)
-        ink = float((crop < 128).mean())
+        if crop.ndim == 3:
+            crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        ly, lx = round((LABEL_H - INSET + 0.04) * dpi), round((LABEL_W - INSET + 0.04) * dpi)
+        paper = float(np.median(crop[ly:, lx:]))
+        crop[:ly, :lx] = int(round(paper))
+        ink = float((clean_signature(crop) < 128).mean())
         out.append({"index": i, "image": crop, "empty": ink < 0.0015})
     return out
 

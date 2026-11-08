@@ -105,7 +105,7 @@ export default function Screen() {
           <div className="space-y-5 p-5">
             {modality === 'static' ? (
               <>
-                <ImagePicker label="Questioned signature" files={files} onChange={setFiles} />
+                <ImagePicker crop label="Questioned signature" files={files} onChange={setFiles} />
                 <ModelView file={files[0]} />
               </>
             ) : (

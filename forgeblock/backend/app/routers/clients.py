@@ -298,7 +298,7 @@ async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db:
     import cv2
 
     editable_client_or_404(db, client_id, user)
-    _, img = await read_upload(file)
+    _, img = await read_upload(file, standardized=False)  # the whole sheet, not one signature
     try:
         boxes = enroll_sheet.import_sheet(img)
     except enroll_sheet.SheetError as e:
