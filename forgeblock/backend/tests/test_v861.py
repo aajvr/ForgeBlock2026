@@ -44,3 +44,22 @@ def test_sheet_crops_are_not_whitened():
     boxes = enroll_sheet.crop_boxes(grey)
     assert all(b["empty"] for b in boxes)
     assert 150 < float(np.median(boxes[0]["image"])) < 220                 # paper kept as photographed
+
+
+def _sig(scale=1.0):
+    img = np.full((int(400 * scale), int(700 * scale)), 240, np.uint8)
+    pts = (np.array([[150, 250], [230, 120], [300, 230], [380, 110], [460, 240], [540, 170]]) * scale).astype(np.int32)
+    cv2.polylines(img, [pts], False, 50, max(2, int(3 * scale)))
+    return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+
+def test_signature_width_and_size_match():
+    w1, w3 = capture.signature_width(_sig(1)), capture.signature_width(_sig(3))
+    assert 360 <= w1 <= 420 and 2.7 < w3 / w1 < 3.3
+    out, scale = capture.match_size(_sig(3), [w1, w1, w1])
+    assert 0.3 < scale < 0.37
+    assert abs(capture.signature_width(out) - w1) / w1 < 0.08
+    same, s = capture.match_size(_sig(1), [w1])
+    assert s == 1.0 and same.shape == _sig(1).shape     # within tolerance: untouched
+    keep, s = capture.match_size(_sig(1), [])
+    assert s == 1.0                                     # no references: untouched

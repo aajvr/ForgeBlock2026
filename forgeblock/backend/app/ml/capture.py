@@ -32,7 +32,7 @@ def _ink(gray: np.ndarray) -> np.ndarray:
     k = max(3, (min(gray.shape) // 6) | 1)
     norm = cv2.divide(gray, cv2.medianBlur(gray, min(k, 51)), scale=255)
     t, _ = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return (norm < min(t, 235)).astype(np.uint8) * 255
+    return (norm <= min(t, 235)).astype(np.uint8) * 255
 
 
 def line_mask(gray: np.ndarray) -> np.ndarray:
@@ -63,3 +63,51 @@ def standardize(img: np.ndarray) -> np.ndarray:
     if lines.any():
         gray = cv2.inpaint(gray, lines, 5, cv2.INPAINT_TELEA)
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+
+# ---------------------------------------------------------------- size match (v8.8)
+# The preprocessing uses fixed pixel-size filters (31 px blur, 8x8 CLAHE tiles,
+# 9 px high-pass), so the same signature photographed three times larger looks
+# like different writing to the model. A questioned signature is therefore
+# scaled so that its width matches the client's own references. References are
+# never rescaled, so CEDAR-style evaluations (same scale on both sides) are
+# unchanged. Tests on a real 10-box sheet: close-up photo 3x larger than the
+# references -> mostly Inconsistent; after matching -> 6 of 10 Consistent, the
+# same as references screened against each other.
+SIZE_TOLERANCE = 1.15        # leave the image alone within +/-15 %
+SCALE_LIMITS = (0.2, 5.0)
+
+
+def signature_width(img: np.ndarray) -> int | None:
+    """Width in pixels of the signature (its main ink clusters), or None."""
+    gray = _gray(img)
+    ink = _ink(gray)
+    h, w = ink.shape
+    n, lab, st, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    keep = np.zeros(n, bool)
+    keep[1:] = st[1:, cv2.CC_STAT_AREA] >= max(15, int(0.0001 * ink.size))
+    ink = np.where(keep[lab], 255, 0).astype(np.uint8)
+    if not ink.any():
+        return None
+    k = max(5, int(0.04 * max(h, w))) | 1
+    blob = cv2.dilate(ink, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    n, lab, _, _ = cv2.connectedComponentsWithStats(blob, connectivity=8)
+    amount = np.bincount(lab[ink > 0], minlength=n)
+    amount[0] = 0
+    main = np.isin(lab, np.nonzero(amount >= 0.15 * amount.max())[0]) & (ink > 0)
+    xs = np.nonzero(main.any(0))[0]
+    return int(xs[-1] - xs[0] + 1) if len(xs) else None
+
+
+def match_size(img: np.ndarray, reference_widths: list[int]) -> tuple[np.ndarray, float]:
+    """Scale `img` so its signature is as wide as the references' median.
+    Returns the (possibly unchanged) image and the scale factor used."""
+    widths = [w for w in reference_widths if w]
+    own = signature_width(img)
+    if not widths or not own:
+        return img, 1.0
+    scale = float(np.clip(np.median(widths) / own, *SCALE_LIMITS))
+    if 1 / SIZE_TOLERANCE <= scale <= SIZE_TOLERANCE:
+        return img, 1.0
+    interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+    return cv2.resize(img, None, fx=scale, fy=scale, interpolation=interp), scale

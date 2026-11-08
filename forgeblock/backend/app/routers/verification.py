@@ -22,6 +22,7 @@ from ..access import can_view_case, can_view_log, visible_client_or_404
 from ..config import MIN_ADAPTIVE_SAMPLES
 from ..database import get_db
 from ..ledger import verify_block
+from ..ml import capture
 from ..ml import decision as dec
 from ..ml.dynamic_features import points_from_payload
 from ..ml.engine import get_engine
@@ -173,6 +174,18 @@ async def static_quality_check(file: UploadFile = File(...), user: User = Depend
     return static_quality(img)
 
 
+_REF_WIDTHS: dict[str, int | None] = {}
+
+
+def _reference_width(profile) -> int | None:
+    """Signature width of a stored static reference (cached; the image never changes)."""
+    key = profile.sample_path
+    if key not in _REF_WIDTHS:
+        ref = load_image(key)
+        _REF_WIDTHS[key] = capture.signature_width(ref) if ref is not None else None
+    return _REF_WIDTHS[key]
+
+
 def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: Case | None = None,
                         document_ref: str | None = None, expected_label: str | None = None,
                         sample_hash: str | None = None) -> VerificationLog:
@@ -181,6 +194,8 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     profiles = active_profiles(db, client.id, "static")
     if not profiles:
         raise HTTPException(409, f"{client.client_code} has no static references on file yet.")
+    # Same signature size as this client's references (capture.match_size).
+    img, size_scale = capture.match_size(img, [_reference_width(p) for p in profiles])
     q = static_quality(img)
     if not q["usable"]:
         raise HTTPException(422, " ".join(q["issues"]))
@@ -190,6 +205,7 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     per_ref, best = _per_ref(test, profiles)
     analysis = {
         "quality": q,
+        "size_scale": round(size_scale, 3),
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
         "features": compare_features(static_features(img), [p.features for p in profiles], "static"),
