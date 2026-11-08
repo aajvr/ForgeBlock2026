@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -21,6 +21,7 @@ from ..access import (
 from ..config import MAX_REFERENCES
 from ..database import get_db
 from ..ml.dynamic_features import points_from_payload
+from ..ml import enroll_sheet
 from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
 from ..ml.quality import dynamic_quality, static_quality
@@ -274,6 +275,48 @@ async def enroll_static(client_id: int, files: list[UploadFile] = File(...), db:
         log_activity(db, user, "enrollment", f"Added {len(accepted)} static reference(s) to {c.client_code}",
                      modality="static")
     return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db)}
+
+
+@router.get("/clients/{client_id}/static/enrollment-sheet")
+def static_enrollment_sheet(client_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+    """Printable 10-box sheet for this client (blank form, holds no signature data)."""
+    c = editable_client_or_404(db, client_id, user)
+    pdf = enroll_sheet.render_pdf(c.client_code)  # code only, never the name (Section 3.2.1)
+    return Response(pdf, media_type="application/pdf",
+                    headers={**VIEW_ONLY_HEADERS,
+                             "Content-Disposition": f'inline; filename="enrollment-sheet-{c.client_code}.pdf"'})
+
+
+@router.post("/clients/{client_id}/static/sheet-preview")
+async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db: Session = Depends(get_db),
+                               user: User = Depends(require_staff)):
+    """Straightens a phone photo or scan of the enrollment sheet and returns the 10
+    cropped boxes for review. Nothing is stored: the examiner picks the boxes to
+    keep, and the page sends them to /static/enroll like any other upload."""
+    import base64
+
+    import cv2
+
+    editable_client_or_404(db, client_id, user)
+    _, img = await read_upload(file)
+    try:
+        boxes = enroll_sheet.import_sheet(img)
+    except enroll_sheet.SheetError as e:
+        raise HTTPException(422, str(e))
+    out = []
+    for b in boxes:
+        ok, png = cv2.imencode(".png", b["image"])
+        q = {"usable": False, "score": 0.0, "issues": ["This box is empty."]} if b["empty"] \
+            else static_quality(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
+        out.append({
+            "index": b["index"],
+            "image": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode(),
+            "empty": b["empty"],
+            "usable": bool(q["usable"]),
+            "quality": q["score"],
+            "issues": q["issues"],
+        })
+    return {"boxes": out}
 
 
 class DynamicEnrollIn(BaseModel):

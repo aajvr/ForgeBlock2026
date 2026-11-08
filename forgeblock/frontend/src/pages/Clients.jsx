@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import ImagePicker from '../components/ImagePicker'
+import SheetEnroll from '../components/SheetEnroll'
 import SignaturePad from '../components/SignaturePad'
 import { AuthImage, DevPenNotice, StrokePreview } from '../components/shared'
 import {
@@ -18,6 +19,7 @@ import {
   Modal,
   PageHeader,
   ScreeningBadge,
+  Segmented,
   Select,
   Spinner,
   StrengthBadge,
@@ -631,6 +633,23 @@ function RefTile({ p, modality, onRemove }) {
 }
 
 function StaticEnroll({ client, onDone }) {
+  const [mode, setMode] = useState('sheet')
+  return (
+    <div className="space-y-4">
+      <Segmented
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'sheet', label: 'Enrollment sheet (phone)' },
+          { value: 'images', label: 'Upload signature images' },
+        ]}
+      />
+      {mode === 'sheet' ? <SheetEnroll client={client} onDone={onDone} /> : <ImageEnroll client={client} onDone={onDone} />}
+    </div>
+  )
+}
+
+function ImageEnroll({ client, onDone }) {
   const [files, setFiles] = useState([])
   const [res, setRes] = useState(null)
   const [error, setError] = useState('')
