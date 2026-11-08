@@ -1,0 +1,59 @@
+{
+  "_about": "Platt (logistic) calibration of the confidence score, P(genuine) = 1 / (1 + exp(-(a*z + b))), per module and per model fingerprint (see app/ml/engine.py). Fitted on writers the model never saw. Refit with training/calibrate_static.py / calibrate_dynamic.py. Optional per-entry \"band\": [lo, hi] = Inconclusive band for that module (overrides env CALIBRATED_BAND).",
+  "static": {
+    "1395aa164620db5c": {
+      "a": 1.6705,
+      "b": -1.5608,
+      "band": [
+        0.35,
+        0.65
+      ],
+      "model": "embedding_signet.keras (SigNet) as shipped in v8.2",
+      "fitted_on": "CEDAR writers 39-55 (the validation + testing writers of the model's own training split, never trained on); 10 refs, screened 14 genuine + 24 forgeries each; 646 screenings (Aa's Colab run, 2026-11-08). Training writers 1-38 behave the same (AUC 0.904).",
+      "auc": 0.909,
+      "date": "2026-11-08",
+      "note": "provisional: refit on ForgeBlock's own static sheets"
+    }
+  },
+  "dynamic": {
+    "thr:0.364863": {
+      "a": 1.307,
+      "b": 1.353,
+      "model": "FB-DYN-E2 v1 (own_dynamic_model_OWN_E2, exported 2026-11-07, fold 0)",
+      "fitted_on": "ForgeBlock own iPad dataset, the 13 fold-0 TEST writers the model never saw (3,4,10,14,22,32,37,39,41,45,52,54,59); refs S1-S10, screened S11-S20 genuine + S21-S30 forgeries; 260 screenings",
+      "auc": 0.967,
+      "date": "2026-11-08",
+      "band": [
+        0.35,
+        0.8
+      ]
+    },
+    "thr:0.637894": {
+      "a": 0.9143,
+      "b": 0.1152,
+      "model": "SVC2004 E2 baseline (dynamic_encoder.pt shipped up to v8.3)",
+      "fitted_on": "ForgeBlock own iPad dataset, 65 writers (all unseen by this model); refs S1-S10, screened S11-S30; 1300 screenings",
+      "auc": 0.913,
+      "date": "2026-11-08"
+    }
+  },
+  "_alternatives": {
+    "static_bhsig260": {
+      "a": 1.7578,
+      "b": -2.3398,
+      "band": [
+        0.35,
+        0.65
+      ],
+      "fitted_on": "BHSig260 (Bengali+Hindi), 100 random writers never seen by the model; 10 refs, screened 14 genuine + 30 skilled forgeries each; 4400 screenings (Aa's Colab run, 2026-11-08)",
+      "auc": 0.865,
+      "how_to_use": "copy a and b into static.1395aa164620db5c"
+    },
+    "static_cedar_all55": {
+      "a": 1.4297,
+      "b": -1.1595,
+      "auc": 0.906,
+      "fitted_on": "CEDAR all 55 writers (incl. 38 training writers)"
+    }
+  }
+}

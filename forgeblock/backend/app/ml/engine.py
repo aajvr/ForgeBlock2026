@@ -7,7 +7,15 @@ adaptive thresholds:
     static_config.json, dynamic_config.json
 Without a config the defaults below are used; a dynamic model can supply
 its own defaults (SvcDynamicModel takes them from its checkpoint).
+
+Calibration (v8.5): weights/calibration.json holds the Platt parameters
+(a, b) per module, keyed by a fingerprint of the model they were fitted
+for, so a calibration is never applied to a different model:
+    static  - first 16 hex of the SHA-256 of static_model.keras
+    dynamic - "thr:" + the checkpoint's enroll threshold (6 decimals)
+A model without a matching entry keeps the uncalibrated v8.2 confidence.
 """
+import hashlib
 import json
 import logging
 import threading
@@ -42,6 +50,36 @@ def _load_config(path: Path, default: dict) -> dict:
     }
 
 
+def _file_fingerprint(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:16]
+
+
+def _dynamic_fingerprint(model) -> str | None:
+    thr = getattr(model, "checkpoint_thresholds", None)
+    if not thr:
+        return None
+    return f"thr:{float(thr.get('enroll', thr.get('pairs'))):.6f}"
+
+
+def _load_calibration(path: Path, module: str, fingerprint: str | None) -> dict | None:
+    if not fingerprint or not path.exists():
+        return None
+    try:
+        entry = json.loads(path.read_text()).get(module, {}).get(fingerprint)
+    except (ValueError, AttributeError):
+        log.exception("weights/calibration.json is not valid JSON; confidence stays uncalibrated")
+        return None
+    if entry and "a" in entry and "b" in entry:
+        return {**entry, "fingerprint": fingerprint}
+    return None
+
+
 def _version(model, modality: str) -> str:
     return f"{modality}-{model.kind}" + (f":{model.source}" if model.source else "")
 
@@ -62,6 +100,15 @@ class Engine:
                                         getattr(self.dynamic_model, "default_config", DEFAULT_DYNAMIC_CONFIG))
         self.static_cfg["model_version"] = _version(self.static_model, "static")
         self.dynamic_cfg["model_version"] = _version(self.dynamic_model, "dynamic")
+        cal = weights_dir / "calibration.json"
+        self.static_fingerprint = _file_fingerprint(weights_dir / "static_model.keras")
+        self.dynamic_fingerprint = _dynamic_fingerprint(self.dynamic_model)
+        self.static_cfg["calibration"] = _load_calibration(cal, "static", self.static_fingerprint)
+        self.dynamic_cfg["calibration"] = _load_calibration(cal, "dynamic", self.dynamic_fingerprint)
+        for name, fp, c in (("static", self.static_fingerprint, self.static_cfg["calibration"]),
+                            ("dynamic", self.dynamic_fingerprint, self.dynamic_cfg["calibration"])):
+            log.info("%s confidence: %s (model fingerprint %s)", name,
+                     "calibrated" if c else "uncalibrated (v8.2 z-score)", fp)
 
     def static_embedding(self, img: np.ndarray) -> np.ndarray:
         x = preprocess_signature(img)
@@ -90,6 +137,7 @@ class Engine:
                 "model_version": cfg["model_version"],
                 "default_thresholds": cfg["thresholds"],
                 "evaluation": cfg.get("evaluation"),
+                "confidence": "calibrated" if cfg.get("calibration") else "uncalibrated",
             }
 
         out = {"static": one(self.static_model, self.static_cfg), "dynamic": one(self.dynamic_model, self.dynamic_cfg)}

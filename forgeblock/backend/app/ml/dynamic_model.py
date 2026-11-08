@@ -121,6 +121,7 @@ class SvcDynamicModel:
         self.kind = "pytorch-svc"
         self.source = path.name
         self.default_config = self._default_config(ck)
+        self.checkpoint_thresholds = dict(ck.get("thresholds") or {})
 
     @staticmethod
     def _default_config(ck: dict) -> dict:
