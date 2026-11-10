@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { useAuth } from '../auth'
+import { LIMITED_PEN_LABEL, penMissing, penWords } from './penData'
 import { Alert, Field, Select, StrengthBadge } from './ui'
 
 // Image served by an authenticated endpoint (viewed in the app only).
@@ -33,16 +33,38 @@ export function AuthImage({ src, className, alt = '' }) {
   )
 }
 
-// Shown on dynamic signing pads when the server accepts development pens
-// without tilt (DEV_PEN_DEVICES), e.g. a Wacom One CTL-472.
+// v8.11: dynamic signatures without pen pressure or tilt (finger, mouse, a
+// stylus that is not an Apple Pencil) are accepted and labelled "Limited pen
+// data"; the comparison leaves out what either signature lacks.
+export function LimitedPenBadge({ missing, className = '' }) {
+  return (
+    <span
+      title={missing?.length ? `No ${penWords(missing)} recorded` : 'No pen pressure or tilt recorded'}
+      className={`inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11.5px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200 ${className}`}
+    >
+      {LIMITED_PEN_LABEL}
+    </span>
+  )
+}
+
+// Shown above dynamic signing pads.
 export function DevPenNotice() {
-  const { user } = useAuth()
-  if (!user?.dev_pen_devices) return null
+  return (
+    <Alert kind="info">
+      Use the Apple Pencil for the most reliable results. Signatures made with a finger, a mouse or another pen are accepted, but they have
+      no pen pressure or tilt: they are labelled "{LIMITED_PEN_LABEL}" and compared on shape and timing only.
+    </Alert>
+  )
+}
+
+// After signing: tells the user right away that this signature lacks pen data.
+export function PenDataHint({ strokes }) {
+  const missing = penMissing(strokes)
+  if (!strokes?.length || !missing.length) return null
   return (
     <Alert kind="warn">
-      Development pen mode is on. A pen without tilt (such as a Wacom One) is accepted, but results are less accurate, are marked "Development
-      device", are compared only with development-device references and are left out of the evaluation figures. Use the Apple Pencil for real
-      signatures.
+      This signature has no {penWords(missing)}: the pen or finger used did not record it. It will still be accepted and labelled
+      "{LIMITED_PEN_LABEL}".
     </Alert>
   )
 }

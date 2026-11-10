@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { LimitedPenBadge } from '../components/shared'
 import { Badge, Card, Empty, FindingBadge, Input, PageHeader, ScreeningBadge, Select, Spinner, Table, fmtDate, td } from '../components/ui'
 
 // Decision column: the examiner's finding, "Needs decision" while the case is
@@ -22,7 +23,10 @@ export function RecordsTable({ rows, showExaminer = false }) {
       {rows.map((l) => (
         <tr key={l.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/app/records/${l.id}`)}>
           <td className={td}><span className="font-mono text-sm font-medium text-brand-700">{l.receipt_code}</span></td>
-          <td className={td}><Badge tone={l.modality === 'static' ? 'blue' : 'violet'}>{l.modality === 'static' ? 'Static' : 'Dynamic'}</Badge></td>
+          <td className={td}>
+            <Badge tone={l.modality === 'static' ? 'blue' : 'violet'}>{l.modality === 'static' ? 'Static' : 'Dynamic'}</Badge>
+            {l.pen_label && <LimitedPenBadge className="ml-1.5" />}
+          </td>
           <td className={td}>{l.client_code || <span className="text-slate-400">-</span>}</td>
           {showExaminer && (
             <td className={td}>

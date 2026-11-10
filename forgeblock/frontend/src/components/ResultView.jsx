@@ -2,7 +2,7 @@ import { ArrowRight, ChevronDown, ChevronUp, Grid3x3, Info, Link2, ShieldAlert, 
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
-import { AuthImage, StrokePreview } from './shared'
+import { AuthImage, LimitedPenBadge, StrokePreview } from './shared'
 import StrokeReplay, { ReplayControls } from './StrokeReplay'
 import { Alert, Badge, FindingBadge, RESULT, StrengthBadge, fmtDate, fmtDay } from './ui'
 
@@ -565,12 +565,7 @@ export default function ResultView({ result: r }) {
           </Link>
         )}
       </ResultHeader>
-      {r.capture_device === 'development' && (
-        <Alert kind="warn">
-          Development device: signed with a pen that has no tilt (for example a Wacom One). This result is less accurate than with the Apple Pencil
-          and is not counted in the evaluation figures.
-        </Alert>
-      )}
+      <PenDataNote r={r} />
       {staff && stored && <Signatures r={r} />}
       <StaffFacts r={r} />
       <DetailsToggle tabs={tabs}>
@@ -586,5 +581,21 @@ export default function ResultView({ result: r }) {
       </DetailsToggle>
       <p className="text-sm text-slate-500">{r.disclaimer}</p>
     </div>
+  )
+}
+
+// v8.11: dynamic screening that left out pen pressure and/or tilt.
+export function PenDataNote({ r }) {
+  if (r.modality !== 'dynamic') return null
+  const note = r.pen_note
+  if (!note && r.capture_device !== 'development') return null
+  return (
+    <Alert kind="warn">
+      <div className="mb-1 flex items-center gap-2">
+        <LimitedPenBadge missing={note?.left_out || ['tilt']} />
+      </div>
+      {note?.message ||
+        'The questioned signature has no pen tilt. The comparison used shape and timing without the pen tilt, so this result is less certain than an Apple Pencil screening.'}
+    </Alert>
   )
 }

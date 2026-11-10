@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import ResultView, { DetailsToggle, KeyFacts, LedgerBlockValue, ResultHeader } from '../components/ResultView'
+import ResultView, { DetailsToggle, KeyFacts, LedgerBlockValue, PenDataNote, ResultHeader } from '../components/ResultView'
 import { Alert, Badge, FindingBadge, PageHeader, Spinner, fmtDate } from '../components/ui'
 
 // What a client sees of a screening on a document in their name: the result,
@@ -17,6 +17,7 @@ function ClientResult({ r }) {
   return (
     <div className="space-y-5">
       <ResultHeader r={r} whose="your" />
+      <PenDataNote r={r} />
       <KeyFacts facts={[
         ['Client', r.client_name || r.client_code || '-'],
         ['Examiner’s decision', decision],

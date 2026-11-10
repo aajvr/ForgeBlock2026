@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import ImagePicker from '../components/ImagePicker'
 import SignaturePad from '../components/SignaturePad'
-import { CasePicker, ClientPicker, DevPenNotice } from '../components/shared'
+import { CasePicker, ClientPicker, DevPenNotice, PenDataHint } from '../components/shared'
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Tabs } from '../components/ui'
 
 const PEN_KEY = 'forgeblock_pen_only'
@@ -55,6 +55,7 @@ export default function Screen() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const pad = useRef(null)
+  const [signed, setSigned] = useState(null) // v8.11: for the limited pen data hint
 
   const run = async () => {
     setError('')
@@ -119,10 +120,11 @@ export default function Screen() {
                       try { localStorage.setItem(PEN_KEY, e.target.checked ? '1' : '0') } catch { /* ignore */ }
                     }}
                   />
-                  Pen-only mode (Apple Pencil, or a development pen)
+                  Pen-only mode (ignore finger and palm touches)
                 </label>
                 <DevPenNotice />
-                <SignaturePad ref={pad} penOnly={penOnly} height={240} />
+                <SignaturePad ref={pad} penOnly={penOnly} height={240} onChange={(st) => setSigned(st.length ? st.map((x) => [...x]) : null)} />
+                <PenDataHint strokes={signed} />
                 <Button variant="ghost" size="sm" onClick={() => pad.current.clear()}>Clear</Button>
               </>
             )}

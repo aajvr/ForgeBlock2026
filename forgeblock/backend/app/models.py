@@ -130,7 +130,9 @@ class SignatureProfile(Base):
     # Handwriting measurements used by the feature analysis.
     features: Mapped[dict] = mapped_column(JSON, default=dict)
     quality: Mapped[float] = mapped_column(Float, default=100.0)
-    # Dynamic only: "development" for a pen without tilt (DEV_PEN_DEVICES).
+    # Dynamic only: "limited" when the signature has no pen pressure and/or
+    # tilt (v8.11; features["_pen"] says which); "development" = older
+    # no-tilt pen references.
     capture_device: Mapped[str | None] = mapped_column(String(20), nullable=True)
     enrolled_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     enrolled_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -200,9 +202,9 @@ class VerificationLog(Base):
     # Known answer for prepared test samples (genuine | forged), for evaluation.
     expected_label: Mapped[str | None] = mapped_column(String(10), nullable=True)
     best_match_profile_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Dynamic only: "development" for a pen without tilt (DEV_PEN_DEVICES).
-    # Not part of the sealed record; development records are left out of the
-    # model performance figures.
+    # Dynamic only: "limited" when the comparison left out pen pressure
+    # and/or tilt (v8.11; analysis["pen_data"] says why); "development" =
+    # older no-tilt pen records. Not part of the sealed record.
     capture_device: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # Explanations (not part of the sealed record).
     analysis: Mapped[dict] = mapped_column(JSON, default=dict)

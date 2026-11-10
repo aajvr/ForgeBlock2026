@@ -111,6 +111,9 @@ def profile_out(p: SignatureProfile, cons: dict | None = None) -> dict:
         "flagged": c.get("flagged", False),
         "enrolled_at": p.enrolled_at,
         "capture_device": p.capture_device,
+        "pen_label": "Limited pen data" if p.capture_device in ("limited", "development") else None,
+        "pen_missing": sorted(((p.features or {}).get("_pen") or {}).get("missing") or
+                              (["tilt"] if p.capture_device == "development" else [])),
         "status": p.status,
     }
 
@@ -195,6 +198,7 @@ def log_out(l: VerificationLog, db: Session, names_map: dict | None = None) -> d
         "expected_label": l.expected_label,
         "review_status": l.review_status,
         "capture_device": l.capture_device,
+        "pen_label": "Limited pen data" if l.capture_device in ("limited", "development") else None,
         "reference_count": len(l.reference_profile_ids or []),
         "created_at": l.created_at,
     }

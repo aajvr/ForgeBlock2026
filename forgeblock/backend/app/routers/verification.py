@@ -42,6 +42,7 @@ from ..services import (
     save_strokes,
     storage_path,
 )
+from . import pen_data
 from .common import VIEW_ONLY_HEADERS, active_profiles, client_safe, log_out, read_upload, threshold_strength
 
 router = APIRouter(tags=["screening"])
@@ -81,6 +82,8 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
         } if block else None,
         "integrity": integrity,
         "stored_sample": storage_path(l.test_sample_path) is not None,
+        # v8.11: plain-language note when pen pressure/tilt was left out (all viewers)
+        "pen_note": (l.analysis or {}).get("pen_data") if l.modality == "dynamic" else None,
     })
     if viewer.role in ("admin", "examiner"):
         out["analysis"] = l.analysis or {}
@@ -252,22 +255,11 @@ class DynamicScreenIn(BaseModel):
     expected_label: str | None = None
 
 
-def _dyn_embedding(strokes: Strokes) -> tuple[np.ndarray, str]:
-    """Embedding and capture device ("standard", or "development" for a pen
-    without tilt accepted under DEV_PEN_DEVICES)."""
+def _dyn_points(strokes: Strokes) -> np.ndarray:
     try:
-        pts = points_from_payload(strokes)
-        engine = get_engine()
-        return engine.dynamic_embedding(pts), engine.dynamic_capture_device(pts)
+        return points_from_payload(strokes)
     except (ValueError, KeyError, TypeError) as e:
         raise HTTPException(422, str(e) if isinstance(e, ValueError) else "Malformed stroke data.")
-
-
-def _same_device(profiles: list[SignatureProfile], device: str) -> list[SignatureProfile]:
-    """Development-pen signatures are compared only with development-pen
-    references, and Apple Pencil signatures only with Apple Pencil ones."""
-    want = "development" if device == "development" else None
-    return [p for p in profiles if p.capture_device == want]
 
 
 @router.post("/api/screen/dynamic")
@@ -281,20 +273,28 @@ def screen_dynamic(body: DynamicScreenIn, db: Session = Depends(get_db), user: U
     q = dynamic_quality(body.test)
     if not q["usable"]:
         raise HTTPException(422, " ".join(q["issues"]))
-    test, device = _dyn_embedding(body.test)
-    profiles = _same_device(profiles, device)
-    if not profiles:
-        kind = "development-pen" if device == "development" else "Apple Pencil"
-        raise HTTPException(409, f"{client.client_code} has no {kind} dynamic references. "
-                                 "Signatures are compared only with references from the same kind of pen.")
-    refs = [np.array(p.embedding) for p in profiles]
-    decision = dec.screen_dynamic_embedding(test, refs, engine.dynamic_cfg, MIN_ADAPTIVE_SAMPLES)
-    per_ref, best = _per_ref(test, profiles)
+    pts = _dyn_points(body.test)
+    try:
+        # v8.11: compared on the pen data both sides have (routers/pen_data.py)
+        test, pairs, mode, test_missing, cfg = pen_data.compare_set(pts, profiles)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if not pairs:
+        raise HTTPException(409, f"{client.client_code}'s dynamic references must be re-embedded on the computer "
+                                 "that enrolled them (Admin, Re-embed references) before they can be compared.")
+    profiles = [p for p, _ in pairs]
+    refs = [e for _, e in pairs]
+    decision = dec.screen_dynamic_embedding(test, refs, cfg, MIN_ADAPTIVE_SAMPLES)
+    per_ref = [{"profile_id": p.id, "cosine": round(dec.pair_metrics(test, e)["cosine"], 4)} for p, e in pairs]
+    best = max(per_ref, key=lambda r: r["cosine"])["profile_id"]
+    pen_note = pen_data.screening_note(mode, test_missing, pairs)
+    device = pen_data.LIMITED if pen_note else "standard"
     analysis = {
         "quality": q,
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
         "features": compare_features(dynamic_features(body.test), [p.features for p in profiles], "dynamic"),
+        "pen_data": pen_note,
     }
     log, _ = record_verification(
         db, user=user, modality="dynamic", mode="verify", decision=decision,

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from app.ml.dynamic_features import points_from_payload
-from app.ml.dynamic_model import PEN_REQUIRED, SvcDynamicModel, load_dynamic_model
+from app.ml.dynamic_model import SvcDynamicModel, load_dynamic_model
 from app.ml.engine import Engine
 
 WEIGHTS = Path(__file__).resolve().parents[1] / "weights"
@@ -47,12 +47,15 @@ def test_tilt_only_pad_data_is_accepted(model):
     assert model.embed(points_from_payload(s)).shape == (64,)
 
 
-def test_mouse_input_is_rejected(model):
+def test_mouse_input_is_accepted_as_limited(model):
+    """v8.11: no pressure and no tilt is accepted; both are left out."""
     s = [[{"x": p["x"], "y": p["y"], "t": p["t"], "pressure": 0.5, "tiltX": 0, "tiltY": 0} for p in st]
          for st in pencil(3)]
-    with pytest.raises(ValueError, match="Apple Pencil"):
-        model.embed(points_from_payload(s))
-    assert "Apple Pencil" in PEN_REQUIRED
+    pts = points_from_payload(s)
+    assert model.missing_channels(pts) == {"tilt", "pressure"}
+    assert model.capture_device(pts) == "limited"
+    e = model.embed(pts)
+    assert e.shape == (64,) and abs(np.linalg.norm(e) - 1) < 1e-6
 
 
 def test_engine_falls_back_on_a_bad_file(tmp_path):
@@ -69,17 +72,12 @@ def wacom(seed: int) -> list:
              for p in st] for st in pencil(seed)]
 
 
-def test_no_tilt_pen_needs_development_mode(model, monkeypatch):
-    from app import config
-
+def test_no_tilt_pen_is_limited(model):
     pts = points_from_payload(wacom(4))
-    monkeypatch.setattr(config, "DEV_PEN_DEVICES", False)
-    with pytest.raises(ValueError, match="Apple Pencil"):
-        model.embed(pts)
-    monkeypatch.setattr(config, "DEV_PEN_DEVICES", True)
     e = model.embed(pts)
     assert e.shape == (64,) and abs(np.linalg.norm(e) - 1) < 1e-6
-    assert model.capture_device(pts) == "development"
+    assert model.missing_channels(pts) == {"tilt"}
+    assert model.capture_device(pts) == "limited"
     assert model.capture_device(points_from_payload(pencil(4))) == "standard"
     # The missing angle features are neutral (training average), not a fixed angle.
     x, n = model.features(pts)

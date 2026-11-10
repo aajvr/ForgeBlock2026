@@ -38,6 +38,7 @@ from ..security import hash_password, require_admin, temporary_password
 from ..services import get_setting, load_strokes, log_activity, set_setting
 from .auth import user_out
 from .clients import delete_client_data
+from . import pen_data
 from .common import client_out, get_client_or_404, log_out, names
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -518,9 +519,10 @@ def reembed_profiles(db: Session = Depends(get_db), admin: User = Depends(requir
                 if strokes is None:
                     raise ValueError("strokes missing")
                 pts = points_from_payload(strokes)
-                p.embedding = engine.dynamic_embedding(pts).tolist()
-                dev = engine.dynamic_capture_device(pts)
-                p.capture_device = dev if dev == "development" else None
+                pen = pen_data.enroll_payload(pts)
+                p.embedding = pen["embedding"]
+                p.capture_device = pen["capture_device"]
+                p.features = {**pen_data.public_features(p.features), "_pen": pen["pen"]}
                 p.model_version = engine.dynamic_cfg["model_version"]
             updated += 1
         except Exception as e:  # keep going; report which profiles could not be updated

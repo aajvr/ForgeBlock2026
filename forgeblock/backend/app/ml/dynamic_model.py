@@ -12,8 +12,14 @@
     .kind          -> short label shown in /api/health
     .source        -> weights file name or None
     .default_config (optional) -> default thresholds/bounds for engine.py
-    .capture_device(points) (optional) -> "standard", or "development" for a
-        pen without tilt accepted only because DEV_PEN_DEVICES is on
+    .missing_channels(points) (optional) -> frozenset of the pen channels
+        the model uses but the signature lacks: "tilt" and/or "pressure"
+        (finger, mouse or a pen without tilt or pressure)
+    .embed(points, missing=...) (optional keyword) -> embedding with those
+        channels left out (set to their training average) as well; used to
+        compare two signatures on the pen data both of them have
+    .capture_device(points) (optional) -> "standard", or "limited" when the
+        signature lacks pen pressure and/or tilt (v8.11)
 
 backend/weights/dynamic_encoder.pt can hold either
   * a checkpoint exported by the team's SVC2004 notebook (svc_dynamic_colab,
@@ -28,16 +34,31 @@ from pathlib import Path
 import numpy as np
 
 TORCH_FILENAME = "dynamic_encoder.pt"
+# Optional (v8.11): the notebook's OWN_E3 checkpoint (base features only),
+# used for signatures without pen tilt. See engine.py.
+BASIC_FILENAME = "dynamic_encoder_basic.pt"
 MIN_PEN_DOWN = 10
-PEN_REQUIRED = ("This dynamic model needs Apple Pencil input (pen pressure and angle). "
-                "Please sign again with the Apple Pencil.")
 ORIENTATION_FEATURES = ("azimuth_sin", "azimuth_cos", "altitude")
+PRESSURE_FEATURES = ("pressure", "dpressure")
+CHANNEL_FEATURES = {"tilt": ORIENTATION_FEATURES, "pressure": PRESSURE_FEATURES}
+# Pen channels a signature can lack (v8.11). Such signatures are accepted and
+# marked "limited"; the missing channels are left out of the comparison.
+PEN_CHANNELS = ("tilt", "pressure")
 
 
-def _dev_pen_devices() -> bool:
-    from .. import config
+def mode_key(missing) -> str:
+    """Name of a comparison mode: "full", "no_tilt", "no_pressure" or "basic"."""
+    m = frozenset(missing or ())
+    if not m:
+        return "full"
+    if m >= {"tilt", "pressure"}:
+        return "basic"
+    return "no_" + next(iter(m))
 
-    return config.DEV_PEN_DEVICES
+
+def missing_from_key(key: str) -> frozenset:
+    return {"full": frozenset(), "no_tilt": frozenset({"tilt"}), "no_pressure": frozenset({"pressure"}),
+            "basic": frozenset(PEN_CHANNELS)}[key]
 
 
 def load_checkpoint(path: Path) -> dict:
@@ -68,7 +89,7 @@ class TorchDynamicModel:
         self.kind = "pytorch" if self.trained else "placeholder"
         self.source = path.name if path else None
 
-    def embed(self, points: np.ndarray) -> np.ndarray:
+    def embed(self, points: np.ndarray, missing=None) -> np.ndarray:
         torch = self._torch
         with torch.inference_mode():
             x = torch.from_numpy(self._features(points)).unsqueeze(0)
@@ -115,8 +136,10 @@ class SvcDynamicModel:
         self.model.load_state_dict(ck["model_state"])
         self.model.eval()
         names = set(self.spec.names)
-        self.needs_pressure = bool(names & {"pressure", "dpressure"})
-        self.needs_orientation = bool(names & {"azimuth_sin", "azimuth_cos", "altitude"})
+        self.needs_pressure = bool(names & set(PRESSURE_FEATURES))
+        self.needs_orientation = bool(names & set(ORIENTATION_FEATURES))
+        self.used_channels = frozenset(c for c, need in (("tilt", self.needs_orientation),
+                                                         ("pressure", self.needs_pressure)) if need)
         self.trained = True
         self.kind = "pytorch-svc"
         self.source = path.name
@@ -147,13 +170,27 @@ class SvcDynamicModel:
         has_pressure = bool(np.isfinite(pr[down]).all() and np.ptp(pr[down]) > 1e-6)
         return has_angles, has_pressure
 
-    def capture_device(self, points: np.ndarray) -> str:
-        """"development" when the pen has no tilt (only accepted with
-        DEV_PEN_DEVICES on), else "standard"."""
+    def missing_channels(self, points: np.ndarray) -> frozenset:
+        """Pen channels this model uses that the signature does not have."""
         pts = np.asarray(points, dtype=np.float64)
-        if pts.ndim != 2 or pts.shape[1] < 7 or len(pts) == 0:
-            return "standard"
-        return "development" if self.needs_orientation and not self._channels(pts)[0] else "standard"
+        if pts.ndim != 2 or len(pts) == 0:
+            return self.used_channels
+        if pts.shape[1] < 7:
+            pts = np.hstack([pts, np.full((len(pts), 7 - pts.shape[1]), np.nan)])
+        pts = pts[np.all(np.isfinite(pts[:, :4]), axis=1)]
+        if not (pts[:, 3] > 0.5).any():
+            return self.used_channels
+        has_angles, has_pressure = self._channels(pts)
+        lack = set()
+        if self.needs_orientation and not has_angles:
+            lack.add("tilt")
+        if self.needs_pressure and not has_pressure:
+            lack.add("pressure")
+        return frozenset(lack)
+
+    def capture_device(self, points: np.ndarray) -> str:
+        """"limited" when the signature lacks pen tilt and/or pressure, else "standard"."""
+        return "limited" if self.missing_channels(points) else "standard"
 
     def _raw(self, points: np.ndarray) -> tuple[np.ndarray, tuple]:
         """Browser points -> SVC2004 raw rows (N, 7) and the present-channel flags."""
@@ -169,10 +206,6 @@ class SvcDynamicModel:
             raise ValueError("The signature is too short. Please sign again.")
 
         has_angles, has_pressure = self._channels(pts)
-        if self.needs_pressure and not has_pressure:
-            raise ValueError(PEN_REQUIRED)
-        if self.needs_orientation and not has_angles and not _dev_pen_devices():
-            raise ValueError(PEN_REQUIRED)
         az, alt, pr = pts[:, 4], pts[:, 5], pts[:, 6]
 
         raw = np.full((len(pts), 7), np.nan)
@@ -187,8 +220,11 @@ class SvcDynamicModel:
             raw[:, 6] = np.where(down, np.nan_to_num(pr), 0.0) * 1023.0
         return raw, (True, True, True, True, has_angles, has_angles, has_pressure)
 
-    def features(self, points: np.ndarray) -> tuple[np.ndarray, int]:
-        """Scaled (T, F) feature matrix and its valid length."""
+    def features(self, points: np.ndarray, missing=None) -> tuple[np.ndarray, int]:
+        """Scaled (T, F) feature matrix and its valid length. The pen channels
+        in `missing`, and any the signature lacks, are left out: their
+        features get the training average (0 after standardization) instead
+        of a meaningless constant."""
         from .svc_dynamic.preprocess import compute_features, normalize_signature, resample
 
         raw, present = self._raw(points)
@@ -200,18 +236,20 @@ class SvcDynamicModel:
         res, length, dt = resample(norm, c.T, c.resample_mode, c.rate_hz, c.gap_factor)
         feats = compute_features(res, length, dt, self.spec.names, c.smooth_window)
         x = self.scaler.transform(feats, length)
+        drop = set(missing or ())
         if not present[4]:
-            # Development pen without tilt: the angle features get their
-            # training average (0 after standardization) instead of a
-            # meaningless constant angle.
-            for name in ORIENTATION_FEATURES:
+            drop.add("tilt")
+        if not present[6]:
+            drop.add("pressure")
+        for channel in drop:
+            for name in CHANNEL_FEATURES[channel]:
                 if name in self.spec.names:
                     x[:length, self.spec.names.index(name)] = 0.0
         return x, length
 
-    def embed(self, points: np.ndarray) -> np.ndarray:
+    def embed(self, points: np.ndarray, missing=None) -> np.ndarray:
         torch = self._torch
-        x, length = self.features(points)
+        x, length = self.features(points, missing)
         with torch.inference_mode():
             e = self.model.encode(torch.from_numpy(x)[None], torch.tensor([length]))[0]
         e = e.numpy().astype(np.float64)
