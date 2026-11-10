@@ -1,13 +1,22 @@
 {
   "thresholds": {
-    "cosine": 0.8924632349014282,
-    "euclidean": 0.40666562550682195,
-    "manhattan": 5.26983118057251
+    "cosine": 0.576663,
+    "euclidean": 0.913416,
+    "manhattan": 11.654791
   },
   "bounds": {
-    "cosine": [0.80, 0.97],
-    "euclidean": [0.25, 0.63],
-    "manhattan": [3.2, 8.0]
+    "cosine": [
+      0.21,
+      0.772
+    ],
+    "euclidean": [
+      0.64,
+      1.372
+    ],
+    "manhattan": [
+      8.215,
+      17.528
+    ]
   },
-  "threshold_source_note": "Default thresholds from thresholds_signet_validation.json (team's validation calibration)."
+  "threshold_source_note": "v8.12: ForgeBlock own static model (MobileNetV3-Large Siamese/triplet, trained on own 55-participant dataset, round 1 of 5, test participants [4, 6, 18, 30, 32, 34, 38, 39, 41, 52, 55] never seen). Default thresholds = EER point on those unseen participants (used with fewer than 7 references). Bounds = 1st-99th percentile of the adaptive thresholds of all 55 participants when unseen, widened."
 }
