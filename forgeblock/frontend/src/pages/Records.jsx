@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { LimitedPenBadge } from '../components/shared'
-import { Badge, Card, Empty, FindingBadge, Input, PageHeader, ScreeningBadge, Select, Spinner, Table, fmtDate, td } from '../components/ui'
+import { Badge, Card, Empty, FindingBadge, Input, PageHeader, ScreeningBadge, Select, Spinner, Table, fmtDay, fmtTime, td } from '../components/ui'
 
 // Decision column: the examiner's finding, "Needs decision" while the case is
 // open, or nothing when no case was needed (Consistent screenings).
@@ -40,7 +40,10 @@ export function RecordsTable({ rows, showExaminer = false }) {
           <td className={`${td} whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
             {l.case_code ? <Link to={`/app/cases/${l.case_id}`} className="text-brand-700 hover:underline">{l.case_code}</Link> : <span className="text-slate-400">-</span>}
           </td>
-          <td className={`${td} whitespace-nowrap text-slate-500`}>{fmtDate(l.created_at)}</td>
+          <td className={`${td} whitespace-nowrap pr-6 text-slate-500`}>
+            <span className="block">{fmtDay(l.created_at)}</span>
+            <span className="block text-xs text-slate-400">{fmtTime(l.created_at)}</span>
+          </td>
         </tr>
       ))}
     </Table>

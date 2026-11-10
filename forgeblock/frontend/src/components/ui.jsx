@@ -308,5 +308,6 @@ export function StrengthBadge({ strength }) {
 
 export const fmtDate = (d) => (d ? new Date(d.endsWith?.('Z') ? d : `${d}Z`).toLocaleString() : '-')
 export const fmtDay = (d) => (d ? new Date(d.endsWith?.('Z') ? d : `${d}Z`).toLocaleDateString() : '-')
+export const fmtTime = (d) => (d ? new Date(d.endsWith?.('Z') ? d : `${d}Z`).toLocaleTimeString() : '')
 export const shortHash = (h) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '-')
 export const pct = (v, digits = 1) => (v === null || v === undefined ? '-' : `${(v * 100).toFixed(digits)}%`)
