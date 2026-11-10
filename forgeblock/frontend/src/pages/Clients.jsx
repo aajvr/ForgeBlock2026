@@ -536,7 +536,7 @@ export default function Clients() {
         eyebrow={isAdmin && folder ? <button onClick={() => open_(null)} className="hover:underline">← All groups</button> : undefined}
         description={isAdmin
           ? 'Clients are kept in groups. Each group has one examiner, who is the only examiner that can see its clients. Right-click a client for quick actions.'
-          : 'The clients of your group. At least 5 references per module, 10 or more recommended, up to 20.'}
+          : 'The clients of your group. At least 7 references per module, 10 or more recommended, up to 20.'}
       >
         {isAdmin && !folder && <Button variant="secondary" onClick={() => setEditGroup('new')}><FolderPlus className="h-4 w-4" /> New group</Button>}
         <Button onClick={() => setOpen(true)} data-tour="new-client">

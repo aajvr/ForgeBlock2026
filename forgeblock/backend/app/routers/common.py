@@ -62,7 +62,7 @@ def active_profiles(db: Session, client_id: int, modality: str) -> list[Signatur
 
 def threshold_strength(count: int) -> dict:
     """Signature card badge: personal threshold strength from the number of
-    references (min 5, recommended 10, max 20)."""
+    references (min 7, recommended 10, max 20)."""
     if count >= RECOMMENDED_REFERENCES:
         level, label = "strong", "Strong"
         note = f"{count} references. Personal threshold is well supported."

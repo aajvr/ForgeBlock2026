@@ -29,7 +29,7 @@ function HowCalculated({ r }) {
       <p>
         {r.threshold_source === 'adaptive'
           ? `Personal thresholds were used: with ${r.reference_count} references on file, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary. They change whenever references are added or removed.`
-          : 'Standard thresholds were used, because the client has fewer than 5 references. With 5 or more, personal thresholds are used.'}
+          : 'Standard thresholds were used, because the client has fewer than 7 references. With 7 or more, personal thresholds are used.'}
       </p>
     </div>
   )

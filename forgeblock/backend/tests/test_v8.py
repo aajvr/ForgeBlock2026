@@ -107,16 +107,16 @@ def test_writer_dependent_confidence():
     cfg = {"thresholds": {"cosine": 0.85, "euclidean": 0.55, "manhattan": 4.0},
            "bounds": {"cosine": [0.80, 0.97], "euclidean": [0.25, 0.63], "manhattan": [1.0, 8.0]}}
     # A reference screened against its own set: high confidence, flagged as an exact match.
-    d = dec.screen_static_embedding(refs[3], refs, cfg, min_adaptive=5)
+    d = dec.screen_static_embedding(refs[3], refs, cfg, min_adaptive=7)
     assert d.classification == "genuine" and d.confidence >= 90, d.confidence
     assert dec.exact_match_index(refs[3], refs) == 3
     # A new genuine-like sample: clearly past the line (old scale gave ~30%).
     v = base + rng.normal(scale=0.035, size=64)
-    d = dec.screen_static_embedding(v / np.linalg.norm(v), refs, cfg, min_adaptive=5)
+    d = dec.screen_static_embedding(v / np.linalg.norm(v), refs, cfg, min_adaptive=7)
     assert d.classification == "genuine" and d.confidence >= 50, d.confidence
     # A different signer: forged side.
     other = rng.normal(size=64)
-    d = dec.screen_static_embedding(other / np.linalg.norm(other), refs, cfg, min_adaptive=5)
+    d = dec.screen_static_embedding(other / np.linalg.norm(other), refs, cfg, min_adaptive=7)
     assert d.classification == "forged" and d.confidence >= 50
 
     table = dec.error_reject_table([5, 15, 40, 80, 90], [False, True, True, True, True], bands=[0, 10, 20])

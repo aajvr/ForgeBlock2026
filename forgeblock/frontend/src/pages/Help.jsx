@@ -28,7 +28,7 @@ const FAQ = [
   {
     topic: 'Clients and references',
     items: [
-      ['How many reference signatures does a client need?', 'At least 5 per module, 10 or more recommended, 20 at most. The badge on the signature card shows this: Not ready (fewer than 5), Ready (5 to 9) and Strong (10 or more).'],
+      ['How many reference signatures does a client need?', 'At least 7 per module, 10 or more recommended, 20 at most. The badge on the signature card shows this: Not ready (fewer than 7), Ready (7 to 9) and Strong (10 or more).'],
       ['What does “Looks different from the others” mean?', 'That reference is much less similar to the client’s other references than they are to each other. It may be a poor scan, a different signature style, or someone else’s signature. Check it and remove it if needed.'],
       ['What makes a good scan?', 'One signature per image, dark ink on plain paper, scanned at 300 dpi or photographed straight on in good light. Each upload gets a quality score; blank, tiny or blurry images are refused.'],
       ['How do I delete a client?', 'Administrators: right-click the client in the Clients list (or press ⋯) and choose Delete client, then confirm. Their signatures and images are removed; the ledger keeps only hashes, so the chain stays valid.'],
@@ -42,7 +42,7 @@ const FAQ = [
       ['What happens if I screen the same signature again?', 'If the same file (or the same stroke data) was already decided, ForgeBlock shows “Decided: Genuine” or “Decided: Forged” with the examiner’s notes, and no new case is opened. The model’s own result stays the same, so the evaluation figures stay honest.'],
       ['What does “Add as reference” do?', 'After a Genuine decision, the examiner can add the questioned signature to the client’s references, so later screenings can match it better. It is optional.'],
       ['How is the confidence score measured?', 'For each measure (cosine, Euclidean and Manhattan for static; cosine and Euclidean for dynamic), ForgeBlock checks how far past the threshold the signature is, compared with the distance from the threshold to a perfect match. These are averaged and shown from 0 to 100%. A signature that passes by only a little gets a low confidence and may be Inconclusive.'],
-      ['What are personal thresholds?', 'With 5 or more references, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary (mean minus 1.5 times the spread, within fixed limits). They change whenever references are added or removed. With fewer than 5, standard thresholds are used.'],
+      ['What are personal thresholds?', 'With 7 or more references, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary (mean minus 1.5 times the spread, within fixed limits). They change whenever references are added or removed. With fewer than 7, standard thresholds are used.'],
       ['What is the difference between static and dynamic?', 'Static screens a scanned or photographed signature on paper. Dynamic screens a signature written live with a pen on a tablet, using the movement, timing and pressure. They are two separate modules; ForgeBlock does not combine them into one score.'],
     ],
   },

@@ -74,8 +74,8 @@ OAUTH_PROVIDERS = [_PROVIDER_ALIASES.get(p.strip(), p.strip())
 
 # Minimum number of genuine samples before adaptive (personal) thresholds
 # are used instead of the global defaults (Chapter 3, Section 3.4).
-MIN_ADAPTIVE_SAMPLES = int(os.getenv("MIN_ADAPTIVE_SAMPLES", "5"))
-# Reference counts per client and modality: 5 is the minimum (personal
+MIN_ADAPTIVE_SAMPLES = int(os.getenv("MIN_ADAPTIVE_SAMPLES", "7"))
+# Reference counts per client and modality: 7 is the minimum (personal
 # threshold turns on), 10 is recommended ("strong"), 20 is the maximum.
 RECOMMENDED_REFERENCES = int(os.getenv("RECOMMENDED_REFERENCES", "10"))
 MAX_REFERENCES = int(os.getenv("MAX_REFERENCES", "20"))

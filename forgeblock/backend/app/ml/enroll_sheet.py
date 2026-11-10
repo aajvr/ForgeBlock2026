@@ -9,9 +9,9 @@ the printed border never reaches the crop. Crops keep their natural paper and
 ink (not whitened), exactly like a questioned photo, so references and
 questioned signatures look alike to the model (see capture.py).
 
-Why 10 boxes: Chapter 3 needs at least 5 genuine references for a personal
+Why 10 boxes: ForgeBlock needs at least 7 genuine references for a personal
 threshold (MIN_ADAPTIVE_SAMPLES); 10 is the recommended number on the
-signature card, and leaves room to drop smudged boxes and still reach 5.
+signature card, and leaves room to drop smudged boxes and still reach 7.
 
 All geometry is in inches from the top-left page corner, shared by the PDF
 drawing, the test raster and the crop.

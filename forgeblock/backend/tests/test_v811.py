@@ -70,20 +70,20 @@ def _profile(pid, strokes, eng):
 
 
 def test_choose_mode(real_engine):
-    pencils = [_profile(i, pencil(10 + i), real_engine) for i in range(6)]
+    pencils = [_profile(i, pencil(10 + i), real_engine) for i in range(7)]
     fingers = [_profile(10 + i, finger(20 + i), real_engine) for i in range(2)]
-    # Pencil query, 6 Pencil references: full comparison, finger refs not used.
+    # Pencil query, 7 Pencil references: full comparison, finger refs not used.
     mode, used = pen_data.choose_mode(frozenset(), pencils + fingers)
-    assert mode == "full" and len(used) == 6
+    assert mode == "full" and len(used) == 7
     # Pencil query, only 2 Pencil references: every reference, basic mode.
     mode, used = pen_data.choose_mode(frozenset(), pencils[:2] + fingers)
     assert mode == "basic" and len(used) == 4
     # Finger query: basic mode with all references.
     mode, used = pen_data.choose_mode(frozenset({"tilt", "pressure"}), pencils + fingers)
-    assert mode == "basic" and len(used) == 8
+    assert mode == "basic" and len(used) == 9
     # No-pressure query: references with pressure can still be used without it.
     mode, used = pen_data.choose_mode(frozenset({"pressure"}), pencils)
-    assert mode == "no_pressure" and len(used) == 6
+    assert mode == "no_pressure" and len(used) == 7
 
 
 def test_compare_set_and_note(real_engine):
@@ -133,10 +133,10 @@ def test_a_tilt_model_is_refused_as_basic_model(tmp_path):
 def test_api_enroll_and_screen_limited(client, examiner, real_engine):
     cid = client.post("/api/clients", headers=examiner, json={"full_name": "Limited Pen"}).json()["id"]
     r = client.post(f"/api/clients/{cid}/dynamic/enroll", headers=examiner,
-                    json={"samples": [pencil(50 + i) for i in range(5)] + [finger(60)]})
+                    json={"samples": [pencil(50 + i) for i in range(7)] + [finger(60)]})
     assert r.status_code == 200, r.text
     body = r.json()
-    assert len(body["accepted"]) == 6 and not body["rejected"]
+    assert len(body["accepted"]) == 8 and not body["rejected"]
     assert body["accepted"][-1]["capture_device"] == "limited"
     assert "no pen pressure or tilt" in body["accepted"][-1]["notice"]
     assert body["limited_notice"] and "Limited pen data" in body["limited_notice"]
@@ -152,9 +152,9 @@ def test_api_enroll_and_screen_limited(client, examiner, real_engine):
     res = r.json()
     assert res["capture_device"] == "limited"
     assert res["analysis"]["pen_data"]["label"] == "Limited pen data"
-    assert res["reference_count"] == 6
-    # Pencil screening with 5 Pencil references: full comparison, no label.
+    assert res["reference_count"] == 8
+    # Pencil screening with 7 Pencil references: full comparison, no label.
     r = client.post("/api/screen/dynamic", headers=examiner, json={"test": pencil(52), "client_id": cid})
     res = r.json()
     assert r.status_code == 200 and res["capture_device"] is None and res["analysis"]["pen_data"] is None
-    assert res["reference_count"] == 5
+    assert res["reference_count"] == 7
