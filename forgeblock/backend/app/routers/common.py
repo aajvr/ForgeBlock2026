@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..config import MAX_REFERENCES, MIN_ADAPTIVE_SAMPLES, RECOMMENDED_REFERENCES
 from ..ml.engine import get_engine
+from ..ml.capture import standardize
 from ..ml.preprocessing import decode_image
 from ..ml.screening import LABELS
 from ..models import Case, Client, ClientGroup, Finding, SignatureProfile, User, VerificationLog
@@ -23,14 +24,18 @@ VIEW_ONLY_HEADERS = {
 }
 
 
-async def read_upload(upload: UploadFile) -> tuple[bytes, np.ndarray]:
+async def read_upload(upload: UploadFile, standardized: bool = True) -> tuple[bytes, np.ndarray]:
+    """Read an uploaded static image. By default printed lines (box borders,
+    ruled lines) are erased (app/ml/capture.py) so they are not mistaken for
+    ink; references and questioned signatures get the same treatment."""
     data = await upload.read()
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "Images must be 10 MB or smaller.")
     try:
-        return data, decode_image(data)
+        img = decode_image(data)
     except ValueError as e:
         raise HTTPException(422, str(e))
+    return data, standardize(img) if standardized else img
 
 
 def model_cfg(modality: str) -> dict:
@@ -106,6 +111,9 @@ def profile_out(p: SignatureProfile, cons: dict | None = None) -> dict:
         "flagged": c.get("flagged", False),
         "enrolled_at": p.enrolled_at,
         "capture_device": p.capture_device,
+        "pen_label": "Limited pen data" if p.capture_device in ("limited", "development") else None,
+        "pen_missing": sorted(((p.features or {}).get("_pen") or {}).get("missing") or
+                              (["tilt"] if p.capture_device == "development" else [])),
         "status": p.status,
     }
 
@@ -190,6 +198,7 @@ def log_out(l: VerificationLog, db: Session, names_map: dict | None = None) -> d
         "expected_label": l.expected_label,
         "review_status": l.review_status,
         "capture_device": l.capture_device,
+        "pen_label": "Limited pen data" if l.capture_device in ("limited", "development") else None,
         "reference_count": len(l.reference_profile_ids or []),
         "created_at": l.created_at,
     }

@@ -27,6 +27,21 @@ distance / 1.5, matching how personal thresholds are set, so a signature as
 close as the client's typical one scores about 87%. sd is never taken below
 5% of the distance to a perfect match. The decision
 itself (which side of the threshold) is unchanged.
+
+Calibrated confidence (v8.5): when the module has a calibration for the
+loaded model (weights/calibration.json, see engine.py), the same z-score is
+turned into the PROBABILITY that the signature is genuine by logistic
+(Platt) calibration fitted on held-out writers (Platt, 1999):
+
+    P(genuine) = 1 / (1 + exp(-(a * z + b)))
+
+with z the mean of the per-metric z-scores (static) or the cosine z-score
+(dynamic), not clipped to the decision side. The binary decision is then
+P(genuine) >= 0.5 and the confidence is the probability of the stated
+result, max(P, 1 - P) x 100 (capped at 99). The screening result uses a
+middle band of P (screening.py): Inconclusive when the probability is
+close to 50/50 (Chow's reject option, 1970). Without a calibration the
+v8.2 behaviour above is kept.
 """
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -47,6 +62,8 @@ class Decision:
     thresholds: dict
     threshold_source: str
     votes: dict = field(default_factory=dict)
+    p_genuine: float | None = None  # calibrated probability (v8.5), None if uncalibrated
+    band: tuple | None = None       # (lo, hi) Inconclusive band of this module's calibration
 
     def as_dict(self) -> dict:
         return {
@@ -57,6 +74,7 @@ class Decision:
             "thresholds": {k: round(v, 4) for k, v in self.thresholds.items()},
             "threshold_source": self.threshold_source,
             "votes": self.votes,
+            "p_genuine": None if self.p_genuine is None else round(self.p_genuine, 4),
         }
 
 
@@ -124,6 +142,29 @@ def _confidence(margins: list[float], genuine: bool) -> float:
     return float(np.clip(score, 0, CONFIDENCE_CAP))
 
 
+def calibrated_probability(z: float, calibration: dict) -> float:
+    """Platt calibration: P(genuine) = 1 / (1 + exp(-(a z + b)))."""
+    from math import exp
+
+    t = float(calibration["a"]) * float(np.clip(z, -15, 15)) + float(calibration["b"])
+    return 1.0 / (1.0 + exp(-t))
+
+
+def _band(calibration: dict | None) -> tuple | None:
+    b = (calibration or {}).get("band")
+    if b and len(b) == 2 and 0 <= float(b[0]) <= 0.5 <= float(b[1]) <= 1:
+        return float(b[0]), float(b[1])
+    return None
+
+
+def _calibrated(margins: list[float], calibration: dict) -> tuple[bool, float, float]:
+    """(genuine, confidence 0-99, P(genuine)) from the signed z margins."""
+    p = calibrated_probability(float(np.mean(margins)), calibration)
+    genuine = p >= 0.5
+    confidence = float(min(CONFIDENCE_CAP, 100 * (p if genuine else 1 - p)))
+    return genuine, confidence, p
+
+
 def _intra_user_stats(refs: list[np.ndarray]) -> dict:
     pairs = [pair_metrics(a, b) for a, b in combinations(refs, 2)]
     return {
@@ -146,7 +187,8 @@ def static_adaptive_thresholds(refs: list[np.ndarray], cfg: dict) -> dict:
     return {"cosine": cos_t, "euclidean": euc_t, "manhattan": man_t}
 
 
-def static_decision(metrics: dict, thresholds: dict, source: str, typical: dict | None = None) -> Decision:
+def static_decision(metrics: dict, thresholds: dict, source: str, typical: dict | None = None,
+                    calibration: dict | None = None) -> Decision:
     tc, te, tm = thresholds["cosine"], thresholds["euclidean"], thresholds["manhattan"]
     votes = {
         "cosine": metrics["cosine"] >= tc,
@@ -161,7 +203,11 @@ def static_decision(metrics: dict, thresholds: dict, source: str, typical: dict 
         _z_margin(metrics["euclidean"], te, typ.get("euclidean"), False),
         _z_margin(metrics["manhattan"], tm, typ.get("manhattan"), False),
     ]
-    confidence = _confidence(margins, genuine)
+    p = None
+    if calibration:
+        genuine, confidence, p = _calibrated(margins, calibration)
+    else:
+        confidence = _confidence(margins, genuine)
     return Decision(
         classification="genuine" if genuine else "forged",
         confidence=confidence,
@@ -170,6 +216,8 @@ def static_decision(metrics: dict, thresholds: dict, source: str, typical: dict 
         thresholds=thresholds,
         threshold_source=source,
         votes=votes,
+        p_genuine=p,
+        band=_band(calibration),
     )
 
 
@@ -180,7 +228,8 @@ def dynamic_personal_threshold(refs: list[np.ndarray], cfg: dict) -> float:
     return float(np.clip(m - ADAPTIVE_K * s, *cfg["bounds"]["cosine"]))
 
 
-def dynamic_decision(metrics: dict, tau_c: float, source: str, typical: dict | None = None) -> Decision:
+def dynamic_decision(metrics: dict, tau_c: float, source: str, typical: dict | None = None,
+                     calibration: dict | None = None) -> Decision:
     tau_e = float(np.sqrt(2 * (1 - tau_c)))
     votes = {
         "cosine": metrics["cosine"] >= tau_c,
@@ -188,7 +237,12 @@ def dynamic_decision(metrics: dict, tau_c: float, source: str, typical: dict | N
     }
     genuine = all(votes.values())
     sigma = metrics["cosine"]
-    confidence = _confidence([_z_margin(sigma, tau_c, (typical or {}).get("cosine"), True)], genuine)
+    margin = _z_margin(sigma, tau_c, (typical or {}).get("cosine"), True)
+    p = None
+    if calibration:
+        genuine, confidence, p = _calibrated([margin], calibration)
+    else:
+        confidence = _confidence([margin], genuine)
     return Decision(
         classification="genuine" if genuine else "forged",
         confidence=confidence,
@@ -197,6 +251,8 @@ def dynamic_decision(metrics: dict, tau_c: float, source: str, typical: dict | N
         thresholds={"cosine": tau_c, "euclidean": tau_e},
         threshold_source=source,
         votes=votes,
+        p_genuine=p,
+        band=_band(calibration),
     )
 
 
@@ -210,7 +266,7 @@ def screen_static_embedding(test: np.ndarray, refs: list[np.ndarray], cfg: dict,
         thresholds, source = static_adaptive_thresholds(refs, cfg), "adaptive"
     else:
         thresholds, source = cfg["thresholds"], "default"
-    return static_decision(metrics, thresholds, source, typical_genuine(refs))
+    return static_decision(metrics, thresholds, source, typical_genuine(refs), cfg.get("calibration"))
 
 
 def screen_dynamic_embedding(test: np.ndarray, refs: list[np.ndarray], cfg: dict, min_adaptive: int) -> Decision:
@@ -219,7 +275,7 @@ def screen_dynamic_embedding(test: np.ndarray, refs: list[np.ndarray], cfg: dict
         tau_c, source = dynamic_personal_threshold(refs, cfg), "adaptive"
     else:
         tau_c, source = cfg["thresholds"]["cosine"], "default"
-    return dynamic_decision(metrics, tau_c, source, typical_genuine(refs))
+    return dynamic_decision(metrics, tau_c, source, typical_genuine(refs), cfg.get("calibration"))
 
 
 def error_reject_table(confidences: list[float], correct: list[bool], bands=range(0, 51, 5)) -> list[dict]:

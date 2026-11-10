@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -21,6 +21,7 @@ from ..access import (
 from ..config import MAX_REFERENCES
 from ..database import get_db
 from ..ml.dynamic_features import points_from_payload
+from ..ml import enroll_sheet
 from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
 from ..ml.quality import dynamic_quality, static_quality
@@ -36,6 +37,7 @@ from ..services import (
     save_strokes,
     storage_path,
 )
+from . import pen_data
 from .common import (
     VIEW_ONLY_HEADERS,
     active_profiles,
@@ -276,6 +278,48 @@ async def enroll_static(client_id: int, files: list[UploadFile] = File(...), db:
     return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db)}
 
 
+@router.get("/clients/{client_id}/static/enrollment-sheet")
+def static_enrollment_sheet(client_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+    """Printable 10-box sheet for this client (blank form, holds no signature data)."""
+    c = editable_client_or_404(db, client_id, user)
+    pdf = enroll_sheet.render_pdf(c.client_code)  # code only, never the name (Section 3.2.1)
+    return Response(pdf, media_type="application/pdf",
+                    headers={**VIEW_ONLY_HEADERS,
+                             "Content-Disposition": f'inline; filename="enrollment-sheet-{c.client_code}.pdf"'})
+
+
+@router.post("/clients/{client_id}/static/sheet-preview")
+async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db: Session = Depends(get_db),
+                               user: User = Depends(require_staff)):
+    """Straightens a phone photo or scan of the enrollment sheet and returns the 10
+    cropped boxes for review. Nothing is stored: the examiner picks the boxes to
+    keep, and the page sends them to /static/enroll like any other upload."""
+    import base64
+
+    import cv2
+
+    editable_client_or_404(db, client_id, user)
+    _, img = await read_upload(file, standardized=False)  # the whole sheet, not one signature
+    try:
+        boxes = enroll_sheet.import_sheet(img)
+    except enroll_sheet.SheetError as e:
+        raise HTTPException(422, str(e))
+    out = []
+    for b in boxes:
+        ok, png = cv2.imencode(".png", b["image"])
+        q = {"usable": False, "score": 0.0, "issues": ["This box is empty."]} if b["empty"] \
+            else static_quality(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
+        out.append({
+            "index": b["index"],
+            "image": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode(),
+            "empty": b["empty"],
+            "usable": bool(q["usable"]),
+            "quality": q["score"],
+            "issues": q["issues"],
+        })
+    return {"boxes": out}
+
+
 class DynamicEnrollIn(BaseModel):
     samples: list[list[list[dict]]] = Field(min_length=1, max_length=MAX_REFERENCES)
 
@@ -294,8 +338,7 @@ def enroll_dynamic(client_id: int, body: DynamicEnrollIn, db: Session = Depends(
             continue
         try:
             pts = points_from_payload(strokes)
-            emb = engine.dynamic_embedding(pts)
-            device = engine.dynamic_capture_device(pts)
+            pen = pen_data.enroll_payload(pts)
         except (ValueError, KeyError, TypeError) as e:
             rejected.append({"file": f"Signature {i}", "issues": [str(e) if isinstance(e, ValueError) else "Malformed stroke data."]})
             continue
@@ -303,20 +346,28 @@ def enroll_dynamic(client_id: int, body: DynamicEnrollIn, db: Session = Depends(
             client_id=c.id,
             modality="dynamic",
             sample_path=save_strokes(strokes, f"profiles/dynamic/{c.id}"),
-            embedding=emb.tolist(),
+            embedding=pen["embedding"],
             model_version=engine.dynamic_cfg["model_version"],
-            features=dynamic_features(strokes),
+            features={**dynamic_features(strokes), "_pen": pen["pen"]},
             quality=q["score"],
-            capture_device=device if device == "development" else None,
+            capture_device=pen["capture_device"],
             enrolled_by=user.id,
         )
         db.add(p)
         db.commit()
-        accepted.append({"file": f"Signature {i}", "id": p.id, "quality": q["score"], "issues": q["issues"]})
+        notice = pen_data.enroll_notice(pen["pen"]["missing"])
+        accepted.append({"file": f"Signature {i}", "id": p.id, "quality": q["score"], "issues": q["issues"],
+                         "capture_device": p.capture_device, "pen_missing": pen["pen"]["missing"],
+                         "notice": notice})
+    limited = [a for a in accepted if a.get("notice")]
     if accepted:
         log_activity(db, user, "enrollment", f"Added {len(accepted)} dynamic reference(s) to {c.client_code}",
                      modality="dynamic")
-    return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db)}
+    return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db),
+            "limited_notice": (f"{len(limited)} of the saved signature(s) have no pen pressure or tilt and are "
+                               f"labelled \"{pen_data.LIMITED_LABEL}\". Your saved signature or pen did not record "
+                               "this pen data, so screenings with them compare shape and timing only."
+                               if limited else None)}
 
 
 def _profile(db: Session, profile_id: int, user: User, edit: bool = False) -> SignatureProfile:
@@ -360,7 +411,8 @@ def reference_strokes(profile_id: int, db: Session = Depends(get_db), user: User
     strokes = load_strokes(p.sample_path) if p.modality == "dynamic" else None
     if strokes is None:
         raise HTTPException(404, "Strokes not available.")
-    return {"strokes": strokes, "features": p.features}
+    return {"strokes": strokes, "features": pen_data.public_features(p.features),
+            "pen_missing": sorted(pen_data.ref_missing(p))}
 
 
 @router.get("/models/reference-counts")

@@ -32,6 +32,7 @@ from ..services import (
     save_image,
     save_strokes,
 )
+from . import pen_data
 from .common import active_profiles, examiner_ref, group_examiner, log_out, names
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -257,13 +258,14 @@ def add_as_reference(case_id: int, body: AddReferenceIn, db: Session = Depends(g
         if strokes is None:
             raise HTTPException(404, "The questioned strokes are no longer stored.")
         pts = points_from_payload(strokes)
-        device = engine.dynamic_capture_device(pts)
+        pen = pen_data.enroll_payload(pts)
         p = SignatureProfile(client_id=client.id, modality="dynamic",
                              sample_path=save_strokes(strokes, f"profiles/dynamic/{client.id}"),
-                             embedding=engine.dynamic_embedding(pts).tolist(),
+                             embedding=pen["embedding"],
                              model_version=engine.dynamic_cfg["model_version"],
-                             features=dynamic_features(strokes), quality=dynamic_quality(strokes)["score"],
-                             capture_device=device if device == "development" else None, enrolled_by=user.id)
+                             features={**dynamic_features(strokes), "_pen": pen["pen"]},
+                             quality=dynamic_quality(strokes)["score"],
+                             capture_device=pen["capture_device"], enrolled_by=user.id)
     db.add(p)
     db.commit()
     case_event(db, c.id, user, "reference_added",

@@ -4,8 +4,10 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import ImagePicker from '../components/ImagePicker'
+import SheetEnroll from '../components/SheetEnroll'
 import SignaturePad from '../components/SignaturePad'
-import { AuthImage, DevPenNotice, StrokePreview } from '../components/shared'
+import { penMissing } from '../components/penData'
+import { AuthImage, DevPenNotice, LimitedPenBadge, PenDataHint, StrokePreview } from '../components/shared'
 import {
   Alert,
   Avatar,
@@ -18,6 +20,7 @@ import {
   Modal,
   PageHeader,
   ScreeningBadge,
+  Segmented,
   Select,
   Spinner,
   StrengthBadge,
@@ -622,7 +625,7 @@ function RefTile({ p, modality, onRemove }) {
         {p.consistency !== null && <span className={p.flagged ? 'font-medium text-warn-700' : ''}>Match {p.consistency.toFixed(2)}</span>}
       </div>
       {p.flagged && <div className="mt-1 text-[12.5px] font-medium text-warn-700">Looks different from the others</div>}
-      {p.capture_device === 'development' && <div className="mt-1 text-[12.5px] font-medium text-violet-700">Development device</div>}
+      {p.pen_label && <div className="mt-1"><LimitedPenBadge missing={p.pen_missing} /></div>}
       {onRemove && <button onClick={() => onRemove(p)} className="absolute right-1 top-1 hidden rounded-md bg-white/90 p-1 text-slate-500 shadow-sm hover:text-bad-600 group-hover:block" aria-label="Remove reference">
         <Trash2 className="h-3.5 w-3.5" />
       </button>}
@@ -631,6 +634,23 @@ function RefTile({ p, modality, onRemove }) {
 }
 
 function StaticEnroll({ client, onDone }) {
+  const [mode, setMode] = useState('sheet')
+  return (
+    <div className="space-y-4">
+      <Segmented
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'sheet', label: 'Enrollment sheet (phone)' },
+          { value: 'images', label: 'Upload signature images' },
+        ]}
+      />
+      {mode === 'sheet' ? <SheetEnroll client={client} onDone={onDone} /> : <ImageEnroll client={client} onDone={onDone} />}
+    </div>
+  )
+}
+
+function ImageEnroll({ client, onDone }) {
   const [files, setFiles] = useState([])
   const [res, setRes] = useState(null)
   const [error, setError] = useState('')
@@ -678,10 +698,13 @@ function DynamicEnroll({ client, onDone }) {
   const [res, setRes] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [last, setLast] = useState(null)
   const add = () => {
     if (pad.current.isEmpty()) return setError('Please sign in the box first.')
     setError('')
-    setSamples([...samples, pad.current.getStrokes()])
+    const s = pad.current.getStrokes()
+    setSamples([...samples, s])
+    setLast(s)
     pad.current.clear()
   }
   const save = async () => {
@@ -701,7 +724,7 @@ function DynamicEnroll({ client, onDone }) {
   return (
     <div className="space-y-3">
       <label className="flex items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={penOnly} onChange={(e) => setPenOnly(e.target.checked)} /> Pen-only mode (Apple Pencil, or a development pen)
+        <input type="checkbox" checked={penOnly} onChange={(e) => setPenOnly(e.target.checked)} /> Pen-only mode (ignore finger and palm touches)
       </label>
       <DevPenNotice />
       <SignaturePad ref={pad} penOnly={penOnly} />
@@ -717,10 +740,12 @@ function DynamicEnroll({ client, onDone }) {
           {samples.map((s, i) => (
             <div key={i} className="rounded-md border border-slate-200 bg-white p-1">
               <StrokePreview strokes={s} className="h-10 w-24" />
+              {penMissing(s).length > 0 && <LimitedPenBadge missing={penMissing(s)} className="mt-1" />}
             </div>
           ))}
         </div>
       )}
+      {samples.length > 0 && <PenDataHint strokes={last} />}
       <Alert>{error}</Alert>
       {res && (
         <Alert kind={res.rejected.length ? 'warn' : 'success'}>
@@ -730,6 +755,7 @@ function DynamicEnroll({ client, onDone }) {
           ))}
         </Alert>
       )}
+      {res?.limited_notice && <Alert kind="warn">{res.limited_notice}</Alert>}
     </div>
   )
 }

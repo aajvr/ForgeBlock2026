@@ -255,7 +255,7 @@ def record_verification(
         expected_label=expected_label,
         best_match_profile_id=best_match_profile_id,
         analysis=analysis or {},
-        capture_device=capture_device if capture_device == "development" else None,
+        capture_device=capture_device if capture_device in ("development", "limited") else None,
     )
     db.add(log)
     db.commit()
