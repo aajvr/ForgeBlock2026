@@ -22,12 +22,12 @@ export function RecordsTable({ rows, showExaminer = false }) {
     <Table head={head}>
       {rows.map((l) => (
         <tr key={l.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/app/records/${l.id}`)}>
-          <td className={td}><span className="font-mono text-sm font-medium text-brand-700">{l.receipt_code}</span></td>
+          <td className={`${td} whitespace-nowrap`}><span className="font-mono text-sm font-medium text-brand-700">{l.receipt_code}</span></td>
           <td className={td}>
             <Badge tone={l.modality === 'static' ? 'blue' : 'violet'}>{l.modality === 'static' ? 'Static' : 'Dynamic'}</Badge>
             {l.pen_label && <LimitedPenBadge className="ml-1.5" />}
           </td>
-          <td className={td}>{l.client_code || <span className="text-slate-400">-</span>}</td>
+          <td className={`${td} whitespace-nowrap`}>{l.client_code || <span className="text-slate-400">-</span>}</td>
           {showExaminer && (
             <td className={td}>
               <span className="block">{l.performed_by_name || '-'}</span>
@@ -37,7 +37,7 @@ export function RecordsTable({ rows, showExaminer = false }) {
           <td className={td}><ScreeningBadge value={l.screening_result} /></td>
           <td className={`${td} text-right tabular-nums`}>{l.confidence_score.toFixed(1)}%</td>
           <td className={td}><DecisionCell row={l} /></td>
-          <td className={td} onClick={(e) => e.stopPropagation()}>
+          <td className={`${td} whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
             {l.case_code ? <Link to={`/app/cases/${l.case_id}`} className="text-brand-700 hover:underline">{l.case_code}</Link> : <span className="text-slate-400">-</span>}
           </td>
           <td className={`${td} whitespace-nowrap text-slate-500`}>{fmtDate(l.created_at)}</td>
@@ -97,7 +97,7 @@ export default function Records() {
       />
       {data && <Summary s={data.summary} />}
       <Card bodyClass="p-0">
-        <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
           <div className="relative lg:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input value={filters.q} onChange={set('q')} placeholder="Receipt, client or case" style={{ paddingLeft: '2.25rem' }} />
@@ -120,7 +120,7 @@ export default function Records() {
             <option value="forged">Forged</option>
             <option value="none">No case</option>
           </Select>
-          <div className="flex items-center gap-2">
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:col-span-2 2xl:col-span-3">
             <Input type="date" value={filters.date_from} onChange={set('date_from')} aria-label="From" />
             <Input type="date" value={filters.date_to} onChange={set('date_to')} aria-label="To" />
           </div>

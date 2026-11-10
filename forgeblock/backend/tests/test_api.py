@@ -81,7 +81,7 @@ def test_idle_timeout(client, admin):
     assert r.status_code == 401 and "without activity" in r.json()["detail"]
 
 
-def _client_with_refs(c, h, name="Juan Dela Cruz", n=5):
+def _client_with_refs(c, h, name="Juan Dela Cruz", n=7):
     r = c.post("/api/clients", headers=h, json={"full_name": name})
     assert r.status_code == 200, r.text
     cid = r.json()["id"]
@@ -96,7 +96,7 @@ def test_static_screening_case_and_finding(client, examiner, examiner2, admin):
     cid = _client_with_refs(client, examiner)
     card = client.get(f"/api/clients/{cid}", headers=examiner).json()
     assert card["static_strength"]["level"] == "basic"
-    assert len(card["static_references"]) == 5
+    assert len(card["static_references"]) == 7
 
     # Blank uploads are rejected by the quality check.
     r = client.post(f"/api/clients/{cid}/static/enroll", headers=examiner,

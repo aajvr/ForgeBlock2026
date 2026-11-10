@@ -1,0 +1,58 @@
+{
+  "static": {
+    "f5f7cf01b8c40d87": {
+      "a": 1.9663,
+      "b": -2.4516,
+      "band": [
+        0.35,
+        0.65
+      ],
+      "model": "static_model.keras v8.12: MobileNetV3-Large Siamese (triplet loss) trained on ForgeBlock's own 55-participant static dataset",
+      "fitted_on": "ForgeBlock own static dataset, all 55 participants each screened by the round model that never saw them (5-fold person-disjoint, cross-validated Platt); refs G1-10, screened G11-20 + 20 skilled forgeries; 1650 screenings",
+      "auc": 0.873,
+      "eer": 0.21,
+      "ece": 0.039,
+      "rates": {
+        "genuine": {
+          "C": 50.5,
+          "inconcl": 32.4,
+          "X": 17.1
+        },
+        "forgery": {
+          "C": 5.4,
+          "inconcl": 20.6,
+          "X": 74.0
+        }
+      },
+      "date": "2026-11-10"
+    }
+  },
+  "static_client_classifier": {
+    "f5f7cf01b8c40d87": {
+      "a": 6.3925,
+      "b": -5.4503,
+      "band": [
+        0.35,
+        0.65
+      ],
+      "model": "static_model.keras v8.12 + per-client LS-SVM (app/ml/client_classifier.py, gamma_scale 2, lambda 10)",
+      "fitted_on": "ForgeBlock own static dataset, all 55 participants each screened by the round model that never saw them (5-fold person-disjoint, cross-validated Platt); refs G1-10, screened G11-20 + 20 skilled forgeries; 1650 screenings; background = the other 10 test participants of the same round x 10 references",
+      "auc": 0.912,
+      "eer": 0.169,
+      "ece": 0.013,
+      "rates": {
+        "genuine": {
+          "C": 61.1,
+          "inconcl": 22.4,
+          "X": 16.5
+        },
+        "forgery": {
+          "C": 6.4,
+          "inconcl": 11.0,
+          "X": 82.6
+        }
+      },
+      "date": "2026-11-10"
+    }
+  }
+}

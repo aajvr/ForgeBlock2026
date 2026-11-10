@@ -51,7 +51,7 @@ export function Field({ label, hint, children, className = '' }) {
 }
 
 export const inputClass =
-  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100'
+  'w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100'
 
 export function Input(props) {
   return <input className={inputClass} {...props} />

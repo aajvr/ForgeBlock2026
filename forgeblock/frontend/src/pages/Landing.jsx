@@ -94,7 +94,7 @@ const SECTIONS = [
 
 // The scroll story: each step lights up the matching part of the dashboard.
 const STORY = [
-  { title: 'Register the client’s signatures', text: 'An examiner enrolls 5 to 20 genuine signatures for each client.' },
+  { title: 'Register the client’s signatures', text: 'An examiner enrolls 7 to 20 genuine signatures for each client.' },
   { title: 'Screen a questioned signature', text: 'ForgeBlock compares it and gives a result with a confidence score.' },
   { title: 'The examiner decides', text: 'Anything not clearly Consistent goes to the examiner for a Genuine or Forged finding.' },
   { title: 'Every result is sealed in the ledger', text: 'Each screening and decision is sealed in a hash-linked block with a receipt code.' },

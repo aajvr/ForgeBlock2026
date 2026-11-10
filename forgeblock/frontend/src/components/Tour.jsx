@@ -9,7 +9,7 @@ const STEPS = {
   examiner: [
     { title: 'Welcome to ForgeBlock', text: 'This short tour shows where everything is in your examiner workspace. It takes about a minute.' },
     { target: 'nav-home', title: 'My work', text: 'Your start page: cases waiting for your decision and your latest screenings.' },
-    { target: 'nav-clients', title: 'Clients', text: 'The clients of your group. Register a client (add their email to create their account) and enroll their genuine signatures: at least 5, and 10 or more for the best results.' },
+    { target: 'nav-clients', title: 'Clients', text: 'The clients of your group. Register a client (add their email to create their account) and enroll their genuine signatures: at least 7, and 10 or more for the best results.' },
     { target: 'nav-screen', title: 'Screen a signature', text: 'Upload a scanned signature (Static) or have it signed with the pen (Dynamic). ForgeBlock compares it with the client’s signatures on file.' },
     { target: 'nav-cases', title: 'Cases', text: 'When a result is Inconclusive or Inconsistent, a case opens here. You decide Genuine or Forged and write your notes.' },
     { target: 'nav-records', title: 'Records', text: 'Every screening you made, with its result, your decision and its receipt code.' },
