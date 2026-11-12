@@ -288,9 +288,23 @@ def access_policy(db: Session = Depends(get_db), admin: User = Depends(require_a
 
 # -------------------------------------------------------------- audit log ---
 
+@router.get("/audit/actors")
+def audit_actors(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Everyone who appears in the audit log (for the "Who" filter), and
+    whether there are system entries (no user)."""
+    ids = [i for i in db.scalars(select(ActivityLog.user_id).distinct()) if i is not None]
+    users = db.scalars(select(User).where(User.id.in_(ids)).order_by(User.full_name)).all() if ids else []
+    has_system = db.scalar(select(func.count()).select_from(ActivityLog).where(ActivityLog.user_id.is_(None))) or 0
+    return {
+        "users": [{"id": u.id, "full_name": u.full_name, "role": u.role, "account_code": u.account_code} for u in users],
+        "has_system": bool(has_system),
+    }
+
+
 @router.get("/audit")
 def audit_log(
     user_id: int | None = None,
+    system: bool = False,
     activity_type: str | None = None,
     q: str | None = None,
     limit: int = Query(300, le=2000),
@@ -298,7 +312,9 @@ def audit_log(
     admin: User = Depends(require_admin),
 ):
     stmt = select(ActivityLog).order_by(ActivityLog.id.desc())
-    if user_id:
+    if system:
+        stmt = stmt.where(ActivityLog.user_id.is_(None))
+    elif user_id:
         stmt = stmt.where(ActivityLog.user_id == user_id)
     if activity_type:
         stmt = stmt.where(ActivityLog.activity_type == activity_type)
