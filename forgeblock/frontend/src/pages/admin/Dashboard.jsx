@@ -13,6 +13,7 @@ export default function Dashboard() {
   }, [days])
   if (!d) return <Spinner />
   const t = d.totals
+  const since = new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10)
   return (
     <>
       <PageHeader eyebrow="Administrator" title="Dashboard" description="Screening activity, workload and system health at a glance.">
@@ -21,16 +22,16 @@ export default function Dashboard() {
       {(t.open_cases > 0 || d.deletion_requests > 0) && (
         <Alert kind="warn" className="mb-6">
           Needs attention:{' '}
-          {t.open_cases > 0 && <Link to="/app/cases" className="font-medium underline">{t.open_cases} case(s) waiting for the examiner’s decision</Link>}
+          {t.open_cases > 0 && <Link to="/app/cases?status=open" className="font-medium underline">{t.open_cases} case(s) waiting for the examiner’s decision</Link>}
           {t.open_cases > 0 && d.deletion_requests > 0 && ' · '}
           {d.deletion_requests > 0 && <Link to="/app/admin/settings" className="font-medium underline">{d.deletion_requests} deletion request(s)</Link>}
         </Alert>
       )}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Clients on file" value={t.clients} icon={Users} tone="indigo" />
-        <Stat label="Cases needing a decision" value={t.open_cases} icon={Briefcase} tone="amber" />
-        <Stat label="Screenings (all time)" value={t.screenings} icon={ScanSearch} hint={d.average_confidence !== null ? `Average confidence ${d.average_confidence}% in this period` : undefined} />
-        <Stat label="Ledger blocks" value={t.chain_height} icon={Link2} tone="green" hint={d.ledger ? (d.ledger.valid ? 'Last auto-check: intact' : 'Last auto-check: FAILED') : 'Not checked yet'} />
+        <Stat label="Clients on file" value={t.clients} icon={Users} tone="indigo" to="/app/clients" />
+        <Stat label="Cases needing a decision" value={t.open_cases} icon={Briefcase} tone="amber" to="/app/cases?status=open" />
+        <Stat label="Screenings (all time)" value={t.screenings} icon={ScanSearch} to="/app/records" hint={d.average_confidence !== null ? `Average confidence ${d.average_confidence}% in this period` : undefined} />
+        <Stat label="Ledger blocks" value={t.chain_height} icon={Link2} tone="green" to="/app/admin/ledger" hint={d.ledger ? (d.ledger.valid ? 'Last auto-check: intact' : 'Last auto-check: FAILED') : 'Not checked yet'} />
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_340px]">
         <Card title="Screenings per day" subtitle={`Last ${days} days, by screening result`}>
@@ -38,9 +39,9 @@ export default function Dashboard() {
         </Card>
         <div className="space-y-6">
           <Card title="Screening results" subtitle={`Last ${days} days`}>
-            <HBars rows={['consistent', 'inconclusive', 'inconsistent'].map((k) => ({ label: k[0].toUpperCase() + k.slice(1), value: d.results[k], color: RESULT_COLORS[k] }))} />
+            <HBars rows={['consistent', 'inconclusive', 'inconsistent'].map((k) => ({ label: k[0].toUpperCase() + k.slice(1), value: d.results[k], color: RESULT_COLORS[k], to: `/app/records?result=${k}&date_from=${since}` }))} />
             <div className="mt-4 border-t border-slate-100 pt-4">
-              <HBars rows={[{ label: 'Static', value: d.by_modality.static }, { label: 'Dynamic', value: d.by_modality.dynamic, color: '#6d28d9' }]} />
+              <HBars rows={[{ label: 'Static', value: d.by_modality.static, to: `/app/records?modality=static&date_from=${since}` }, { label: 'Dynamic', value: d.by_modality.dynamic, color: '#6d28d9', to: `/app/records?modality=dynamic&date_from=${since}` }]} />
             </div>
           </Card>
           <Card title="Examiner workload" subtitle={`Screenings in the last ${days} days`}>

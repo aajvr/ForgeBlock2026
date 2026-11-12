@@ -31,14 +31,15 @@ export default function ExaminerHome() {
   if (user.role === 'admin') return <Navigate to="/app/admin" replace />
   if (!d) return <Spinner />
   const c = d.counts
+  const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10)
   return (
     <>
       <PageHeader eyebrow="Examiner" title={`Good day, ${user.full_name.split(' ')[0]}`} description="What needs your decision, and your latest screenings." />
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Needs your decision" value={c.open_cases} icon={Briefcase} tone="amber" />
-        <Stat label="Screenings this week" value={c.screenings_week} icon={ScanSearch} />
-        <Stat label="Decisions made" value={c.decided} icon={CheckCircle2} tone="green" />
-        <Stat label="Clients you can screen" value={c.clients} icon={Users} tone="violet" />
+        <Stat label="Needs your decision" value={c.open_cases} icon={Briefcase} tone="amber" to="/app/cases?status=open" />
+        <Stat label="Screenings this week" value={c.screenings_week} icon={ScanSearch} to={`/app/records?date_from=${weekAgo}`} />
+        <Stat label="Decisions made" value={c.decided} icon={CheckCircle2} tone="green" to="/app/cases?status=closed" />
+        <Stat label="Clients you can screen" value={c.clients} icon={Users} tone="violet" to="/app/clients" />
       </div>
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <Action to="/app/screen" icon={ScanSearch} title="Screen a signature" text="Compare a questioned signature with a client on file." />

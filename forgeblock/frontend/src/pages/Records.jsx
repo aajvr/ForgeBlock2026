@@ -1,9 +1,10 @@
 import { ClipboardList, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { LimitedPenBadge } from '../components/shared'
+import { patchParams } from '../components/params'
 import { Badge, Card, Empty, FindingBadge, Input, PageHeader, ScreeningBadge, Select, Spinner, Table, fmtDay, fmtTime, td } from '../components/ui'
 
 // Decision column: the examiner's finding, "Needs decision" while the case is
@@ -72,9 +73,14 @@ function Summary({ s }) {
   )
 }
 
+const FILTER_KEYS = ['q', 'modality', 'result', 'decision', 'date_from', 'date_to']
+
 export default function Records() {
   const { user } = useAuth()
-  const [filters, setFilters] = useState({ q: '', modality: '', result: '', decision: '', date_from: '', date_to: '' })
+  // Filters live in the URL (?result=inconclusive&date_from=…) so the dashboard can link to them.
+  const [params, setParams] = useSearchParams()
+  const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']))
+  const filterKey = params.toString()
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
@@ -87,9 +93,10 @@ export default function Records() {
       }).catch((e) => setError(e.message))
     }, filters.q ? 250 : 0)
     return () => clearTimeout(t)
-  }, [filters])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey])
 
-  const set = (k) => (e) => setFilters((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => patchParams(setParams, { [k]: e.target.value || null })
   return (
     <>
       <PageHeader

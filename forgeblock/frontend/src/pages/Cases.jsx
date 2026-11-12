@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { patchParams } from '../components/params'
 import { Alert, Badge, Button, Card, Empty, Field, FindingBadge, Input, Modal, PageHeader, ScreeningBadge, Segmented, Select, Spinner, Table, Tabs, Textarea, fmtDay, td } from '../components/ui'
 
 export const STATUS_TONE = { open: 'amber', awaiting_second_opinion: 'gray', closed: 'gray' }
@@ -115,8 +116,11 @@ export function CasesTable({ cases, compact = false, showExaminer = false }) {
 export default function Cases() {
   const { user } = useAuth()
   const [params, setParams] = useSearchParams()
-  const [scope, setScope] = useState(user.role === 'admin' ? 'all' : 'mine')
-  const [status, setStatus] = useState('open')
+  const isAdmin = user.role === 'admin'
+  const scope = isAdmin ? (params.get('scope') === 'mine' ? 'mine' : 'all') : 'mine'
+  const status = params.has('status') ? (params.get('status') === 'all' ? '' : params.get('status')) : 'open'
+  const setScope = (v) => patchParams(setParams, { scope: v === 'all' ? null : v })
+  const setStatus = (v) => patchParams(setParams, { status: v === 'open' ? null : v || 'all' })
   const [q, setQ] = useState('')
   const [cases, setCases] = useState(null)
   const [error, setError] = useState('')
@@ -136,7 +140,7 @@ export default function Cases() {
         title="Cases"
         description="Screenings that were not clearly Consistent wait here for the examiner’s decision: Genuine or Forged, with notes."
       >
-        <Button onClick={() => setParams({ new: '1' })} data-tour="new-case">
+        <Button onClick={() => patchParams(setParams, { new: '1' }, false)} data-tour="new-case">
           <Plus className="h-4 w-4" /> Open a case
         </Button>
       </PageHeader>
@@ -149,7 +153,7 @@ export default function Cases() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
-          {user.role === 'admin' ? (
+          {isAdmin ? (
             <Segmented value={scope} onChange={setScope} options={[{ value: 'all', label: 'All examiners' }, { value: 'mine', label: 'Mine' }]} />
           ) : (
             <span className="text-sm text-slate-500">Your cases only.</span>
@@ -165,10 +169,10 @@ export default function Cases() {
         ) : cases.length === 0 ? (
           <Empty icon={Briefcase}>{status === 'open' ? 'Nothing waiting for a decision.' : 'No cases here yet.'}</Empty>
         ) : (
-          <CasesTable cases={cases} showExaminer={user.role === 'admin'} />
+          <CasesTable cases={cases} showExaminer={isAdmin} />
         )}
       </Card>
-      <NewCaseModal open={newOpen} onClose={() => setParams({})} clientId={params.get('client') || ''} />
+      <NewCaseModal open={newOpen} onClose={() => patchParams(setParams, { new: null, client: null })} clientId={params.get('client') || ''} />
     </>
   )
 }

@@ -1,5 +1,6 @@
-import { CheckCircle2, CircleAlert, CircleHelp, Info, Loader2, X, XCircle } from 'lucide-react'
+import { CheckCircle2, ChevronRight, CircleAlert, CircleHelp, Info, Loader2, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 export function Card({ title, subtitle, actions, children, className = '', bodyClass = 'p-5' }) {
   return (
@@ -142,9 +143,10 @@ const STAT_TILES = {
   indigo: 'bg-indigo-100 text-indigo-800',
 }
 
-export function Stat({ label, value, hint, icon: Icon, tone = 'brand' }) {
-  return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-soft">
+// A stat card. With `to` the whole card is a router link to the matching page.
+export function Stat({ label, value, hint, icon: Icon, tone = 'brand', to, ariaLabel }) {
+  const body = (
+    <>
       <div className="flex items-start justify-between gap-3 text-sm text-slate-500">
         {label}
         {Icon && (
@@ -155,7 +157,19 @@ export function Stat({ label, value, hint, icon: Icon, tone = 'brand' }) {
       </div>
       <div className="mt-2 text-3xl font-semibold tabular-nums text-slate-900">{value}</div>
       {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
-    </div>
+    </>
+  )
+  const base = 'rounded-2xl border border-slate-200/70 bg-white p-5 shadow-soft'
+  if (!to) return <div className={base}>{body}</div>
+  return (
+    <Link
+      to={to}
+      aria-label={ariaLabel || `${typeof label === 'string' ? label : 'Open'}: ${typeof value === 'string' || typeof value === 'number' ? value : ''}`.trim()}
+      className={`group relative block cursor-pointer transition-all duration-150 hover:-translate-y-px hover:border-brand-200 hover:shadow-md focus-visible:-translate-y-px focus-visible:border-brand-500 focus-visible:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 ${base}`}
+    >
+      {body}
+      <ChevronRight aria-hidden className="absolute right-2 top-2 h-4 w-4 text-brand-600 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" />
+    </Link>
   )
 }
 

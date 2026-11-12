@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState } from 'react'
 
 // Status colours for screening results (always shown with a label).
@@ -82,15 +83,23 @@ export function HBars({ rows, color = '#0f6cbd' }) {
   const max = Math.max(1, ...rows.map((r) => r.value))
   return (
     <div className="space-y-2">
-      {rows.map((r) => (
-        <div key={r.label} className="grid grid-cols-[120px_1fr_40px] items-center gap-3 text-sm" title={`${r.label}: ${r.value}`}>
-          <span className="truncate text-slate-600">{r.label}</span>
-          <div className="h-2.5 rounded-full bg-slate-100">
-            <div className="h-full rounded-full" style={{ width: `${(r.value / max) * 100}%`, background: r.color || color }} />
-          </div>
-          <span className="text-right tabular-nums text-slate-700">{r.value}</span>
-        </div>
-      ))}
+      {rows.map((r) => {
+        const inner = (
+          <>
+            <span className={`truncate ${r.to ? 'text-brand-700 group-hover:underline' : 'text-slate-600'}`}>{r.label}</span>
+            <div className="h-2.5 rounded-full bg-slate-100">
+              <div className="h-full rounded-full" style={{ width: `${(r.value / max) * 100}%`, background: r.color || color }} />
+            </div>
+            <span className="text-right tabular-nums text-slate-700">{r.value}</span>
+          </>
+        )
+        const cls = 'grid grid-cols-[120px_1fr_40px] items-center gap-3 text-sm'
+        return r.to ? (
+          <Link key={r.label} to={r.to} className={`group -mx-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-slate-50 ${cls}`} title={`${r.label}: ${r.value}. Open these records`}>{inner}</Link>
+        ) : (
+          <div key={r.label} className={cls} title={`${r.label}: ${r.value}`}>{inner}</div>
+        )
+      })}
     </div>
   )
 }
