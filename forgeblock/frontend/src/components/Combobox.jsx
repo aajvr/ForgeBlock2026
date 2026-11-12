@@ -4,19 +4,23 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 // A searchable dropdown (combobox) for filters.
 //   options: [{ value, label, sub?, prefix? (node), keywords? }]
 //   value '' means the "any" option (anyLabel).
-export function Combobox({ label, value, onChange, options, anyLabel = 'Any', placeholder = 'Search…', className = '', extra }) {
+//   tabs: optional [{ value, label }] shown above the list; an option shows under
+//   a tab when its `group` matches. Options with `tabOnly` show only under their tab.
+export function Combobox({ label, value, onChange, options, anyLabel = 'Any', placeholder = 'Search…', className = '', extra, tabs }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [tab, setTab] = useState('')
   const [active, setActive] = useState(0)
   const ref = useRef(null)
   const listRef = useRef(null)
   const id = useId()
   const all = useMemo(() => [{ value: '', label: anyLabel }, ...(extra || []), ...options], [anyLabel, extra, options])
   const shown = useMemo(() => {
+    const inTab = all.filter((o) => o.value === '' || (tab ? o.group === tab : !o.tabOnly))
     const t = q.trim().toLowerCase()
-    if (!t) return all
-    return all.filter((o) => o.value !== '' && `${o.label} ${o.sub || ''} ${o.keywords || ''}`.toLowerCase().includes(t))
-  }, [all, q])
+    if (!t) return inTab
+    return inTab.filter((o) => o.value !== '' && `${o.label} ${o.sub || ''} ${o.keywords || ''}`.toLowerCase().includes(t))
+  }, [all, q, tab])
   const current = all.find((o) => String(o.value) === String(value)) || all[0]
 
   useEffect(() => {
@@ -25,7 +29,12 @@ export function Combobox({ label, value, onChange, options, anyLabel = 'Any', pl
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [open])
-  useEffect(() => setActive(0), [q, open])
+  useEffect(() => setActive(0), [q, open, tab])
+  // Open on the tab of the current choice.
+  useEffect(() => {
+    if (open && tabs) setTab(current.group && tabs.some((t) => t.value === current.group) ? current.group : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [active])
@@ -57,7 +66,24 @@ export function Combobox({ label, value, onChange, options, anyLabel = 'Any', pl
         <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute left-0 z-40 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+        <div className="absolute left-0 z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+          {tabs && (
+            <div role="tablist" aria-label={`${label} by role`} className="flex flex-wrap gap-1 p-1">
+              {[{ value: '', label: 'All' }, ...tabs].map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.value}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setTab(t.value)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${tab === t.value ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="relative p-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input

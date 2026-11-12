@@ -1,12 +1,12 @@
 import { Briefcase, Plus, Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { Combobox, FilterChip } from '../components/Combobox'
 import { patchParams } from '../components/params'
 import { useUsers } from '../components/useUsers'
-import { Alert, Badge, Button, Card, Empty, Field, FindingBadge, Input, Modal, PageHeader, ScreeningBadge, Segmented, Select, Spinner, Table, Tabs, Textarea, fmtDay, td } from '../components/ui'
+import { Alert, Badge, Button, Card, Empty, Field, FindingBadge, Input, Modal, PageHeader, ScreeningBadge, Select, Spinner, Table, Tabs, Textarea, fmtDay, td } from '../components/ui'
 
 export const STATUS_TONE = { open: 'amber', awaiting_second_opinion: 'gray', closed: 'gray' }
 
@@ -119,15 +119,17 @@ export default function Cases() {
   const { user } = useAuth()
   const [params, setParams] = useSearchParams()
   const isAdmin = user.role === 'admin'
-  const scope = isAdmin ? (params.get('scope') === 'mine' ? 'mine' : 'all') : 'mine'
   const status = params.has('status') ? (params.get('status') === 'all' ? '' : params.get('status')) : 'open'
-  const examinerId = isAdmin ? params.get('examiner') || '' : ''
-  // "Mine" clears the examiner filter; choosing an examiner switches the toggle to All.
-  const setScope = (v) => patchParams(setParams, { scope: v === 'all' ? null : v, ...(v === 'mine' && { examiner: null }) })
+  // Admins filter with one Examiner dropdown: any examiner, cases they opened
+  // themselves ('me'), or one examiner. ?scope=mine from older links means 'me'.
+  const examinerId = isAdmin ? params.get('examiner') || (params.get('scope') === 'mine' ? 'me' : '') : ''
+  const scope = !isAdmin || examinerId === 'me' ? 'mine' : 'all'
   const setExaminer = (v) => patchParams(setParams, { examiner: v || null, scope: null })
   const examiners = useUsers({ role: 'examiner', enabled: isAdmin })
   const examinerOptions = examiners.map((u) => ({ value: u.id, label: u.full_name, sub: [u.account_code, u.group_name || 'No group'].filter(Boolean).join(' · '), keywords: u.email }))
-  const examinerName = examiners.find((u) => String(u.id) === examinerId)?.full_name
+  const meOption = useMemo(() => [{ value: 'me', label: 'Opened by me', sub: 'Cases you opened yourself' }], [])
+  const examinerName = examinerId === 'me' ? 'Opened by me' : examiners.find((u) => String(u.id) === examinerId)?.full_name
+  const examinerParam = examinerId && examinerId !== 'me' ? examinerId : ''
   const setStatus = (v) => patchParams(setParams, { status: v === 'open' ? null : v || 'all' })
   const [q, setQ] = useState('')
   const [cases, setCases] = useState(null)
@@ -136,11 +138,11 @@ export default function Cases() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      const qs = new URLSearchParams({ scope, ...(status && { status }), ...(q && { q }), ...(examinerId && { examiner_id: examinerId }) })
+      const qs = new URLSearchParams({ scope, ...(status && { status }), ...(q && { q }), ...(examinerParam && { examiner_id: examinerParam }) })
       api.get(`/api/cases?${qs}`).then((d) => { setCases(d); setError('') }).catch((e) => setError(e.message))
     }, 150)
     return () => clearTimeout(t)
-  }, [scope, status, q, examinerId])
+  }, [scope, status, q, examinerParam])
 
   return (
     <>
@@ -163,9 +165,8 @@ export default function Cases() {
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
           {isAdmin ? (
             <>
-              <Segmented value={scope} onChange={setScope} options={[{ value: 'all', label: 'All examiners' }, { value: 'mine', label: 'Mine' }]} />
-              <Combobox label="Examiner" anyLabel="Any examiner" placeholder="Search examiners" value={examinerId} onChange={setExaminer} options={examinerOptions} className="w-60" />
-              {examinerId && <FilterChip label={`Examiner: ${examinerName || `#${examinerId}`}`} onRemove={() => setExaminer('')} />}
+              <Combobox label="Examiner" anyLabel="Any examiner" placeholder="Search examiners" value={examinerId} onChange={setExaminer} options={examinerOptions} extra={meOption} className="w-64" />
+              {examinerId && <FilterChip label={examinerId === 'me' ? examinerName : `Examiner: ${examinerName || `#${examinerId}`}`} onRemove={() => setExaminer('')} />}
             </>
           ) : (
             <span className="text-sm text-slate-500">Your cases only.</span>

@@ -90,3 +90,6 @@ def test_admin_only_filters(client, admin, examiner):
     rows = client.get(f"/api/admin/audit?user_id={uid}", headers=admin).json()
     assert rows and all(r["user_id"] == uid for r in rows)
     assert all(r["user_id"] is None for r in client.get("/api/admin/audit?system=true", headers=admin).json())
+    roles = {u["id"]: u["role"] for u in actors.json()["users"]}
+    rows = client.get("/api/admin/audit?role=examiner", headers=admin).json()
+    assert rows and all(roles.get(r["user_id"]) == "examiner" for r in rows)

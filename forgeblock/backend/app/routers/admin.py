@@ -311,6 +311,7 @@ def audit_actors(db: Session = Depends(get_db), admin: User = Depends(require_ad
 def audit_log(
     user_id: int | None = None,
     system: bool = False,
+    role: str | None = Query(None, pattern="^(admin|examiner|client)$"),
     activity_type: str | None = None,
     q: str | None = None,
     limit: int = Query(300, le=2000),
@@ -322,6 +323,8 @@ def audit_log(
         stmt = stmt.where(ActivityLog.user_id.is_(None))
     elif user_id:
         stmt = stmt.where(ActivityLog.user_id == user_id)
+    elif role:
+        stmt = stmt.where(ActivityLog.user_id.in_(select(User.id).where(User.role == role)))
     if activity_type:
         stmt = stmt.where(ActivityLog.activity_type == activity_type)
     if q:
