@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import { BrandMark } from './Brand'
+import Logo from './Logo'
 import NotificationBell from './NotificationBell'
 import Tour from './Tour'
 import { Avatar } from './ui'
@@ -315,8 +315,8 @@ export default function Layout() {
         } ${floating && expanded ? 'is-lifted' : ''}`}
       >
         <div className="flex h-10 shrink-0 items-center">
-          <span className="flex w-[3.75rem] shrink-0 justify-center"><BrandMark light className="h-9 w-9" /></span>
-          <span className={`whitespace-nowrap text-xl font-semibold tracking-tight ${fade}`}>ForgeBlock</span>
+          <span className="flex w-[3.75rem] shrink-0 justify-center"><Logo variant="white" showText={false} size={28} /></span>
+          <span className={`whitespace-nowrap text-xl font-bold tracking-tight text-white ${fade}`} aria-hidden="true">ForgeBlock</span>
           <button className="ml-auto mr-1 lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
             <X className="h-5 w-5" />
           </button>

@@ -28,7 +28,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import Brand, { BrandMark } from '../components/Brand'
+import Logo from '../components/Logo'
 import SignatureTrace from '../components/SignatureTrace'
 import { SIGNATURE_HEIGHT, SIGNATURE_PATHS, SIGNATURE_WIDTH } from '../components/signaturePaths'
 import useOnScreen from '../components/useOnScreen'
@@ -264,7 +264,7 @@ function WorkspacePreview({ focus = 0 }) {
   return (
     <div className="sidebar-examiner flex aspect-[4/3] w-full text-left sm:aspect-[16/9]" role="img" aria-label="Preview of the ForgeBlock examiner workspace">
       <div className="hidden w-[21%] shrink-0 flex-col py-4 pl-3 text-white sm:flex">
-        <div className="mb-4 flex items-center gap-1.5 text-[13px] font-semibold"><BrandMark light className="h-5 w-5" /> ForgeBlock</div>
+        <div className="mb-4 flex items-center"><Logo variant="white" size={26} /></div>
         {nav.map((n) => (
           <div key={n.label} className={`relative mb-0.5 flex items-center gap-1.5 rounded-l-lg px-2 py-1.5 text-[11px] ${n.on ? 'bg-white font-semibold text-brand-700' : 'text-white/85'}`}>
             <n.icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{n.label}</span>
@@ -663,7 +663,7 @@ function RoleMockup({ role }) {
   return (
     <div className={`${shade} flex h-40 overflow-hidden rounded-xl pt-2 text-slate-900`} aria-hidden="true">
       <div className="flex w-9 shrink-0 flex-col items-center gap-2 pt-1 text-white/85">
-        <BrandMark light className="h-4 w-4" />
+        <Logo variant="white" showText={false} size={18} />
         <Gauge className="h-3.5 w-3.5" />
         <Users className="h-3.5 w-3.5" />
         <Link2 className="h-3.5 w-3.5" />
@@ -744,7 +744,7 @@ export default function Landing() {
     <div className="min-h-screen overflow-x-clip bg-white text-slate-900">
       <header className="sticky top-3 z-20 h-0 px-3 sm:px-5">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-2xl border border-white/60 bg-white/90 pl-4 pr-2 shadow-soft backdrop-blur">
-          <Brand tagline={false} />
+          <Logo variant="gradient" size={40} />
           <nav className="hidden items-center gap-7 text-sm text-slate-600 md:flex">
             {SECTIONS.map(([href, label]) => <a key={href} href={href} className="transition hover:text-slate-900">{label}</a>)}
           </nav>
@@ -877,7 +877,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-5 pb-8 pt-14 text-sm text-slate-500">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]">
             <div>
-              <Brand tagline={false} />
+              <Logo variant="blue" size={40} />
               <p className="mt-3 max-w-xs">Signature screening with a tamper-evident record of every result and every examiner’s decision.</p>
             </div>
             {FOOTER_COLUMNS.map((col) => (

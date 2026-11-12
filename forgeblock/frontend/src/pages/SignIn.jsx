@@ -208,7 +208,7 @@ export default function SignIn() {
             <ArrowLeft className="h-4 w-4" /> Back to home
           </Link>
           <div className="mb-8 lg:hidden">
-            <Brand />
+            <Brand variant="gradient" />
           </div>
           <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 bg-white p-8 shadow-lift">
             <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-600 via-brand-400 to-cyan-500" aria-hidden="true" />
