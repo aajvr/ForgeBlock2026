@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleAlert, CircleHelp, Info, Loader2, X, XCircle } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export function Card({ title, subtitle, actions, children, className = '', bodyClass = 'p-5' }) {
   return (
@@ -279,6 +279,45 @@ export function Modal({ open, title, onClose, children, wide }) {
   )
 }
 
+
+// Styled replacement for window.confirm. onConfirm may be async: the dialog shows a spinner while it runs,
+// closes when it resolves, and shows the error in place if it throws.
+export function ConfirmDialog({ open, title, children, confirmLabel = 'Confirm', danger = false, icon: Icon = CircleAlert, onConfirm, onClose }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    if (open) setError('')
+  }, [open])
+  const run = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      await onConfirm?.()
+      onClose?.()
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal open={open} onClose={busy ? undefined : onClose} title={title}>
+      <div className="flex gap-3">
+        {Icon && (
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${danger ? 'bg-bad-50 text-bad-600' : 'bg-brand-50 text-brand-600'}`}>
+            <Icon className="h-5 w-5" />
+          </span>
+        )}
+        <div className="self-center text-[15px] text-slate-700">{children}</div>
+      </div>
+      <Alert className="mt-4">{error}</Alert>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button variant={danger ? 'danger' : 'primary'} loading={busy} onClick={run} autoFocus>{confirmLabel}</Button>
+      </div>
+    </Modal>
+  )
+}
 export function Table({ head, children }) {
   return (
     <div className="overflow-x-auto">

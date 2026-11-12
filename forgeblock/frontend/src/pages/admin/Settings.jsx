@@ -2,7 +2,7 @@ import { CheckCircle2, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
-import { Alert, Badge, Button, Card, Field, Input, PageHeader, Spinner, fmtDay } from '../../components/ui'
+import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, PageHeader, Spinner, fmtDay } from '../../components/ui'
 
 export default function Settings() {
   const [s, setS] = useState(null)
@@ -10,6 +10,7 @@ export default function Settings() {
   const [days, setDays] = useState('')
   const [msg, setMsg] = useState('')
   const [access, setAccess] = useState(null)
+  const [toDelete, setToDelete] = useState(null)
   const load = () => {
     api.get('/api/admin/access-policy').then(setAccess).catch(() => {})
     api.get('/api/admin/settings').then((d) => { setS(d); setDays(String(d.retention.days)) })
@@ -49,7 +50,7 @@ export default function Settings() {
                   <Link to={`/app/clients/${c.id}`} className="text-brand-700 hover:underline">{c.full_name} ({c.client_code})</Link>
                   <span className="flex items-center gap-2 text-xs text-slate-500">
                     {c.retention_until ? fmtDay(c.retention_until) : ''}
-                    <button title="Delete signature data" className="text-slate-400 hover:text-bad-600" onClick={async () => { if (window.confirm(`Delete all signature data of ${c.client_code}?`)) { await api.del(`/api/clients/${c.id}`); load() } }}>
+                    <button title="Delete signature data" className="text-slate-400 hover:text-bad-600" onClick={() => setToDelete(c)}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </span>
@@ -68,6 +69,17 @@ export default function Settings() {
           <p className="mt-2 text-xs text-slate-500">Change these in the backend .env file (MAX_FAILED_LOGINS, LOCKOUT_MINUTES, IDLE_TIMEOUT_MINUTES).</p>
         </Card>
       </div>
+      <ConfirmDialog
+        open={!!toDelete}
+        title="Delete signature data?"
+        confirmLabel={<><Trash2 className="h-4 w-4" /> Delete</>}
+        danger
+        icon={Trash2}
+        onConfirm={async () => { await api.del(`/api/clients/${toDelete.id}`); load() }}
+        onClose={() => setToDelete(null)}
+      >
+        Delete all signature data of <b>{toDelete?.full_name}</b> ({toDelete?.client_code})? This cannot be undone.
+      </ConfirmDialog>
     </>
   )
 }

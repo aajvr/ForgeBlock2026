@@ -14,6 +14,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   Empty,
   Field,
   Input,
@@ -769,6 +770,8 @@ export function ClientDetail() {
   const [tab, setTab] = useState('static')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [toRemove, setToRemove] = useState(null)
+  const [removeError, setRemoveError] = useState('')
   const load = useCallback(() => api.get(`/api/clients/${id}`).then(setC).catch((e) => setError(e.message)), [id])
   useEffect(() => {
     load()
@@ -776,10 +779,21 @@ export function ClientDetail() {
   if (error) return <Alert>{error}</Alert>
   if (!c) return <Spinner />
 
+  // Take the reference out of the list right away, then delete it on the server.
+  // On failure, put the card back as it was and show the error.
   const remove = async (p) => {
-    if (!window.confirm('Remove this reference from the signature card?')) return
-    await api.del(`/api/references/${p.id}`)
-    load()
+    const before = c
+    const listKey = `${tab}_references`
+    const countKey = `${tab}_count`
+    setRemoveError('')
+    setC((cur) => ({ ...cur, [listKey]: cur[listKey].filter((r) => r.id !== p.id), [countKey]: Math.max(0, (cur[countKey] || 0) - 1) }))
+    try {
+      await api.del(`/api/references/${p.id}`)
+      load() // refresh strength and similarity flags in the background
+    } catch (err) {
+      setC(before)
+      setRemoveError(`Could not remove the reference: ${err.message}`)
+    }
   }
   const refs = c[`${tab}_references`]
   const strength = c[`${tab}_strength`]
@@ -804,9 +818,10 @@ export function ClientDetail() {
           </div>
           <div className="space-y-6 p-5">
             <StrengthMeter strength={strength} />
+            <Alert>{removeError}</Alert>
             {refs.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {refs.map((p) => <RefTile key={p.id} p={p} modality={tab} onRemove={c.can_edit ? remove : null} />)}
+                {refs.map((p) => <RefTile key={p.id} p={p} modality={tab} onRemove={c.can_edit ? setToRemove : null} />)}
               </div>
             ) : (
               <Empty>No {tab} references yet.</Empty>
@@ -879,6 +894,17 @@ export function ClientDetail() {
               </Button>
             )}
           </Card>
+          <ConfirmDialog
+            open={!!toRemove}
+            title="Remove this reference?"
+            confirmLabel={<><Trash2 className="h-4 w-4" /> Remove</>}
+            danger
+            icon={Trash2}
+            onConfirm={() => { remove(toRemove) }}
+            onClose={() => setToRemove(null)}
+          >
+            This reference signature will be removed from the signature card.
+          </ConfirmDialog>
           {deleting && <DeleteClientModal client={c} onClose={() => setDeleting(false)} onDeleted={() => navigate('/app/clients')} />}
         </div>
       </div>

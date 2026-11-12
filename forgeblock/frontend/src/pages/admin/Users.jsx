@@ -2,7 +2,7 @@ import { KeyRound, Lock, Unlock, UserPlus, Users as UsersIcon } from 'lucide-rea
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
-import { Alert, Badge, Button, Card, Field, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, fmtDate, td } from '../../components/ui'
+import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, fmtDate, td } from '../../components/ui'
 
 function Credentials({ rows }) {
   return (
@@ -119,6 +119,7 @@ export default function Users() {
   const [q, setQ] = useState('')
   const [modal, setModal] = useState(null)
   const [reset, setReset] = useState(null)
+  const [toReset, setToReset] = useState(null)
   const load = () => api.get(`/api/admin/users?${new URLSearchParams({ ...(role && { role }), ...(q && { q }) })}`).then(setUsers)
   useEffect(() => {
     const t = setTimeout(load, 150)
@@ -178,7 +179,7 @@ export default function Users() {
                 <td className={`${td} text-right`}>
                   <div className="flex justify-end gap-1">
                     {u.locked && <Button size="sm" variant="ghost" onClick={async () => { await api.post(`/api/admin/users/${u.id}/unlock`); load() }}><Unlock className="h-3.5 w-3.5" /> Unlock</Button>}
-                    <Button size="sm" variant="ghost" onClick={async () => { if (window.confirm(`Reset the password of ${u.full_name}?`)) { setReset(await api.post(`/api/admin/users/${u.id}/reset-password`)); load() } }}><KeyRound className="h-3.5 w-3.5" /> Reset</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setToReset(u)}><KeyRound className="h-3.5 w-3.5" /> Reset</Button>
                     {u.id !== me.id && (
                       <Button size="sm" variant="ghost" onClick={() => patch(u, { status: u.status === 'active' ? 'disabled' : 'active' })}>
                         {u.status === 'active' ? 'Disable' : 'Enable'}
@@ -193,6 +194,16 @@ export default function Users() {
       </Card>
       <Modal open={modal === 'one'} onClose={() => setModal(null)} title="New account"><CreateUser onDone={load} /></Modal>
       <Modal open={modal === 'bulk'} onClose={() => setModal(null)} title="Create test examiner accounts" wide><BulkCreate onDone={load} /></Modal>
+      <ConfirmDialog
+        open={!!toReset}
+        title="Reset password?"
+        confirmLabel={<><KeyRound className="h-4 w-4" /> Reset password</>}
+        icon={KeyRound}
+        onConfirm={async () => { setReset(await api.post(`/api/admin/users/${toReset.id}/reset-password`)); load() }}
+        onClose={() => setToReset(null)}
+      >
+        Reset the password of <b>{toReset?.full_name}</b>? They get a new temporary password and must change it at their next sign-in.
+      </ConfirmDialog>
       <Modal open={!!reset} onClose={() => setReset(null)} title="Password reset">{reset && <Credentials rows={[reset]} />}</Modal>
     </>
   )
