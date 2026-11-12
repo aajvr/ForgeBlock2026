@@ -12,7 +12,7 @@ import json
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -23,6 +23,7 @@ from ..config import MIN_ADAPTIVE_SAMPLES
 from ..database import get_db
 from ..ledger import verify_block
 from ..ml import capture
+from ..ml import client_classifier as cc
 from ..ml import decision as dec
 from ..ml.dynamic_features import points_from_payload
 from ..ml.engine import get_engine
@@ -30,8 +31,8 @@ from ..ml.explain import overlay_png
 from ..ml.features import compare_features, dynamic_features, static_features
 from ..ml.preprocessing import preprocessed_preview
 from ..ml.quality import dynamic_quality, static_quality
-from ..ml.screening import DISCLAIMER, caption
-from ..models import BlockchainLedger, Case, Finding, SignatureProfile, User, VerificationLog
+from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
+from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
 from ..security import current_user, require_staff
 from ..services import (
     load_image,
@@ -43,7 +44,7 @@ from ..services import (
     storage_path,
 )
 from . import pen_data
-from .common import VIEW_ONLY_HEADERS, active_profiles, client_safe, log_out, read_upload, threshold_strength
+from .common import VIEW_ONLY_HEADERS, active_profiles, model_view_png, client_safe, log_out, read_upload, threshold_strength
 
 router = APIRouter(tags=["screening"])
 
@@ -56,6 +57,34 @@ def _votes(l: VerificationLog) -> dict:
     if "manhattan" in t:
         v["manhattan"] = m["manhattan"] <= t["manhattan"]
     return v
+
+
+def explain_result(l: VerificationLog) -> dict | None:
+    """v8.14: plain-language reason for the result (staff only). With a calibrated
+    model the confidence is the probability of the shown side, so P(genuine)
+    can be recovered from it and the stored classification."""
+    cfg = get_engine().static_cfg if l.modality == "static" else get_engine().dynamic_cfg
+    cal = cfg.get("calibration")
+    if not cal:
+        return None
+    lo, hi = dec._band(cal) or CALIBRATED_BAND
+    p = l.confidence_score if l.classification == "genuine" else 100 - l.confidence_score
+    p = round(float(min(99.0, max(1.0, p))))
+    lo, hi = round(lo * 100), round(hi * 100)
+    votes = _votes(l) or {}
+    all_pass = bool(votes) and all(votes.values())
+    if l.screening_result == "consistent":
+        why = f"The chance that this signature is genuine is about {p}%, above the {hi}% needed for Consistent."
+    elif l.screening_result == "inconsistent":
+        why = f"The chance that this signature is genuine is only about {p}%, below the {lo}% line for Inconsistent."
+    else:
+        side = "leans genuine" if p >= 50 else "leans not genuine"
+        why = (f"The chance that this signature is genuine is about {p}%: it {side}, but it falls between "
+               f"{lo}% and {hi}%, too close to call either way, so an examiner should review it.")
+        if all_pass:
+            why += (" Every score passed its threshold, but only by a little compared with how much this "
+                    "client's own signatures vary, and signatures that only just pass are often skilled forgeries.")
+    return {"p_genuine": p, "band": [lo, hi], "all_pass": all_pass, "why": why}
 
 
 def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
@@ -91,6 +120,7 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
         out["reference_profile_ids"] = list(l.reference_profile_ids or [])
         out["strength"] = threshold_strength(len(l.reference_profile_ids or [])) if l.mode == "verify" else None
         out["internal_decision"] = l.classification  # for evaluation pages only
+        out["explain"] = explain_result(l)
     out["case"] = None
     out["finding"] = None
     if l.case_id:
@@ -189,6 +219,49 @@ def _reference_width(profile) -> int | None:
     return _REF_WIDTHS[key]
 
 
+def _background(db: Session, client_id: int, model_version: str, dim: int) -> tuple[np.ndarray | None, int]:
+    """Static reference embeddings of OTHER clients (same model), up to
+    REFS_PER_BACKGROUND_CLIENT each, for the per-client classifier. Used inside
+    the model only; nothing about these clients is shown."""
+    rows = db.execute(
+        select(SignatureProfile.client_id, SignatureProfile.embedding)
+        .join(Client, Client.id == SignatureProfile.client_id)
+        .where(Client.status == "active", SignatureProfile.modality == "static", SignatureProfile.status == "active",
+               SignatureProfile.client_id != client_id, SignatureProfile.model_version == model_version)
+        .order_by(SignatureProfile.client_id, SignatureProfile.id)
+    ).all()
+    per: dict[int, list] = {}
+    for cid, emb in rows:
+        if emb is not None and len(emb) == dim and len(per.setdefault(cid, [])) < cc.REFS_PER_BACKGROUND_CLIENT:
+            per[cid].append(emb)
+    usable = [cid for cid, e in per.items() if len(e) >= MIN_ADAPTIVE_SAMPLES]
+    if len(usable) > cc.MAX_BACKGROUND_CLIENTS:  # a fixed, even spread over the clients
+        idx = np.linspace(0, len(usable) - 1, cc.MAX_BACKGROUND_CLIENTS).round().astype(int)
+        usable = [usable[i] for i in idx]
+    if len(usable) < cc.MIN_BACKGROUND_CLIENTS:
+        return None, len(usable)
+    return np.array([e for cid in usable for e in per[cid]], np.float64), len(usable)
+
+
+def _client_classifier(db: Session, client_id: int, test: np.ndarray, refs: list[np.ndarray],
+                       decision, cfg: dict) -> dict:
+    """v8.10: replaces the result's probability with the per-client
+    classifier's when there is a calibration and enough other clients."""
+    cal = cfg.get("client_classifier")
+    info = {"used": False, "background_clients": 0, "min_background_clients": cc.MIN_BACKGROUND_CLIENTS}
+    if not cal or len(refs) < MIN_ADAPTIVE_SAMPLES:
+        return info
+    neg, k = _background(db, client_id, cfg["model_version"], len(test))
+    info["background_clients"] = k
+    if neg is None:
+        return info
+    s = float(cc.fit(np.array(refs), neg)(test)[0])
+    p = cc.probability(s, cal)
+    info.update(used=True, score=round(s, 4), p_distance_only=decision.p_genuine)
+    dec.with_probability(decision, p, cal)
+    return info
+
+
 def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: Case | None = None,
                         document_ref: str | None = None, expected_label: str | None = None,
                         sample_hash: str | None = None) -> VerificationLog:
@@ -205,10 +278,12 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     test = engine.static_embedding(img)
     refs = [np.array(p.embedding) for p in profiles]
     decision = dec.screen_static_embedding(test, refs, engine.static_cfg, MIN_ADAPTIVE_SAMPLES)
+    classifier = _client_classifier(db, client.id, test, refs, decision, engine.static_cfg)
     per_ref, best = _per_ref(test, profiles)
     analysis = {
         "quality": q,
         "size_scale": round(size_scale, 3),
+        "client_classifier": classifier,
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
         "features": compare_features(static_features(img), [p.features for p in profiles], "static"),
@@ -324,11 +399,17 @@ def verification_detail(log_id: int, db: Session = Depends(get_db), user: User =
 
 
 @router.get("/api/verifications/{log_id}/image")
-def questioned_image(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def questioned_image(log_id: int, view: str = Query("original", pattern="^(original|model)$"),
+                     db: Session = Depends(get_db), user: User = Depends(require_staff)):
     log = _visible_log(db, log_id, user)
     path = storage_path(log.test_sample_path) if log.modality == "static" else None
     if path is None:
         raise HTTPException(404, "The questioned image is not stored for this record.")
+    if view == "model":  # display only, see common.model_view_png
+        img = load_image(log.test_sample_path)
+        if img is None:
+            raise HTTPException(404, "The questioned image is not stored for this record.")
+        return Response(model_view_png(img), media_type="image/png", headers=VIEW_ONLY_HEADERS)
     return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
 
 

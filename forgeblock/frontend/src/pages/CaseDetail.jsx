@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { AuthImage, StrokePreview } from '../components/shared'
 import { Alert, Badge, Button, Card, Empty, FINDING, PageHeader, ScreeningBadge, Spinner, Textarea, fmtDate } from '../components/ui'
 import { STATUS_TONE } from './Cases'
 
@@ -12,6 +13,40 @@ const CHOICES = [
   { value: 'genuine', label: 'Genuine', note: 'The client wrote this signature.', Icon: CheckCircle2, on: 'border-ok-600 bg-ok-50 text-ok-700' },
   { value: 'forged', label: 'Forged', note: 'Someone else wrote this signature.', Icon: XCircle, on: 'border-bad-600 bg-bad-50 text-bad-700' },
 ]
+
+// The questioned signature next to the closest reference on file, so the examiner can
+// compare them while deciding. The case lists screenings without the best match, so each
+// pair asks for its screening's details.
+function SignaturePair({ id }) {
+  const [r, setR] = useState(null)
+  const [strokes, setStrokes] = useState({})
+  useEffect(() => {
+    api.get(`/api/verifications/${id}`).then(setR).catch(() => setR(false))
+  }, [id])
+  const dynamic = r && r.modality === 'dynamic'
+  useEffect(() => {
+    if (!dynamic || !r.stored_sample) return
+    api.get(`/api/verifications/${id}/strokes`).then((d) => setStrokes((s) => ({ ...s, test: d.strokes }))).catch(() => {})
+    if (r.best_match_profile_id) api.get(`/api/references/${r.best_match_profile_id}/strokes`).then((d) => setStrokes((s) => ({ ...s, ref: d.strokes }))).catch(() => {})
+  }, [dynamic, id, r])
+  if (r === false || (r && !r.stored_sample)) return null
+  const box = 'flex h-28 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-2'
+  const pane = (label, content) => (
+    <div className="min-w-0">
+      <div className="mb-1 text-xs font-medium text-slate-500">{label}</div>
+      <div className={box}>{content}</div>
+    </div>
+  )
+  const img = (src) => <AuthImage src={src} className="h-full w-full object-contain" />
+  const missing = <span className="text-xs text-slate-400">Not available</span>
+  return (
+    <div className="mt-3 grid w-full gap-3 sm:grid-cols-2">
+      {pane('Questioned signature', !r ? null : dynamic ? (strokes.test ? <StrokePreview strokes={strokes.test} className="h-full w-full" /> : null) : img(`/api/verifications/${id}/image`))}
+      {pane('Closest reference on file', !r ? null : !r.best_match_profile_id ? missing
+        : dynamic ? (strokes.ref ? <StrokePreview strokes={strokes.ref} className="h-full w-full" /> : null) : img(`/api/references/${r.best_match_profile_id}/image`))}
+    </div>
+  )
+}
 
 function FindingForm({ c, onSaved }) {
   const [finding, setFinding] = useState('')
@@ -137,6 +172,7 @@ export default function CaseDetail() {
                         )
                       )}
                     </div>
+                    <SignaturePair id={s.id} />
                   </li>
                 ))}
               </ul>

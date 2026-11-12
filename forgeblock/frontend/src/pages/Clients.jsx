@@ -618,7 +618,7 @@ function RefTile({ p, modality, onRemove }) {
   return (
     <div className={`group relative rounded-lg border bg-white p-2 ${p.flagged ? 'border-warn-600' : 'border-slate-200'}`}>
       <div className="flex h-20 items-center justify-center">
-        {modality === 'static' ? <AuthImage src={`/api/references/${p.id}/image`} className="h-20 w-full object-contain" /> : strokes && <StrokePreview strokes={strokes} className="h-16 w-full" />}
+        {modality === 'static' ? <AuthImage src={`/api/references/${p.id}/image?view=model`} className="h-20 w-full object-contain" /> : strokes && <StrokePreview strokes={strokes} className="h-16 w-full" />}
       </div>
       <div className="mt-1 flex items-center justify-between text-[12.5px] text-slate-500">
         <span>Quality {Math.round(p.quality)}</span>

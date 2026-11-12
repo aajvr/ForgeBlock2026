@@ -3,7 +3,7 @@ import re
 from datetime import timedelta
 
 import numpy as np
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
@@ -22,6 +22,7 @@ from ..config import MAX_REFERENCES
 from ..database import get_db
 from ..ml.dynamic_features import points_from_payload
 from ..ml import enroll_sheet
+from ..ml.capture import standardize
 from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
 from ..ml.quality import dynamic_quality, static_quality
@@ -30,6 +31,7 @@ from ..security import hash_password, require_admin, require_staff, temporary_pa
 from ..services import (
     delete_file,
     get_setting,
+    load_image,
     load_strokes,
     log_activity,
     next_code,
@@ -45,6 +47,7 @@ from .common import (
     consistency,
     log_out,
     model_cfg,
+    model_view_png,
     names,
     profile_out,
     read_upload,
@@ -307,11 +310,18 @@ async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db:
     out = []
     for b in boxes:
         ok, png = cv2.imencode(".png", b["image"])
+        view = None
+        if not b["empty"]:
+            # Display only: the cleaned view of the box after the same line erasing
+            # every upload gets. The box image itself is what gets enrolled.
+            bgr = standardize(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
+            view = "data:image/png;base64," + base64.b64encode(model_view_png(bgr)).decode()
         q = {"usable": False, "score": 0.0, "issues": ["This box is empty."]} if b["empty"] \
             else static_quality(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
         out.append({
             "index": b["index"],
             "image": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode(),
+            "model_view": view,
             "empty": b["empty"],
             "usable": bool(q["usable"]),
             "quality": q["score"],
@@ -395,13 +405,20 @@ def remove_reference(profile_id: int, db: Session = Depends(get_db), user: User 
 
 
 @router.get("/references/{profile_id}/image")
-def reference_image(profile_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def reference_image(profile_id: int, view: str = Query("original", pattern="^(original|model)$"),
+                    db: Session = Depends(get_db), user: User = Depends(require_staff)):
     """Shown inside the app's viewer only. There is no download or export
-    function (Section 3.8); the response is marked inline and not cached."""
+    function (Section 3.8); the response is marked inline and not cached.
+    view=model returns the cleaned 224 x 224 picture the model sees (display only)."""
     p = _profile(db, profile_id, user)
     path = storage_path(p.sample_path) if p.modality == "static" else None
     if path is None:
         raise HTTPException(404, "Image not available.")
+    if view == "model":
+        img = load_image(p.sample_path)
+        if img is None:
+            raise HTTPException(404, "Image not available.")
+        return Response(model_view_png(img), media_type="image/png", headers=VIEW_ONLY_HEADERS)
     return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
 
 

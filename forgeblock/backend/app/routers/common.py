@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..config import MAX_REFERENCES, MIN_ADAPTIVE_SAMPLES, RECOMMENDED_REFERENCES
 from ..ml.engine import get_engine
 from ..ml.capture import standardize
-from ..ml.preprocessing import decode_image
+from ..ml.preprocessing import decode_image, preprocessed_preview
 from ..ml.screening import LABELS
 from ..models import Case, Client, ClientGroup, Finding, SignatureProfile, User, VerificationLog
 
@@ -36,6 +36,15 @@ async def read_upload(upload: UploadFile, standardized: bool = True) -> tuple[by
     except ValueError as e:
         raise HTTPException(422, str(e))
     return data, standardize(img) if standardized else img
+
+
+def model_view_png(img: np.ndarray) -> bytes:
+    """PNG of the cleaned 224 x 224 image the static model sees (display only;
+    the model always gets the stored image, never this picture)."""
+    import cv2
+
+    ok, png = cv2.imencode(".png", cv2.cvtColor(preprocessed_preview(img), cv2.COLOR_RGB2BGR))
+    return png.tobytes()
 
 
 def model_cfg(modality: str) -> dict:

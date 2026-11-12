@@ -1,0 +1,13 @@
+{
+  "thresholds": {
+    "cosine": 0.8924632349014282,
+    "euclidean": 0.40666562550682195,
+    "manhattan": 5.26983118057251
+  },
+  "bounds": {
+    "cosine": [0.80, 0.97],
+    "euclidean": [0.25, 0.63],
+    "manhattan": [3.2, 8.0]
+  },
+  "threshold_source_note": "Default thresholds from thresholds_signet_validation.json (team's validation calibration)."
+}

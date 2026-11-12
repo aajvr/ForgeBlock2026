@@ -1,0 +1,148 @@
+diff --git a/forgeblock/backend/app/routers/verification.py b/forgeblock/backend/app/routers/verification.py
+index 2a3019d..72fdbb9 100644
+--- a/forgeblock/backend/app/routers/verification.py
++++ b/forgeblock/backend/app/routers/verification.py
+@@ -30,7 +30,7 @@ from ..ml.explain import overlay_png
+ from ..ml.features import compare_features, dynamic_features, static_features
+ from ..ml.preprocessing import preprocessed_preview
+ from ..ml.quality import dynamic_quality, static_quality
+-from ..ml.screening import DISCLAIMER, caption
++from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
+ from ..models import BlockchainLedger, Case, Finding, SignatureProfile, User, VerificationLog
+ from ..security import current_user, require_staff
+ from ..services import (
+@@ -58,6 +58,34 @@ def _votes(l: VerificationLog) -> dict:
+     return v
+ 
+ 
++def explain_result(l: VerificationLog) -> dict | None:
++    """v8.14: plain-language reason for the result (staff only). With a calibrated
++    model the confidence is the probability of the shown side, so P(genuine)
++    can be recovered from it and the stored classification."""
++    cfg = get_engine().static_cfg if l.modality == "static" else get_engine().dynamic_cfg
++    cal = cfg.get("calibration")
++    if not cal:
++        return None
++    lo, hi = dec._band(cal) or CALIBRATED_BAND
++    p = l.confidence_score if l.classification == "genuine" else 100 - l.confidence_score
++    p = round(float(min(99.0, max(1.0, p))))
++    lo, hi = round(lo * 100), round(hi * 100)
++    votes = _votes(l) or {}
++    all_pass = bool(votes) and all(votes.values())
++    if l.screening_result == "consistent":
++        why = f"The chance that this signature is genuine is about {p}%, above the {hi}% needed for Consistent."
++    elif l.screening_result == "inconsistent":
++        why = f"The chance that this signature is genuine is only about {p}%, below the {lo}% line for Inconsistent."
++    else:
++        side = "leans genuine" if p >= 50 else "leans not genuine"
++        why = (f"The chance that this signature is genuine is about {p}%: it {side}, but it falls between "
++               f"{lo}% and {hi}%, too close to call either way, so an examiner should review it.")
++        if all_pass:
++            why += (" Every score passed its threshold, but only by a little compared with how much this "
++                    "client's own signatures vary, and signatures that only just pass are often skilled forgeries.")
++    return {"p_genuine": p, "band": [lo, hi], "all_pass": all_pass, "why": why}
++
++
+ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
+     """Everything the result page shows for one screening."""
+     out = log_out(l, db)
+@@ -91,6 +119,7 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
+         out["reference_profile_ids"] = list(l.reference_profile_ids or [])
+         out["strength"] = threshold_strength(len(l.reference_profile_ids or [])) if l.mode == "verify" else None
+         out["internal_decision"] = l.classification  # for evaluation pages only
++        out["explain"] = explain_result(l)
+     out["case"] = None
+     out["finding"] = None
+     if l.case_id:
+diff --git a/forgeblock/backend/tests/test_v814.py b/forgeblock/backend/tests/test_v814.py
+new file mode 100644
+index 0000000..c5c32b6
+--- /dev/null
++++ b/forgeblock/backend/tests/test_v814.py
+@@ -0,0 +1,27 @@
++"""v8.14: plain-language explanation of the result (staff only)."""
++from test_api import _client_with_refs, signature_png
++
++from app.ml.engine import get_engine
++
++
++def test_result_explains_itself(client, examiner, monkeypatch):
++    cfg = get_engine().static_cfg  # tests run on the placeholder model: give it a calibration
++    monkeypatch.setitem(cfg, "calibration", {"a": 1.9663, "b": -2.4516, "band": [0.35, 0.65]})
++    cid = _client_with_refs(client, examiner)
++    r = client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
++                    files={"file": ("q.png", signature_png(1, jitter=0.65), "image/png")}).json()
++    ex = r["explain"]
++    assert ex["band"] == [35, 65] and 1 <= ex["p_genuine"] <= 99
++    p = ex["p_genuine"]
++    expected = "consistent" if p >= 65 else ("inconsistent" if p <= 35 else "inconclusive")
++    assert r["screening_result"] == expected or abs(p - 65) <= 1 or abs(p - 35) <= 1  # rounding at the edges
++    assert f"{p}%" in ex["why"]
++    assert ex["all_pass"] == all(r["votes"].values())
++
++
++def test_no_explanation_without_calibration(client, examiner, monkeypatch):
++    monkeypatch.setitem(get_engine().static_cfg, "calibration", None)
++    cid = _client_with_refs(client, examiner, name="No calibration")
++    r = client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
++                    files={"file": ("q.png", signature_png(1, jitter=0.65), "image/png")}).json()
++    assert r["explain"] is None
+diff --git a/forgeblock/frontend/src/components/ResultView.jsx b/forgeblock/frontend/src/components/ResultView.jsx
+index de9c886..ce42e47 100644
+--- a/forgeblock/frontend/src/components/ResultView.jsx
++++ b/forgeblock/frontend/src/components/ResultView.jsx
+@@ -19,13 +19,31 @@ function HowCalculated({ r }) {
+         file using {r.modality === 'static' ? 'cosine similarity, Euclidean distance and Manhattan distance' : 'cosine similarity and Euclidean distance'}.
+         Each measure is checked against its threshold ({r.decision_rule.toLowerCase()}).
+       </p>
+-      <p>
++      {r.explain ? (
++        <>
++          <p>
++            Passing a threshold is not enough on its own. ForgeBlock measures <b>how far past</b> the thresholds the signature is, counted in the
++            client’s <b>own</b> natural variation (how much their references differ from each other), and turns that distance into the <b>chance that
++            the signature is genuine</b>. This was calibrated on people the model never saw: signatures that only just pass are still often skilled
++            forgeries, so a signature has to pass by a clear margin to count as Consistent.
++          </p>
++          <p>
++            <b>Consistent</b> when that chance is at least {r.explain.band[1]}%, <b>Inconsistent</b> when it is {r.explain.band[0]}% or less, and{' '}
++            <b>Inconclusive</b> in between, which goes to the examiner. The <b>confidence score</b> is how likely the shown result is (never above 99%).
++          </p>
++          <p className="rounded-lg bg-slate-50 px-3 py-2">
++            <b>This screening:</b> {r.explain.why}
++          </p>
++        </>
++      ) : (
++        <p>
+         The <b>confidence score</b> measures how far past the threshold the signature is, counted in the client’s <b>own</b> natural variation
+         (how much their references differ from each other). Right on the threshold is 0%; one step of their usual variation past it is about 68%,
+         two steps about 95%, and it never goes above 99%. On the Inconsistent side it is the same distance measured below the threshold.
+         Borderline results are <b>Inconclusive</b>{' '}
+         and go to the examiner. It is not a probability that the signature is genuine.
+-      </p>
++        </p>
++      )}
+       <p>
+         {r.threshold_source === 'adaptive'
+           ? `Personal thresholds were used: with ${r.reference_count} references on file, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary. They change whenever references are added or removed.`
+@@ -99,6 +117,7 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
+             {res.label}
+           </div>
+           <p className="mt-2.5 text-base text-slate-700">{shortCaption(r, whose)}</p>
++          {r.explain?.why && <p className="mt-1.5 max-w-xl text-sm text-slate-600">{r.explain.why}</p>}
+         </div>
+         <div className="sm:text-right">
+           <div className="flex items-center gap-1.5 text-sm text-slate-500 sm:justify-end">Confidence score {how}</div>
+@@ -475,6 +494,12 @@ function Scores({ r }) {
+       </table>
+       </div>
+       <p className="text-xs text-slate-500">Decision rule: {r.decision_rule}. {r.reference_count > 1 && 'Values are averaged over all references.'}</p>
++      {r.explain?.all_pass && r.screening_result !== 'consistent' && (
++        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
++          All metrics pass, but the result also depends on how far past the thresholds the signature is, compared with this client’s own
++          signatures. Here the margin was small, so the chance it is genuine is about {r.explain.p_genuine}%.
++        </p>
++      )}
+       {per.length > 0 && (
+         <div>
+           <div className="mb-2 text-sm font-medium">Similarity to each reference</div>

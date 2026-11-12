@@ -1,0 +1,366 @@
+diff --git a/forgeblock/backend/app/routers/clients.py b/forgeblock/backend/app/routers/clients.py
+index 345e0ae..4df51b5 100644
+--- a/forgeblock/backend/app/routers/clients.py
++++ b/forgeblock/backend/app/routers/clients.py
+@@ -3,7 +3,7 @@ import re
+ from datetime import timedelta
+ 
+ import numpy as np
+-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
++from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+ from fastapi.responses import FileResponse, Response
+ from pydantic import BaseModel, Field
+ from sqlalchemy import func, or_, select
+@@ -22,6 +22,7 @@ from ..config import MAX_REFERENCES
+ from ..database import get_db
+ from ..ml.dynamic_features import points_from_payload
+ from ..ml import enroll_sheet
++from ..ml.capture import standardize
+ from ..ml.engine import get_engine
+ from ..ml.features import dynamic_features, static_features
+ from ..ml.quality import dynamic_quality, static_quality
+@@ -30,6 +31,7 @@ from ..security import hash_password, require_admin, require_staff, temporary_pa
+ from ..services import (
+     delete_file,
+     get_setting,
++    load_image,
+     load_strokes,
+     log_activity,
+     next_code,
+@@ -45,6 +47,7 @@ from .common import (
+     consistency,
+     log_out,
+     model_cfg,
++    model_view_png,
+     names,
+     profile_out,
+     read_upload,
+@@ -307,11 +310,18 @@ async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db:
+     out = []
+     for b in boxes:
+         ok, png = cv2.imencode(".png", b["image"])
++        view = None
++        if not b["empty"]:
++            # Display only: the cleaned view of the box after the same line erasing
++            # every upload gets. The box image itself is what gets enrolled.
++            bgr = standardize(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
++            view = "data:image/png;base64," + base64.b64encode(model_view_png(bgr)).decode()
+         q = {"usable": False, "score": 0.0, "issues": ["This box is empty."]} if b["empty"] \
+             else static_quality(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
+         out.append({
+             "index": b["index"],
+             "image": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode(),
++            "model_view": view,
+             "empty": b["empty"],
+             "usable": bool(q["usable"]),
+             "quality": q["score"],
+@@ -395,13 +405,20 @@ def remove_reference(profile_id: int, db: Session = Depends(get_db), user: User
+ 
+ 
+ @router.get("/references/{profile_id}/image")
+-def reference_image(profile_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
++def reference_image(profile_id: int, view: str = Query("original", pattern="^(original|model)$"),
++                    db: Session = Depends(get_db), user: User = Depends(require_staff)):
+     """Shown inside the app's viewer only. There is no download or export
+-    function (Section 3.8); the response is marked inline and not cached."""
++    function (Section 3.8); the response is marked inline and not cached.
++    view=model returns the cleaned 224 x 224 picture the model sees (display only)."""
+     p = _profile(db, profile_id, user)
+     path = storage_path(p.sample_path) if p.modality == "static" else None
+     if path is None:
+         raise HTTPException(404, "Image not available.")
++    if view == "model":
++        img = load_image(p.sample_path)
++        if img is None:
++            raise HTTPException(404, "Image not available.")
++        return Response(model_view_png(img), media_type="image/png", headers=VIEW_ONLY_HEADERS)
+     return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
+ 
+ 
+diff --git a/forgeblock/backend/app/routers/common.py b/forgeblock/backend/app/routers/common.py
+index 8f6ca75..68df0d2 100644
+--- a/forgeblock/backend/app/routers/common.py
++++ b/forgeblock/backend/app/routers/common.py
+@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
+ from ..config import MAX_REFERENCES, MIN_ADAPTIVE_SAMPLES, RECOMMENDED_REFERENCES
+ from ..ml.engine import get_engine
+ from ..ml.capture import standardize
+-from ..ml.preprocessing import decode_image
++from ..ml.preprocessing import decode_image, preprocessed_preview
+ from ..ml.screening import LABELS
+ from ..models import Case, Client, ClientGroup, Finding, SignatureProfile, User, VerificationLog
+ 
+@@ -38,6 +38,15 @@ async def read_upload(upload: UploadFile, standardized: bool = True) -> tuple[by
+     return data, standardize(img) if standardized else img
+ 
+ 
++def model_view_png(img: np.ndarray) -> bytes:
++    """PNG of the cleaned 224 x 224 image the static model sees (display only;
++    the model always gets the stored image, never this picture)."""
++    import cv2
++
++    ok, png = cv2.imencode(".png", cv2.cvtColor(preprocessed_preview(img), cv2.COLOR_RGB2BGR))
++    return png.tobytes()
++
++
+ def model_cfg(modality: str) -> dict:
+     e = get_engine()
+     return e.static_cfg if modality == "static" else e.dynamic_cfg
+diff --git a/forgeblock/backend/app/routers/verification.py b/forgeblock/backend/app/routers/verification.py
+index c9b8ce2..72fdbb9 100644
+--- a/forgeblock/backend/app/routers/verification.py
++++ b/forgeblock/backend/app/routers/verification.py
+@@ -12,7 +12,7 @@ import json
+ 
+ import cv2
+ import numpy as np
+-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
++from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+ from fastapi.responses import FileResponse, Response
+ from pydantic import BaseModel
+ from sqlalchemy import select
+@@ -30,7 +30,7 @@ from ..ml.explain import overlay_png
+ from ..ml.features import compare_features, dynamic_features, static_features
+ from ..ml.preprocessing import preprocessed_preview
+ from ..ml.quality import dynamic_quality, static_quality
+-from ..ml.screening import DISCLAIMER, caption
++from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
+ from ..models import BlockchainLedger, Case, Finding, SignatureProfile, User, VerificationLog
+ from ..security import current_user, require_staff
+ from ..services import (
+@@ -43,7 +43,7 @@ from ..services import (
+     storage_path,
+ )
+ from . import pen_data
+-from .common import VIEW_ONLY_HEADERS, active_profiles, client_safe, log_out, read_upload, threshold_strength
++from .common import VIEW_ONLY_HEADERS, active_profiles, model_view_png, client_safe, log_out, read_upload, threshold_strength
+ 
+ router = APIRouter(tags=["screening"])
+ 
+@@ -58,6 +58,34 @@ def _votes(l: VerificationLog) -> dict:
+     return v
+ 
+ 
++def explain_result(l: VerificationLog) -> dict | None:
++    """v8.14: plain-language reason for the result (staff only). With a calibrated
++    model the confidence is the probability of the shown side, so P(genuine)
++    can be recovered from it and the stored classification."""
++    cfg = get_engine().static_cfg if l.modality == "static" else get_engine().dynamic_cfg
++    cal = cfg.get("calibration")
++    if not cal:
++        return None
++    lo, hi = dec._band(cal) or CALIBRATED_BAND
++    p = l.confidence_score if l.classification == "genuine" else 100 - l.confidence_score
++    p = round(float(min(99.0, max(1.0, p))))
++    lo, hi = round(lo * 100), round(hi * 100)
++    votes = _votes(l) or {}
++    all_pass = bool(votes) and all(votes.values())
++    if l.screening_result == "consistent":
++        why = f"The chance that this signature is genuine is about {p}%, above the {hi}% needed for Consistent."
++    elif l.screening_result == "inconsistent":
++        why = f"The chance that this signature is genuine is only about {p}%, below the {lo}% line for Inconsistent."
++    else:
++        side = "leans genuine" if p >= 50 else "leans not genuine"
++        why = (f"The chance that this signature is genuine is about {p}%: it {side}, but it falls between "
++               f"{lo}% and {hi}%, too close to call either way, so an examiner should review it.")
++        if all_pass:
++            why += (" Every score passed its threshold, but only by a little compared with how much this "
++                    "client's own signatures vary, and signatures that only just pass are often skilled forgeries.")
++    return {"p_genuine": p, "band": [lo, hi], "all_pass": all_pass, "why": why}
++
++
+ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
+     """Everything the result page shows for one screening."""
+     out = log_out(l, db)
+@@ -91,6 +119,7 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
+         out["reference_profile_ids"] = list(l.reference_profile_ids or [])
+         out["strength"] = threshold_strength(len(l.reference_profile_ids or [])) if l.mode == "verify" else None
+         out["internal_decision"] = l.classification  # for evaluation pages only
++        out["explain"] = explain_result(l)
+     out["case"] = None
+     out["finding"] = None
+     if l.case_id:
+@@ -324,11 +353,17 @@ def verification_detail(log_id: int, db: Session = Depends(get_db), user: User =
+ 
+ 
+ @router.get("/api/verifications/{log_id}/image")
+-def questioned_image(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
++def questioned_image(log_id: int, view: str = Query("original", pattern="^(original|model)$"),
++                     db: Session = Depends(get_db), user: User = Depends(require_staff)):
+     log = _visible_log(db, log_id, user)
+     path = storage_path(log.test_sample_path) if log.modality == "static" else None
+     if path is None:
+         raise HTTPException(404, "The questioned image is not stored for this record.")
++    if view == "model":  # display only, see common.model_view_png
++        img = load_image(log.test_sample_path)
++        if img is None:
++            raise HTTPException(404, "The questioned image is not stored for this record.")
++        return Response(model_view_png(img), media_type="image/png", headers=VIEW_ONLY_HEADERS)
+     return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
+ 
+ 
+diff --git a/forgeblock/backend/tests/test_v814.py b/forgeblock/backend/tests/test_v814.py
+new file mode 100644
+index 0000000..c5c32b6
+--- /dev/null
++++ b/forgeblock/backend/tests/test_v814.py
+@@ -0,0 +1,27 @@
++"""v8.14: plain-language explanation of the result (staff only)."""
++from test_api import _client_with_refs, signature_png
++
++from app.ml.engine import get_engine
++
++
++def test_result_explains_itself(client, examiner, monkeypatch):
++    cfg = get_engine().static_cfg  # tests run on the placeholder model: give it a calibration
++    monkeypatch.setitem(cfg, "calibration", {"a": 1.9663, "b": -2.4516, "band": [0.35, 0.65]})
++    cid = _client_with_refs(client, examiner)
++    r = client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
++                    files={"file": ("q.png", signature_png(1, jitter=0.65), "image/png")}).json()
++    ex = r["explain"]
++    assert ex["band"] == [35, 65] and 1 <= ex["p_genuine"] <= 99
++    p = ex["p_genuine"]
++    expected = "consistent" if p >= 65 else ("inconsistent" if p <= 35 else "inconclusive")
++    assert r["screening_result"] == expected or abs(p - 65) <= 1 or abs(p - 35) <= 1  # rounding at the edges
++    assert f"{p}%" in ex["why"]
++    assert ex["all_pass"] == all(r["votes"].values())
++
++
++def test_no_explanation_without_calibration(client, examiner, monkeypatch):
++    monkeypatch.setitem(get_engine().static_cfg, "calibration", None)
++    cid = _client_with_refs(client, examiner, name="No calibration")
++    r = client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
++                    files={"file": ("q.png", signature_png(1, jitter=0.65), "image/png")}).json()
++    assert r["explain"] is None
+diff --git a/forgeblock/backend/tests/test_v89.py b/forgeblock/backend/tests/test_v89.py
+new file mode 100644
+index 0000000..10bc8ff
+--- /dev/null
++++ b/forgeblock/backend/tests/test_v89.py
+@@ -0,0 +1,41 @@
++"""v8.9: cleaned 'what the model sees' previews for references, sheet boxes and
++questioned images. Display only: the stored images and the scores do not change."""
++import base64
++
++import cv2
++import numpy as np
++from test_api import _client_with_refs, signature_png
++from test_v86 import _signed_sheet_photo
++
++
++def _png(content: bytes) -> np.ndarray:
++    return cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR)
++
++
++def test_model_views(client, examiner, examiner2):
++    cid = _client_with_refs(client, examiner)
++    ref = client.get(f"/api/clients/{cid}", headers=examiner).json()["static_references"][0]["id"]
++
++    original = client.get(f"/api/references/{ref}/image", headers=examiner)
++    model = client.get(f"/api/references/{ref}/image?view=model", headers=examiner)
++    assert original.status_code == 200 and model.status_code == 200
++    assert model.headers["content-type"] == "image/png" and model.headers["cache-control"] == original.headers["cache-control"]
++    assert _png(model.content).shape[:2] == (224, 224)
++    assert _png(original.content).shape[:2] != (224, 224)  # the stored image is untouched
++    assert client.get(f"/api/references/{ref}/image?view=raw", headers=examiner).status_code == 422
++    assert client.get(f"/api/references/{ref}/image?view=model", headers=examiner2).status_code == 404
++
++    res = client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
++                      files={"file": ("q.png", signature_png(99), "image/png")}).json()
++    r = client.get(f"/api/verifications/{res['id']}/image?view=model", headers=examiner)
++    assert r.status_code == 200 and _png(r.content).shape[:2] == (224, 224)
++
++    r = client.post(f"/api/clients/{cid}/static/sheet-preview", headers=examiner,
++                    files={"file": ("sheet.jpg", _signed_sheet_photo(3), "image/jpeg")})
++    boxes = r.json()["boxes"]
++    for b in boxes:
++        if b["empty"]:
++            assert b["model_view"] is None
++        else:
++            img = _png(base64.b64decode(b["model_view"].split(",", 1)[1]))
++            assert img.shape[:2] == (224, 224)
+diff --git a/forgeblock/frontend/src/components/ResultView.jsx b/forgeblock/frontend/src/components/ResultView.jsx
+index de9c886..ce42e47 100644
+--- a/forgeblock/frontend/src/components/ResultView.jsx
++++ b/forgeblock/frontend/src/components/ResultView.jsx
+@@ -19,13 +19,31 @@ function HowCalculated({ r }) {
+         file using {r.modality === 'static' ? 'cosine similarity, Euclidean distance and Manhattan distance' : 'cosine similarity and Euclidean distance'}.
+         Each measure is checked against its threshold ({r.decision_rule.toLowerCase()}).
+       </p>
+-      <p>
++      {r.explain ? (
++        <>
++          <p>
++            Passing a threshold is not enough on its own. ForgeBlock measures <b>how far past</b> the thresholds the signature is, counted in the
++            client’s <b>own</b> natural variation (how much their references differ from each other), and turns that distance into the <b>chance that
++            the signature is genuine</b>. This was calibrated on people the model never saw: signatures that only just pass are still often skilled
++            forgeries, so a signature has to pass by a clear margin to count as Consistent.
++          </p>
++          <p>
++            <b>Consistent</b> when that chance is at least {r.explain.band[1]}%, <b>Inconsistent</b> when it is {r.explain.band[0]}% or less, and{' '}
++            <b>Inconclusive</b> in between, which goes to the examiner. The <b>confidence score</b> is how likely the shown result is (never above 99%).
++          </p>
++          <p className="rounded-lg bg-slate-50 px-3 py-2">
++            <b>This screening:</b> {r.explain.why}
++          </p>
++        </>
++      ) : (
++        <p>
+         The <b>confidence score</b> measures how far past the threshold the signature is, counted in the client’s <b>own</b> natural variation
+         (how much their references differ from each other). Right on the threshold is 0%; one step of their usual variation past it is about 68%,
+         two steps about 95%, and it never goes above 99%. On the Inconsistent side it is the same distance measured below the threshold.
+         Borderline results are <b>Inconclusive</b>{' '}
+         and go to the examiner. It is not a probability that the signature is genuine.
+-      </p>
++        </p>
++      )}
+       <p>
+         {r.threshold_source === 'adaptive'
+           ? `Personal thresholds were used: with ${r.reference_count} references on file, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary. They change whenever references are added or removed.`
+@@ -99,6 +117,7 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
+             {res.label}
+           </div>
+           <p className="mt-2.5 text-base text-slate-700">{shortCaption(r, whose)}</p>
++          {r.explain?.why && <p className="mt-1.5 max-w-xl text-sm text-slate-600">{r.explain.why}</p>}
+         </div>
+         <div className="sm:text-right">
+           <div className="flex items-center gap-1.5 text-sm text-slate-500 sm:justify-end">Confidence score {how}</div>
+@@ -475,6 +494,12 @@ function Scores({ r }) {
+       </table>
+       </div>
+       <p className="text-xs text-slate-500">Decision rule: {r.decision_rule}. {r.reference_count > 1 && 'Values are averaged over all references.'}</p>
++      {r.explain?.all_pass && r.screening_result !== 'consistent' && (
++        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
++          All metrics pass, but the result also depends on how far past the thresholds the signature is, compared with this client’s own
++          signatures. Here the margin was small, so the chance it is genuine is about {r.explain.p_genuine}%.
++        </p>
++      )}
+       {per.length > 0 && (
+         <div>
+           <div className="mb-2 text-sm font-medium">Similarity to each reference</div>
+diff --git a/forgeblock/frontend/src/components/SheetEnroll.jsx b/forgeblock/frontend/src/components/SheetEnroll.jsx
+index dde221a..fc02a8b 100644
+--- a/forgeblock/frontend/src/components/SheetEnroll.jsx
++++ b/forgeblock/frontend/src/components/SheetEnroll.jsx
+@@ -150,7 +150,7 @@ export default function SheetEnroll({ client, onDone }) {
+                     {on && <Check className="h-3.5 w-3.5" />}
+                   </span>
+                   <span className="text-xs font-medium text-slate-500">Box {b.index}</span>
+-                  <img src={b.image} alt={`Box ${b.index}`} className="mt-1 h-20 w-full object-contain" />
++                  <img src={b.model_view || b.image} alt={`Box ${b.index}`} className="mt-1 h-20 w-full object-contain" />
+                   {(b.empty || b.issues.length > 0) && (
+                     <div className={`mt-1 text-[12px] ${b.usable ? 'text-amber-700' : 'text-bad-600'}`}>
+                       {b.empty ? 'Empty box' : b.issues.join(' ')}
+diff --git a/forgeblock/frontend/src/pages/Clients.jsx b/forgeblock/frontend/src/pages/Clients.jsx
+index 00e201c..2eba04e 100644
+--- a/forgeblock/frontend/src/pages/Clients.jsx
++++ b/forgeblock/frontend/src/pages/Clients.jsx
+@@ -618,7 +618,7 @@ function RefTile({ p, modality, onRemove }) {
+   return (
+     <div className={`group relative rounded-lg border bg-white p-2 ${p.flagged ? 'border-warn-600' : 'border-slate-200'}`}>
+       <div className="flex h-20 items-center justify-center">
+-        {modality === 'static' ? <AuthImage src={`/api/references/${p.id}/image`} className="h-20 w-full object-contain" /> : strokes && <StrokePreview strokes={strokes} className="h-16 w-full" />}
++        {modality === 'static' ? <AuthImage src={`/api/references/${p.id}/image?view=model`} className="h-20 w-full object-contain" /> : strokes && <StrokePreview strokes={strokes} className="h-16 w-full" />}
+       </div>
+       <div className="mt-1 flex items-center justify-between text-[12.5px] text-slate-500">
+         <span>Quality {Math.round(p.quality)}</span>

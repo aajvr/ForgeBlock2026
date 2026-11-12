@@ -19,13 +19,31 @@ function HowCalculated({ r }) {
         file using {r.modality === 'static' ? 'cosine similarity, Euclidean distance and Manhattan distance' : 'cosine similarity and Euclidean distance'}.
         Each measure is checked against its threshold ({r.decision_rule.toLowerCase()}).
       </p>
-      <p>
+      {r.explain ? (
+        <>
+          <p>
+            Passing a threshold is not enough on its own. ForgeBlock measures <b>how far past</b> the thresholds the signature is, counted in the
+            client’s <b>own</b> natural variation (how much their references differ from each other), and turns that distance into the <b>chance that
+            the signature is genuine</b>. This was calibrated on people the model never saw: signatures that only just pass are still often skilled
+            forgeries, so a signature has to pass by a clear margin to count as Consistent.
+          </p>
+          <p>
+            <b>Consistent</b> when that chance is at least {r.explain.band[1]}%, <b>Inconsistent</b> when it is {r.explain.band[0]}% or less, and{' '}
+            <b>Inconclusive</b> in between, which goes to the examiner. The <b>confidence score</b> is how likely the shown result is (never above 99%).
+          </p>
+          <p className="rounded-lg bg-slate-50 px-3 py-2">
+            <b>This screening:</b> {r.explain.why}
+          </p>
+        </>
+      ) : (
+        <p>
         The <b>confidence score</b> measures how far past the threshold the signature is, counted in the client’s <b>own</b> natural variation
         (how much their references differ from each other). Right on the threshold is 0%; one step of their usual variation past it is about 68%,
         two steps about 95%, and it never goes above 99%. On the Inconsistent side it is the same distance measured below the threshold.
         Borderline results are <b>Inconclusive</b>{' '}
         and go to the examiner. It is not a probability that the signature is genuine.
-      </p>
+        </p>
+      )}
       <p>
         {r.threshold_source === 'adaptive'
           ? `Personal thresholds were used: with ${r.reference_count} references on file, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary. They change whenever references are added or removed.`
@@ -99,6 +117,7 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
             {res.label}
           </div>
           <p className="mt-2.5 text-base text-slate-700">{shortCaption(r, whose)}</p>
+          {r.explain?.why && <p className="mt-1.5 max-w-xl text-sm text-slate-600">{r.explain.why}</p>}
         </div>
         <div className="sm:text-right">
           <div className="flex items-center gap-1.5 text-sm text-slate-500 sm:justify-end">Confidence score {how}</div>
@@ -475,6 +494,12 @@ function Scores({ r }) {
       </table>
       </div>
       <p className="text-xs text-slate-500">Decision rule: {r.decision_rule}. {r.reference_count > 1 && 'Values are averaged over all references.'}</p>
+      {r.explain?.all_pass && r.screening_result !== 'consistent' && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          All metrics pass, but the result also depends on how far past the thresholds the signature is, compared with this client’s own
+          signatures. Here the margin was small, so the chance it is genuine is about {r.explain.p_genuine}%.
+        </p>
+      )}
       {per.length > 0 && (
         <div>
           <div className="mb-2 text-sm font-medium">Similarity to each reference</div>

@@ -128,6 +128,9 @@ class Engine:
         self.dynamic_fingerprint = _dynamic_fingerprint(self.dynamic_model)
         self.static_cfg["calibration"] = _load_calibration(cal, "static", self.static_fingerprint)
         self.dynamic_cfg["calibration"] = _load_calibration(cal, "dynamic", self.dynamic_fingerprint)
+        # v8.10 per-client classifier (app/ml/client_classifier.py)
+        self.static_cfg["client_classifier"] = _load_calibration(cal, "static_client_classifier",
+                                                                 self.static_fingerprint)
         for name, fp, c in (("static", self.static_fingerprint, self.static_cfg["calibration"]),
                             ("dynamic", self.dynamic_fingerprint, self.dynamic_cfg["calibration"])):
             log.info("%s confidence: %s (model fingerprint %s)", name,

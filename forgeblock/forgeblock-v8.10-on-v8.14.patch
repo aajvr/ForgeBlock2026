@@ -1,0 +1,309 @@
+From ab29e8e3b9bb347242df9ad118aacf577724d47e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 10 Nov 2026 12:48:22 +0000
+Subject: [PATCH] v8.10 per-client check on v8.14 (local only)
+
+---
+ .../backend/app/ml/client_classifier.py       | 82 +++++++++++++++++++
+ forgeblock/backend/app/ml/decision.py         | 12 +++
+ forgeblock/backend/app/ml/engine.py           |  3 +
+ .../backend/app/routers/verification.py       | 48 ++++++++++-
+ forgeblock/backend/tests/test_v810.py         | 76 +++++++++++++++++
+ 5 files changed, 220 insertions(+), 1 deletion(-)
+ create mode 100644 forgeblock/backend/app/ml/client_classifier.py
+ create mode 100644 forgeblock/backend/tests/test_v810.py
+
+diff --git a/forgeblock/backend/app/ml/client_classifier.py b/forgeblock/backend/app/ml/client_classifier.py
+new file mode 100644
+index 0000000..a4144d8
+--- /dev/null
++++ b/forgeblock/backend/app/ml/client_classifier.py
+@@ -0,0 +1,82 @@
++"""Per-client classifier for static screening (v8.10).
++
++The plain method compares the questioned signature with the client's
++references by distance only. This step also asks: is it closer to THIS
++client than to other people captured the same way? For each screening a
++small kernel classifier (least-squares SVM, RBF kernel; Suykens and
++Vandewalle's LS-SVM, solved in closed form with NumPy) is fitted on
++
++    positives  = the client's own static reference embeddings
++    negatives  = the static reference embeddings of OTHER clients in this
++                 ForgeBlock database (the "background"), up to 10 each
++
++The static model itself is not changed or retrained; only its embeddings
++are used, and nobody's signature image is shown or shared.
++
++Results (v8.12 MobileNetV3 static model, ForgeBlock's own 55-participant
++static data, 5-fold person-disjoint, 10 references): skilled-forgery EER
++23.8% with distance only -> 16.4% with this check (AUC 0.849 -> 0.914).
++The background must be captured like the clients: CEDAR signatures as
++background made own-data results worse (EER 30%, earlier SigNet test). So
++the classifier is used only when at least MIN_BACKGROUND_CLIENTS other
++clients have at least the minimum number of static references; otherwise
++the plain distance method is used as before.
++
++Score normalisation: the raw LS-SVM output depends on how many background
++clients there are, so it is rescaled with the classifier's own
++leave-one-out predictions (closed form for LS-SVM, Cawley and Talbot):
++
++    s = (f(x) - mean LOO(negatives)) / (mean LOO(positives) - mean LOO(negatives))
++
++0 = like a typical other person, 1 = like the client's typical genuine
++signature. s is turned into P(genuine) with Platt calibration (a, b in
++weights/calibration.json, "static_client_classifier", keyed by the static
++model fingerprint like the v8.5 calibration).
++"""
++from __future__ import annotations
++
++import numpy as np
++
++MIN_BACKGROUND_CLIENTS = 10
++MAX_BACKGROUND_CLIENTS = 60
++REFS_PER_BACKGROUND_CLIENT = 10
++GAMMA_SCALE = 2.0   # RBF width: gamma = GAMMA_SCALE / (dim * variance of the training set)
++LAMBDA = 10.0       # LS-SVM regularisation
++
++
++def _sq(a: np.ndarray, b: np.ndarray) -> np.ndarray:
++    return np.maximum((a * a).sum(1)[:, None] + (b * b).sum(1)[None] - 2 * a @ b.T, 0)
++
++
++def fit(positives: np.ndarray, negatives: np.ndarray, gamma_scale: float = GAMMA_SCALE,
++        lam: float = LAMBDA):
++    """Returns score(Q) -> normalised score per row of Q (see module docstring)."""
++    pos = np.asarray(positives, np.float64)
++    neg = np.asarray(negatives, np.float64)
++    x = np.r_[pos, neg]
++    y = np.r_[np.ones(len(pos)), -np.ones(len(neg))]
++    w = np.r_[np.full(len(pos), len(neg) / len(pos)), np.ones(len(neg))]  # balance the classes
++    g = gamma_scale / (x.shape[1] * max(float(x.var()), 1e-12))
++    k = np.exp(-g * _sq(x, x))
++    n = len(x)
++    a = np.zeros((n + 1, n + 1))
++    a[0, 1:] = 1
++    a[1:, 0] = 1
++    a[1:, 1:] = k + np.diag(1 / (lam * w))
++    ai = np.linalg.inv(a)
++    sol = ai @ np.r_[0.0, y]
++    b, alpha = sol[0], sol[1:]
++    loo = y - alpha / np.diag(ai)[1:]
++    mp, mn = loo[: len(pos)].mean(), loo[len(pos):].mean()
++    span = max(mp - mn, 1e-3)
++
++    def score(q: np.ndarray) -> np.ndarray:
++        q = np.atleast_2d(np.asarray(q, np.float64))
++        return (np.exp(-g * _sq(q, x)) @ alpha + b - mn) / span
++
++    return score
++
++
++def probability(s: float, calibration: dict) -> float:
++    t = float(calibration["a"]) * float(np.clip(s, -10, 10)) + float(calibration["b"])
++    return float(1 / (1 + np.exp(-t)))
+diff --git a/forgeblock/backend/app/ml/decision.py b/forgeblock/backend/app/ml/decision.py
+index f6fad1f..7124868 100644
+--- a/forgeblock/backend/app/ml/decision.py
++++ b/forgeblock/backend/app/ml/decision.py
+@@ -258,6 +258,18 @@ def dynamic_decision(metrics: dict, tau_c: float, source: str, typical: dict | N
+ 
+ # ------------------------------------------------------------ screening ---
+ 
++def with_probability(d: Decision, p: float, calibration: dict) -> Decision:
++    """The same decision with its result and confidence taken from another
++    calibrated P(genuine) (v8.10 per-client classifier). Metrics, thresholds
++    and votes stay as computed, for the details view."""
++    genuine = p >= 0.5
++    d.classification = "genuine" if genuine else "forged"
++    d.confidence = float(min(CONFIDENCE_CAP, 100 * (p if genuine else 1 - p)))
++    d.p_genuine = p
++    d.band = _band(calibration) or d.band
++    return d
++
++
+ def screen_static_embedding(test: np.ndarray, refs: list[np.ndarray], cfg: dict, min_adaptive: int) -> Decision:
+     """Static decision as the application makes it (also used by the
+     evaluation script, so its numbers match the system)."""
+diff --git a/forgeblock/backend/app/ml/engine.py b/forgeblock/backend/app/ml/engine.py
+index 637bb3d..f237338 100644
+--- a/forgeblock/backend/app/ml/engine.py
++++ b/forgeblock/backend/app/ml/engine.py
+@@ -128,6 +128,9 @@ class Engine:
+         self.dynamic_fingerprint = _dynamic_fingerprint(self.dynamic_model)
+         self.static_cfg["calibration"] = _load_calibration(cal, "static", self.static_fingerprint)
+         self.dynamic_cfg["calibration"] = _load_calibration(cal, "dynamic", self.dynamic_fingerprint)
++        # v8.10 per-client classifier (app/ml/client_classifier.py)
++        self.static_cfg["client_classifier"] = _load_calibration(cal, "static_client_classifier",
++                                                                 self.static_fingerprint)
+         for name, fp, c in (("static", self.static_fingerprint, self.static_cfg["calibration"]),
+                             ("dynamic", self.dynamic_fingerprint, self.dynamic_cfg["calibration"])):
+             log.info("%s confidence: %s (model fingerprint %s)", name,
+diff --git a/forgeblock/backend/app/routers/verification.py b/forgeblock/backend/app/routers/verification.py
+index 72fdbb9..49f0f4e 100644
+--- a/forgeblock/backend/app/routers/verification.py
++++ b/forgeblock/backend/app/routers/verification.py
+@@ -23,6 +23,7 @@ from ..config import MIN_ADAPTIVE_SAMPLES
+ from ..database import get_db
+ from ..ledger import verify_block
+ from ..ml import capture
++from ..ml import client_classifier as cc
+ from ..ml import decision as dec
+ from ..ml.dynamic_features import points_from_payload
+ from ..ml.engine import get_engine
+@@ -31,7 +32,7 @@ from ..ml.features import compare_features, dynamic_features, static_features
+ from ..ml.preprocessing import preprocessed_preview
+ from ..ml.quality import dynamic_quality, static_quality
+ from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
+-from ..models import BlockchainLedger, Case, Finding, SignatureProfile, User, VerificationLog
++from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
+ from ..security import current_user, require_staff
+ from ..services import (
+     load_image,
+@@ -218,6 +219,49 @@ def _reference_width(profile) -> int | None:
+     return _REF_WIDTHS[key]
+ 
+ 
++def _background(db: Session, client_id: int, model_version: str, dim: int) -> tuple[np.ndarray | None, int]:
++    """Static reference embeddings of OTHER clients (same model), up to
++    REFS_PER_BACKGROUND_CLIENT each, for the per-client classifier. Used inside
++    the model only; nothing about these clients is shown."""
++    rows = db.execute(
++        select(SignatureProfile.client_id, SignatureProfile.embedding)
++        .join(Client, Client.id == SignatureProfile.client_id)
++        .where(Client.status == "active", SignatureProfile.modality == "static", SignatureProfile.status == "active",
++               SignatureProfile.client_id != client_id, SignatureProfile.model_version == model_version)
++        .order_by(SignatureProfile.client_id, SignatureProfile.id)
++    ).all()
++    per: dict[int, list] = {}
++    for cid, emb in rows:
++        if emb is not None and len(emb) == dim and len(per.setdefault(cid, [])) < cc.REFS_PER_BACKGROUND_CLIENT:
++            per[cid].append(emb)
++    usable = [cid for cid, e in per.items() if len(e) >= MIN_ADAPTIVE_SAMPLES]
++    if len(usable) > cc.MAX_BACKGROUND_CLIENTS:  # a fixed, even spread over the clients
++        idx = np.linspace(0, len(usable) - 1, cc.MAX_BACKGROUND_CLIENTS).round().astype(int)
++        usable = [usable[i] for i in idx]
++    if len(usable) < cc.MIN_BACKGROUND_CLIENTS:
++        return None, len(usable)
++    return np.array([e for cid in usable for e in per[cid]], np.float64), len(usable)
++
++
++def _client_classifier(db: Session, client_id: int, test: np.ndarray, refs: list[np.ndarray],
++                       decision, cfg: dict) -> dict:
++    """v8.10: replaces the result's probability with the per-client
++    classifier's when there is a calibration and enough other clients."""
++    cal = cfg.get("client_classifier")
++    info = {"used": False, "background_clients": 0, "min_background_clients": cc.MIN_BACKGROUND_CLIENTS}
++    if not cal or len(refs) < MIN_ADAPTIVE_SAMPLES:
++        return info
++    neg, k = _background(db, client_id, cfg["model_version"], len(test))
++    info["background_clients"] = k
++    if neg is None:
++        return info
++    s = float(cc.fit(np.array(refs), neg)(test)[0])
++    p = cc.probability(s, cal)
++    info.update(used=True, score=round(s, 4), p_distance_only=decision.p_genuine)
++    dec.with_probability(decision, p, cal)
++    return info
++
++
+ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: Case | None = None,
+                         document_ref: str | None = None, expected_label: str | None = None,
+                         sample_hash: str | None = None) -> VerificationLog:
+@@ -234,10 +278,12 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case:
+     test = engine.static_embedding(img)
+     refs = [np.array(p.embedding) for p in profiles]
+     decision = dec.screen_static_embedding(test, refs, engine.static_cfg, MIN_ADAPTIVE_SAMPLES)
++    classifier = _client_classifier(db, client.id, test, refs, decision, engine.static_cfg)
+     per_ref, best = _per_ref(test, profiles)
+     analysis = {
+         "quality": q,
+         "size_scale": round(size_scale, 3),
++        "client_classifier": classifier,
+         "exact_match": _exact_match(test, refs, profiles),
+         "per_reference": per_ref,
+         "features": compare_features(static_features(img), [p.features for p in profiles], "static"),
+diff --git a/forgeblock/backend/tests/test_v810.py b/forgeblock/backend/tests/test_v810.py
+new file mode 100644
+index 0000000..52a1780
+--- /dev/null
++++ b/forgeblock/backend/tests/test_v810.py
+@@ -0,0 +1,76 @@
++"""v8.10: per-client classifier for static screening (app/ml/client_classifier.py)."""
++import numpy as np
++from test_api import _client_with_refs, signature_png
++
++from app.database import SessionLocal
++from app.ml import client_classifier as cc
++from app.ml.engine import get_engine
++from app.models import Client, SignatureProfile
++
++
++def _unit(v):
++    return v / np.linalg.norm(v, axis=-1, keepdims=True)
++
++
++def test_classifier_separates_client_from_others():
++    rng = np.random.default_rng(0)
++    centre = _unit(rng.normal(size=256))
++    pos = _unit(centre + 0.15 * rng.normal(size=(10, 256)))
++    others = [_unit(rng.normal(size=256)) for _ in range(12)]
++    neg = np.concatenate([_unit(c + 0.15 * rng.normal(size=(10, 256))) for c in others])
++    score = cc.fit(pos, neg)
++    own = score(_unit(centre + 0.15 * rng.normal(size=(5, 256))))
++    other = score(_unit(others[0] + 0.15 * rng.normal(size=(5, 256))))
++    assert own.min() > other.max()
++    assert abs(float(np.mean(own)) - 1) < 0.5 and abs(float(np.mean(other))) < 0.5  # normalised scale
++    cal = {"a": 6.3925, "b": -5.4503}
++    assert cc.probability(1.0, cal) > 0.65 and cc.probability(0.0, cal) < 0.35
++
++
++def _add_background(n_clients: int, version: str, dim: int, start: int = 0):
++    rng = np.random.default_rng(1 + start)
++    with SessionLocal() as db:
++        for i in range(start, start + n_clients):
++            c = Client(client_code=f"BG-{i:03d}", full_name=f"Background {i}")
++            db.add(c)
++            db.flush()
++            centre = _unit(rng.normal(size=dim))
++            for e in _unit(centre + 0.15 * rng.normal(size=(10, dim))):
++                db.add(SignatureProfile(client_id=c.id, modality="static", sample_path="none.png",
++                                        embedding=e.tolist(), model_version=version))
++        db.commit()
++
++
++def test_shipped_calibration_has_classifier_entry():
++    import json
++    from pathlib import Path
++
++    c = json.loads((Path(__file__).parents[1] / "weights" / "calibration.json").read_text())
++    entry = c["static_client_classifier"]["f5f7cf01b8c40d87"]  # the shipped v8.12 static model
++    assert entry["a"] > 0 and entry["band"] == [0.35, 0.65]
++
++
++def test_screening_uses_classifier_only_with_enough_clients(client, examiner, monkeypatch):
++    cfg = get_engine().static_cfg  # tests run on the placeholder model, so give it the entry
++    monkeypatch.setitem(cfg, "client_classifier", {"a": 6.3925, "b": -5.4503, "band": [0.35, 0.65]})
++    cid = _client_with_refs(client, examiner)
++    screen = lambda: client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
++                                 files={"file": ("q.png", signature_png(1, jitter=0.65), "image/png")}).json()
++
++    r = screen()
++    info = r["analysis"]["client_classifier"]
++    have = info["background_clients"]  # other tests may already have made clients with references
++    assert info["used"] is (have >= cc.MIN_BACKGROUND_CLIENTS)
++
++    dim = len(get_engine().static_embedding(np.full((60, 120, 3), 255, np.uint8)))
++    missing = cc.MIN_BACKGROUND_CLIENTS - have
++    if missing > 1:
++        _add_background(missing - 1, cfg["model_version"], dim)
++        assert screen()["analysis"]["client_classifier"]["used"] is False  # one short: plain method
++    _add_background(max(missing, 1) if missing <= 1 else 1, cfg["model_version"], dim, start=100)
++    r = screen()
++    info = r["analysis"]["client_classifier"]
++    assert info["used"] is True and info["background_clients"] >= cc.MIN_BACKGROUND_CLIENTS
++    assert r["screening_result"] in ("consistent", "inconclusive", "inconsistent")
++    assert 0 <= r["confidence_score"] <= 99
++    assert r["integrity"]["valid"]
+-- 
+2.43.0
+

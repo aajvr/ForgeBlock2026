@@ -150,7 +150,7 @@ export default function SheetEnroll({ client, onDone }) {
                     {on && <Check className="h-3.5 w-3.5" />}
                   </span>
                   <span className="text-xs font-medium text-slate-500">Box {b.index}</span>
-                  <img src={b.image} alt={`Box ${b.index}`} className="mt-1 h-20 w-full object-contain" />
+                  <img src={b.model_view || b.image} alt={`Box ${b.index}`} className="mt-1 h-20 w-full object-contain" />
                   {(b.empty || b.issues.length > 0) && (
                     <div className={`mt-1 text-[12px] ${b.usable ? 'text-amber-700' : 'text-bad-600'}`}>
                       {b.empty ? 'Empty box' : b.issues.join(' ')}

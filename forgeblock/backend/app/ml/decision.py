@@ -258,6 +258,18 @@ def dynamic_decision(metrics: dict, tau_c: float, source: str, typical: dict | N
 
 # ------------------------------------------------------------ screening ---
 
+def with_probability(d: Decision, p: float, calibration: dict) -> Decision:
+    """The same decision with its result and confidence taken from another
+    calibrated P(genuine) (v8.10 per-client classifier). Metrics, thresholds
+    and votes stay as computed, for the details view."""
+    genuine = p >= 0.5
+    d.classification = "genuine" if genuine else "forged"
+    d.confidence = float(min(CONFIDENCE_CAP, 100 * (p if genuine else 1 - p)))
+    d.p_genuine = p
+    d.band = _band(calibration) or d.band
+    return d
+
+
 def screen_static_embedding(test: np.ndarray, refs: list[np.ndarray], cfg: dict, min_adaptive: int) -> Decision:
     """Static decision as the application makes it (also used by the
     evaluation script, so its numbers match the system)."""
