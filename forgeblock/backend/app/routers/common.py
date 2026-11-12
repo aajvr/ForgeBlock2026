@@ -69,23 +69,47 @@ def active_profiles(db: Session, client_id: int, modality: str) -> list[Signatur
     )
 
 
-def threshold_strength(count: int) -> dict:
+def threshold_strength(count: int, sittings: int | None = None) -> dict:
     """Signature card badge: personal threshold strength from the number of
-    references (min 7, recommended 10, max 20)."""
+    references (min 7, recommended 20, max 30). `sittings` is the rough number of
+    sittings the references were added in (see sitting_count); when they all come from one
+    sitting the note suggests adding more on another day (signatures vary from
+    day to day, and screening is more reliable when the references show it)."""
+    more = "More signatures make the screening more reliable."
     if count >= RECOMMENDED_REFERENCES:
         level, label = "strong", "Strong"
         note = f"{count} references. Personal threshold is well supported."
+        if count < MAX_REFERENCES:
+            note += f" Adding more (up to {MAX_REFERENCES}) can still help."
     elif count >= MIN_ADAPTIVE_SAMPLES:
         level, label = "basic", "Ready"
-        note = f"{count} references. Personal threshold is on; {RECOMMENDED_REFERENCES} or more is recommended."
+        note = (f"{count} references. Personal threshold is on. {more} "
+                f"{RECOMMENDED_REFERENCES} or more is recommended.")
     elif count > 0:
         level, label = "not_ready", "Not ready"
         note = (f"{count} of {MIN_ADAPTIVE_SAMPLES} references. Default thresholds are used until "
                 f"{MIN_ADAPTIVE_SAMPLES} are on file.")
     else:
         level, label, note = "none", "No references", "No references on file yet."
-    return {"level": level, "label": label, "count": count, "note": note,
+    sitting_tip = None
+    if count > 0 and sittings == 1 and count < MAX_REFERENCES:
+        sitting_tip = ("All references were signed in one sitting. If possible, add more signatures "
+                       "on another day so the references show how the signature naturally varies.")
+    return {"level": level, "label": label, "count": count, "note": note, "sittings": sittings,
+            "sitting_tip": sitting_tip,
             "minimum": MIN_ADAPTIVE_SAMPLES, "recommended": RECOMMENDED_REFERENCES, "maximum": MAX_REFERENCES}
+
+
+SITTING_GAP_HOURS = 6
+
+
+def sitting_count(profiles: list[SignatureProfile]) -> int:
+    """Rough number of sittings: references added more than SITTING_GAP_HOURS
+    apart count as separate sittings (time zone does not matter this way)."""
+    times = sorted(p.enrolled_at for p in profiles if p.enrolled_at)
+    if not times:
+        return 0
+    return 1 + sum((b - a).total_seconds() > SITTING_GAP_HOURS * 3600 for a, b in zip(times, times[1:]))
 
 
 def consistency(profiles: list[SignatureProfile], modality: str) -> dict[int, dict]:
@@ -140,8 +164,9 @@ def examiner_ref(u: User | None) -> dict | None:
 
 
 def client_out(c: Client, db: Session) -> dict:
-    s = len(active_profiles(db, c.id, "static"))
-    d = len(active_profiles(db, c.id, "dynamic"))
+    sp = active_profiles(db, c.id, "static")
+    dp = active_profiles(db, c.id, "dynamic")
+    s, d = len(sp), len(dp)
     g = db.get(ClientGroup, c.group_id) if c.group_id else None
     account = db.scalar(select(User).where(User.client_id == c.id, User.role == "client"))
     return {
@@ -161,8 +186,8 @@ def client_out(c: Client, db: Session) -> dict:
         "retention_until": c.retention_until,
         "static_count": s,
         "dynamic_count": d,
-        "static_strength": threshold_strength(s),
-        "dynamic_strength": threshold_strength(d),
+        "static_strength": threshold_strength(s, sitting_count(sp)),
+        "dynamic_strength": threshold_strength(d, sitting_count(dp)),
     }
 
 

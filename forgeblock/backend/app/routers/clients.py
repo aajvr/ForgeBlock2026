@@ -283,7 +283,7 @@ async def enroll_static(client_id: int, files: list[UploadFile] = File(...), db:
 
 @router.get("/clients/{client_id}/static/enrollment-sheet")
 def static_enrollment_sheet(client_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
-    """Printable 10-box sheet for this client (blank form, holds no signature data)."""
+    """Printable sheet for this client: 2 practice + 10 reference boxes (blank form, holds no signature data)."""
     c = editable_client_or_404(db, client_id, user)
     pdf = enroll_sheet.render_pdf(c.client_code)  # code only, never the name (Section 3.2.1)
     return Response(pdf, media_type="application/pdf",
@@ -318,6 +318,9 @@ async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db:
             view = "data:image/png;base64," + base64.b64encode(model_view_png(bgr)).decode()
         q = {"usable": False, "score": 0.0, "issues": ["This box is empty."]} if b["empty"] \
             else static_quality(cv2.cvtColor(b["image"], cv2.COLOR_GRAY2BGR))
+        if b.get("cut_off"):
+            # A capture problem, not a judgement on the signature: left unticked, the examiner decides.
+            q = {**q, "issues": ["The signature runs over the box border and may be cut off."] + list(q["issues"])}
         out.append({
             "index": b["index"],
             "image": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode(),
@@ -326,6 +329,7 @@ async def static_sheet_preview(client_id: int, file: UploadFile = File(...), db:
             "usable": bool(q["usable"]),
             "quality": q["score"],
             "issues": q["issues"],
+            "cut_off": bool(b.get("cut_off")),
         })
     return {"boxes": out}
 

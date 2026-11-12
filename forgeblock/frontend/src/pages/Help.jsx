@@ -28,8 +28,10 @@ const FAQ = [
   {
     topic: 'Clients and references',
     items: [
-      ['How many reference signatures does a client need?', 'At least 7 per module, 10 or more recommended, 20 at most. The badge on the signature card shows this: Not ready (fewer than 7), Ready (7 to 9) and Strong (10 or more).'],
-      ['What does “Looks different from the others” mean?', 'That reference is much less similar to the client’s other references than they are to each other. It may be a poor scan, a different signature style, or someone else’s signature. Check it and remove it if needed.'],
+      ['How many reference signatures does a client need?', 'At least 7 per module, 20 recommended, 30 at most. More signatures make screening more reliable. The badge on the signature card shows this: Not ready (fewer than 7), Ready (7 to 19) and Strong (20 or more).'],
+      ['Why add signatures on different days?', 'A signature changes a little from day to day. When the references come from two or more sittings, ForgeBlock learns that natural variation and is less likely to call a genuine signature Inconsistent. The signature card suggests this when all references were added in one sitting. With the printed sheet, fill a second sheet on another day.'],
+      ['What are the practice boxes on the enrollment sheet?', 'The first signatures of a sitting are often stiffer than the rest, so the client warms up in the 2 practice boxes first. They are never cropped or added as references.'],
+      ['What does “Looks different from the others” mean?', 'That reference is much less similar to the client’s other references than they are to each other. If it is the client’s own signature and a clean capture, keep it: natural variation makes screening more reliable. Remove it only if the capture is bad (smudged, cut off, blurry) or it is not the client’s signature.'],
       ['What makes a good scan?', 'One signature per image, dark ink on plain paper, scanned at 300 dpi or photographed straight on in good light. Each upload gets a quality score; blank, tiny or blurry images are refused.'],
       ['How do I delete a client?', 'Administrators: right-click the client in the Clients list (or press ⋯) and choose Delete client, then confirm. Their signatures and images are removed; the ledger keeps only hashes, so the chain stays valid.'],
     ],

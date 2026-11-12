@@ -76,9 +76,12 @@ OAUTH_PROVIDERS = [_PROVIDER_ALIASES.get(p.strip(), p.strip())
 # are used instead of the global defaults (Chapter 3, Section 3.4).
 MIN_ADAPTIVE_SAMPLES = int(os.getenv("MIN_ADAPTIVE_SAMPLES", "7"))
 # Reference counts per client and modality: 7 is the minimum (personal
-# threshold turns on), 10 is recommended ("strong"), 20 is the maximum.
-RECOMMENDED_REFERENCES = int(os.getenv("RECOMMENDED_REFERENCES", "10"))
-MAX_REFERENCES = int(os.getenv("MAX_REFERENCES", "20"))
+# threshold turns on), 20 is recommended ("strong"), 30 is the maximum.
+# v8.17: in the enrollment test on the own static dataset the per-client check
+# kept improving with more references (EER 23.6% at 5, 18.0% at 10, 15.0% at 15),
+# so the recommendation went 10 -> 20 and the cap 20 -> 30.
+RECOMMENDED_REFERENCES = int(os.getenv("RECOMMENDED_REFERENCES", "20"))
+MAX_REFERENCES = int(os.getenv("MAX_REFERENCES", "30"))
 
 # Sign-in security: lockout after repeated failures, sign-out when idle.
 MAX_FAILED_LOGINS = int(os.getenv("MAX_FAILED_LOGINS", "5"))

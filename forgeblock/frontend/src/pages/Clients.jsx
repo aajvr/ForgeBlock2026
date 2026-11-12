@@ -536,7 +536,7 @@ export default function Clients() {
         eyebrow={isAdmin && folder ? <button onClick={() => open_(null)} className="hover:underline">← All groups</button> : undefined}
         description={isAdmin
           ? 'Clients are kept in groups. Each group has one examiner, who is the only examiner that can see its clients. Right-click a client for quick actions.'
-          : 'The clients of your group. At least 7 references per module, 10 or more recommended, up to 20.'}
+          : 'The clients of your group. At least 7 references per module, 20 recommended, up to 30. More signatures, from more than one sitting, make screening more reliable.'}
       >
         {isAdmin && !folder && <Button variant="secondary" onClick={() => setEditGroup('new')}><FolderPlus className="h-4 w-4" /> New group</Button>}
         <Button onClick={() => setOpen(true)} data-tour="new-client">
@@ -606,6 +606,7 @@ function StrengthMeter({ strength }) {
         <span className="absolute -translate-x-1/2" style={{ left: `${(recommended / maximum) * 100}%` }}>recommended {recommended}</span>
       </div>
       <p className="mt-1 text-xs text-slate-500">{strength.note}</p>
+      {strength.sitting_tip && <p className="mt-1 text-xs text-amber-700">{strength.sitting_tip}</p>}
     </div>
   )
 }
@@ -811,7 +812,7 @@ export function ClientDetail() {
               <Empty>No {tab} references yet.</Empty>
             )}
             {refs.some((p) => p.flagged) && (
-              <Alert kind="warn">A highlighted reference is much less similar to the others. Check it is the client's own signature and a clean scan, or remove it.</Alert>
+              <Alert kind="warn">A highlighted reference is much less similar to the others. If it is the client's own signature and a clean capture, keep it: natural variation makes screening more reliable. Remove it only if the capture is bad (smudged, cut off, blurry) or it is not the client's signature.</Alert>
             )}
             <div className="border-t border-slate-100 pt-5">
               <h3 className="mb-3 font-semibold">Add {tab} references</h3>

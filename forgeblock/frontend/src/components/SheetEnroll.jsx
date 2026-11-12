@@ -3,10 +3,12 @@ import { useRef, useState } from 'react'
 import { api } from '../api'
 import { Alert, Button } from './ui'
 
-// Static enrollment from the printable 10-box sheet: print it, let the client
-// sign, then take a phone photo (or upload a scan). The server straightens the
-// photo and crops the 10 boxes; the examiner unticks any bad box and the rest
-// are added through the normal static enroll endpoint.
+// Static enrollment from the printable sheet: print it, let the client sign the
+// 2 practice boxes (warm-up, never used) and the 10 reference boxes, then take a
+// phone photo (or upload a scan). The server straightens the photo and crops the
+// 10 reference boxes; the examiner unticks bad captures only and the rest are
+// added through the normal static enroll endpoint. 20 references are
+// recommended, so a client fills two sheets, ideally on different days.
 export default function SheetEnroll({ client, onDone }) {
   const cameraRef = useRef(null)
   const fileRef = useRef(null)
@@ -15,7 +17,8 @@ export default function SheetEnroll({ client, onDone }) {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [res, setRes] = useState(null)
-  const max = client.static_strength?.maximum ?? 20
+  const max = client.static_strength?.maximum ?? 30
+  const recommended = client.static_strength?.recommended ?? 20
   const room = Math.max(0, max - (client.static_count || 0))
   const chosen = (boxes || []).filter((b) => picked[b.index])
 
@@ -52,7 +55,7 @@ export default function SheetEnroll({ client, onDone }) {
       const pick = {}
       let n = 0
       r.boxes.forEach((b) => {
-        if (b.usable && n < room) {
+        if (b.usable && !b.cut_off && n < room) {
           pick[b.index] = true
           n += 1
         }
@@ -95,10 +98,14 @@ export default function SheetEnroll({ client, onDone }) {
   return (
     <div className="space-y-4">
       <ol className="space-y-1.5 text-sm text-slate-600">
-        <li><span className="font-semibold text-slate-800">1.</span> Print the sheet for {client.client_code} and have the client sign once in each of the 10 boxes.</li>
+        <li><span className="font-semibold text-slate-800">1.</span> Print the sheet for {client.client_code}. The client signs the 2 practice boxes first (they are not used), then once in each of the 10 numbered boxes.</li>
         <li><span className="font-semibold text-slate-800">2.</span> Lay it flat in good light and take a photo from straight above, with all four black squares in view.</li>
-        <li><span className="font-semibold text-slate-800">3.</span> Check the 10 crops, untick any bad one, and add the rest.</li>
+        <li><span className="font-semibold text-slate-800">3.</span> Check the 10 crops. Untick only bad captures (empty, smudged, cut off or blurry), not signatures that just look a little different: natural variation helps.</li>
       </ol>
+      <Alert kind="info">
+        More signatures make screening more reliable. {recommended} are recommended (two sheets), up to {max}.
+        If possible, fill the second sheet on another day, so the references show how the client's signature naturally varies.
+      </Alert>
 
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={printSheet} loading={busy === 'print'}>
@@ -152,7 +159,7 @@ export default function SheetEnroll({ client, onDone }) {
                   <span className="text-xs font-medium text-slate-500">Box {b.index}</span>
                   <img src={b.model_view || b.image} alt={`Box ${b.index}`} className="mt-1 h-20 w-full object-contain" />
                   {(b.empty || b.issues.length > 0) && (
-                    <div className={`mt-1 text-[12px] ${b.usable ? 'text-amber-700' : 'text-bad-600'}`}>
+                    <div className={`mt-1 text-[12px] ${b.usable || b.cut_off ? 'text-amber-700' : 'text-bad-600'}`}>
                       {b.empty ? 'Empty box' : b.issues.join(' ')}
                     </div>
                   )}
