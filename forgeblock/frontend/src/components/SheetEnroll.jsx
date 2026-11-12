@@ -1,5 +1,5 @@
 import { Camera, Check, FileUp, Printer } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { Alert, Button } from './ui'
 
@@ -9,7 +9,7 @@ import { Alert, Button } from './ui'
 // 10 reference boxes; the examiner unticks bad captures only and the rest are
 // added through the normal static enroll endpoint. 20 references are
 // recommended, so a client fills two sheets, ideally on different days.
-export default function SheetEnroll({ client, onDone }) {
+export default function SheetEnroll({ client, onDone, onDirty }) {
   const cameraRef = useRef(null)
   const fileRef = useRef(null)
   const [boxes, setBoxes] = useState(null)
@@ -21,6 +21,12 @@ export default function SheetEnroll({ client, onDone }) {
   const recommended = client.static_strength?.recommended ?? 20
   const room = Math.max(0, max - (client.static_count || 0))
   const chosen = (boxes || []).filter((b) => picked[b.index])
+  // Read boxes that are not saved yet count as unsaved work.
+  const dirty = !!boxes?.length
+  useEffect(() => {
+    onDirty?.(dirty)
+    return () => onDirty?.(false)
+  }, [dirty, onDirty])
 
   const printSheet = async () => {
     setError('')

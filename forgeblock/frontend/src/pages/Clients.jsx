@@ -1,8 +1,9 @@
-import { Briefcase, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { ArrowLeft, Briefcase, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { useConfirm } from '../components/ConfirmDialog'
 import ImagePicker from '../components/ImagePicker'
 import SheetEnroll from '../components/SheetEnroll'
 import SignaturePad from '../components/SignaturePad'
@@ -51,6 +52,8 @@ export function AccountCreated({ account }) {
 
 function NewClientModal({ open, onClose, groups, defaultGroup }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const fromHere = { state: { from: location.pathname + location.search } }
   const { user } = useAuth()
   const study = user.study_mode
   const isAdmin = user.role === 'admin'
@@ -82,7 +85,7 @@ function NewClientModal({ open, onClose, groups, defaultGroup }) {
         group_id: isAdmin && form.group_id ? Number(form.group_id) : null,
       })
       if (c.new_account) setCreated(c)
-      else navigate(`/app/clients/${c.id}`)
+      else navigate(`/app/clients/${c.id}`, fromHere)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -94,7 +97,7 @@ function NewClientModal({ open, onClose, groups, defaultGroup }) {
       <Modal open={open} onClose={onClose} title="Client registered">
         <AccountCreated account={created.new_account} />
         <div className="mt-5 flex justify-end">
-          <Button onClick={() => navigate(`/app/clients/${created.id}`)}>Continue to the signature card</Button>
+          <Button onClick={() => navigate(`/app/clients/${created.id}`, fromHere)}>Continue to the signature card</Button>
         </div>
       </Modal>
     )
@@ -453,13 +456,14 @@ function FolderGrid({ data, clients, onOpen, onNew }) {
 
 function ClientsTable({ clients, user, onRowMenu }) {
   const navigate = useNavigate()
+  const location = useLocation()
   return (
     <Table head={['Client', 'Code', 'Static references', 'Dynamic references', 'Account', 'Registered', '']}>
       {clients.map((c) => (
         <tr
           key={c.id}
           className="cursor-pointer hover:bg-brand-50/50"
-          onClick={() => navigate(`/app/clients/${c.id}`)}
+          onClick={() => navigate(`/app/clients/${c.id}`, { state: { from: location.pathname + location.search } })}
           onContextMenu={(e) => {
             e.preventDefault()
             onRowMenu({ client: c, x: e.clientX, y: e.clientY })
@@ -635,7 +639,7 @@ function RefTile({ p, modality, onRemove }) {
   )
 }
 
-function StaticEnroll({ client, onDone }) {
+function StaticEnroll({ client, onDone, onDirty }) {
   const [mode, setMode] = useState('sheet')
   return (
     <div className="space-y-4">
@@ -647,13 +651,22 @@ function StaticEnroll({ client, onDone }) {
           { value: 'images', label: 'Upload signature images' },
         ]}
       />
-      {mode === 'sheet' ? <SheetEnroll client={client} onDone={onDone} /> : <ImageEnroll client={client} onDone={onDone} />}
+      {mode === 'sheet' ? <SheetEnroll client={client} onDone={onDone} onDirty={onDirty} /> : <ImageEnroll client={client} onDone={onDone} onDirty={onDirty} />}
     </div>
   )
 }
 
-function ImageEnroll({ client, onDone }) {
+// Tells the signature card whether there is unsaved work, and clears it on unmount.
+function useReportDirty(dirty, onDirty) {
+  useEffect(() => {
+    onDirty?.(dirty)
+    return () => onDirty?.(false)
+  }, [dirty, onDirty])
+}
+
+function ImageEnroll({ client, onDone, onDirty }) {
   const [files, setFiles] = useState([])
+  useReportDirty(files.length > 0, onDirty)
   const [res, setRes] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -676,7 +689,7 @@ function ImageEnroll({ client, onDone }) {
   }
   return (
     <div className="space-y-3">
-      <ImagePicker multiple files={files} onChange={setFiles} hint="One signature per image. Each one gets a quality check." />
+      <ImagePicker multiple camera={false} files={files} onChange={setFiles} hint="One signature per image. Each one gets a quality check." />
       <Alert>{error}</Alert>
       {res && (
         <Alert kind={res.rejected.length ? 'warn' : 'success'}>
@@ -693,9 +706,10 @@ function ImageEnroll({ client, onDone }) {
   )
 }
 
-function DynamicEnroll({ client, onDone }) {
+function DynamicEnroll({ client, onDone, onDirty }) {
   const pad = useRef(null)
   const [samples, setSamples] = useState([])
+  useReportDirty(samples.length > 0, onDirty)
   const [penOnly, setPenOnly] = useState(false)
   const [res, setRes] = useState(null)
   const [error, setError] = useState('')
@@ -772,6 +786,16 @@ export function ClientDetail() {
   const [deleting, setDeleting] = useState(false)
   const [toRemove, setToRemove] = useState(null)
   const [removeError, setRemoveError] = useState('')
+  const [dirty, setDirty] = useState(false) // images picked or strokes kept but not saved yet
+  const location = useLocation()
+  const confirm = useConfirm()
+  // Warn on reload or tab close too, while there is unsaved work.
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
   const load = useCallback(() => api.get(`/api/clients/${id}`).then(setC).catch((e) => setError(e.message)), [id])
   useEffect(() => {
     load()
@@ -797,10 +821,26 @@ export function ClientDetail() {
   }
   const refs = c[`${tab}_references`]
   const strength = c[`${tab}_strength`]
+  // Back to the Clients page, in the folder the user came from (or the client's own group).
+  const backTo = location.state?.from?.startsWith('/app/clients') ? location.state.from
+    : user.role === 'admin' ? `/app/clients?group=${c.group_id || 'none'}` : '/app/clients'
+  const goBack = async () => {
+    if (dirty && !(await confirm({ title: 'Leave enrollment?', message: 'Unsaved signatures will be lost.', confirmLabel: 'Leave', danger: true }))) return
+    navigate(backTo)
+  }
 
   return (
     <>
-      <PageHeader eyebrow={`Signature card · ${c.client_code}`} title={c.full_name} description={c.notes || undefined}>
+      <PageHeader
+        eyebrow={`Signature card · ${c.client_code}`}
+        title={(
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2"><ArrowLeft className="h-4 w-4" /> Back to clients</Button>
+            <span className="min-w-0">{c.full_name}</span>
+          </span>
+        )}
+        description={c.notes || undefined}
+      >
         {user.study_mode && c.is_practice && <Badge tone="violet">Practice client</Badge>}
         <Link to={`/app/cases?new=1&client=${c.id}`}>
           <Button variant="secondary"><Briefcase className="h-4 w-4" /> Open a case</Button>
@@ -838,9 +878,9 @@ export function ClientDetail() {
               ) : c[`${tab}_count`] >= strength.maximum ? (
                 <Alert kind="info">This card has the maximum of {strength.maximum} references.</Alert>
               ) : tab === 'static' ? (
-                <StaticEnroll client={c} onDone={load} />
+                <StaticEnroll client={c} onDone={load} onDirty={setDirty} />
               ) : (
-                <DynamicEnroll client={c} onDone={load} />
+                <DynamicEnroll client={c} onDone={load} onDirty={setDirty} />
               )}
             </div>
           </div>

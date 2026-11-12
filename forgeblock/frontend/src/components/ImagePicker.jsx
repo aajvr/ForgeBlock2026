@@ -2,10 +2,10 @@ import { Camera, Crop, ImagePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import SignatureCrop from './SignatureCrop'
 
-// Image upload box with preview. "Take photo" opens the camera on phones and tablets.
+// Image upload box with preview. "Take photo" (camera, on by default) opens the camera on phones and tablets.
 // With `crop` (single image only), every picked photo first opens the crop step
 // so the examiner frames just the signature (see SignatureCrop).
-export default function ImagePicker({ label, files, onChange, multiple = false, hint, crop = false }) {
+export default function ImagePicker({ label, files, onChange, multiple = false, hint, crop = false, camera = true }) {
   const inputRef = useRef(null)
   const cameraRef = useRef(null)
   const [previews, setPreviews] = useState([])
@@ -73,16 +73,18 @@ export default function ImagePicker({ label, files, onChange, multiple = false, 
           </div>
         )}
       </div>
-      <div className="mt-2 flex justify-end gap-4">
+      {(camera || (crop && !multiple && original && files?.length > 0)) && <div className="mt-2 flex justify-end gap-4">
         {crop && !multiple && original && files?.length > 0 && (
           <button type="button" onClick={() => setCropping(original)} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:underline">
             <Crop className="h-3.5 w-3.5" /> Crop again
           </button>
         )}
-        <button type="button" onClick={() => cameraRef.current.click()} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:underline">
-          <Camera className="h-3.5 w-3.5" /> Take photo
-        </button>
-      </div>
+        {camera && (
+          <button type="button" onClick={() => cameraRef.current.click()} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:underline">
+            <Camera className="h-3.5 w-3.5" /> Take photo
+          </button>
+        )}
+      </div>}
       <input ref={inputRef} type="file" accept="image/*" multiple={multiple} className="hidden" onChange={(e) => { take(e.target.files); e.target.value = '' }} />
       {crop && (
         <SignatureCrop
@@ -94,7 +96,7 @@ export default function ImagePicker({ label, files, onChange, multiple = false, 
           }}
         />
       )}
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { take(e.target.files); e.target.value = '' }} />
+      {camera && <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { take(e.target.files); e.target.value = '' }} />}
     </div>
   )
 }
