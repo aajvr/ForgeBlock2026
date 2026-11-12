@@ -144,10 +144,13 @@ def list_cases(
     status: str | None = Query(None, pattern="^(open|closed)$"),
     q: str | None = None,
     client_id: int | None = None,
+    examiner_id: int | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(require_staff),
 ):
-    """Examiners see their own cases; admins see all (scope=all) or their own."""
+    """Examiners see their own cases; admins see all (scope=all) or their own.
+    Admins can also narrow to one examiner (examiner_id): cases that examiner
+    opened or decided, and cases of clients in that examiner's group."""
     stmt = own_cases(select(Case).order_by(Case.id.desc()), user)
     if scope == "mine" and user.role == "admin":
         stmt = stmt.where(Case.examiner_id == user.id)
@@ -157,6 +160,15 @@ def list_cases(
         stmt = stmt.where(Case.status != "open")
     if client_id:
         stmt = stmt.where(Case.client_id == client_id)
+    if examiner_id is not None:
+        if user.role != "admin":
+            raise HTTPException(403, "Only administrators can filter by examiner.")
+        ex = db.get(User, examiner_id)
+        handled = [Case.examiner_id == examiner_id,
+                   Case.id.in_(select(Finding.case_id).where(Finding.examiner_id == examiner_id))]
+        if ex is not None and ex.group_id:
+            handled.append(Case.client_id.in_(select(Client.id).where(Client.group_id == ex.group_id)))
+        stmt = stmt.where(or_(*handled))
     if q:
         like = f"%{q.lower()}%"
         client_ids = select(Client.id).where(or_(Client.full_name.ilike(like), Client.client_code.ilike(like)))
