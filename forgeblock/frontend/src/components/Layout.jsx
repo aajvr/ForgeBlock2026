@@ -1,6 +1,5 @@
 import {
   Activity,
-  Bell,
   BookOpen,
   Briefcase,
   ChevronDown,
@@ -27,8 +26,9 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { BrandMark } from './Brand'
+import NotificationBell from './NotificationBell'
 import Tour from './Tour'
-import { Avatar, fmtDate } from './ui'
+import { Avatar } from './ui'
 
 const EXAMINER_NAV = [
   { section: 'Workspace' },
@@ -174,59 +174,6 @@ function GlobalSearch() {
               <span className="font-mono">{r.receipt_code}</span> <span className="text-slate-500">{r.modality}</span>
             </button>
           ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Notifications() {
-  const [data, setData] = useState({ unread: 0, items: [] })
-  const [open, setOpen] = useState(false)
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  useEffect(() => {
-    const load = () => api.get('/api/notifications').then(setData).catch(() => {})
-    load()
-    const t = setInterval(load, 60000)
-    return () => clearInterval(t)
-  }, [location.pathname])
-
-  const toggle = () => {
-    setOpen((o) => !o)
-    if (!open && data.unread) api.post('/api/notifications/read').then(() => setData((d) => ({ ...d, unread: 0 })))
-  }
-
-  return (
-    <div className="relative">
-      <button onClick={toggle} className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Notifications">
-        <Bell className="h-5 w-5" />
-        {data.unread > 0 && (
-          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-bad-600 px-1 text-[11.5px] font-semibold text-white">
-            {data.unread}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div className="absolute right-0 top-11 z-40 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-lg" onMouseLeave={() => setOpen(false)}>
-          <div className="px-2 py-1.5 text-sm font-semibold">Notifications</div>
-          {data.items.length === 0 && <div className="px-3 py-6 text-center text-sm text-slate-500">You're all caught up.</div>}
-          <div className="max-h-80 overflow-y-auto">
-            {data.items.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => {
-                  setOpen(false)
-                  if (n.link) navigate(n.link)
-                }}
-                className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50"
-              >
-                <div className={n.read ? 'text-slate-600' : 'font-medium text-slate-900'}>{n.text}</div>
-                <div className="mt-0.5 text-xs text-slate-400">{fmtDate(n.created_at)}</div>
-              </button>
-            ))}
-          </div>
         </div>
       )}
     </div>
@@ -443,7 +390,7 @@ export default function Layout() {
           </div>
           <div className="ml-auto flex flex-1 items-center justify-end gap-2">
             {staff && <GlobalSearch />}
-            <Notifications />
+            <NotificationBell />
             <UserMenu user={user} onSignOut={doSignOut} />
           </div>
         </header>

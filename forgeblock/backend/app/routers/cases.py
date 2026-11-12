@@ -24,13 +24,18 @@ from ..ml.quality import dynamic_quality, static_quality
 from ..models import BlockchainLedger, Case, CaseEvent, Client, Finding, SignatureProfile, User, VerificationLog, utcnow
 from ..security import require_staff
 from ..services import (
+    assigned_examiner_id,
     case_event,
+    client_account_ids,
+    document_label,
     load_image,
     load_strokes,
     log_activity,
     next_code,
+    notify,
     save_image,
     save_strokes,
+    staff_ids,
 )
 from . import pen_data
 from .common import active_profiles, examiner_ref, group_examiner, log_out, names
@@ -191,6 +196,13 @@ def open_case(body: CaseIn, db: Session = Depends(get_db), user: User = Depends(
     db.refresh(c)
     case_event(db, c.id, user, "opened", f"Case opened for {client.client_code}: {c.title}")
     log_activity(db, user, "case", f"Opened case {c.case_code} ({client.client_code})")
+    # The client has no case page: their link is their portal home.
+    notify(db, client_account_ids(db, client.id), "Your document is being reviewed", link="/app/me",
+           type="case_opened", body=f"Your examiner opened a review of {document_label(c.document_ref) if c.document_ref else c.title}.",
+           entity_type="case", entity_id=c.id)
+    notify(db, [assigned_examiner_id(db, client), *staff_ids(db, "admin")], f"Case {c.case_code} opened",
+           link=f"/app/cases/{c.id}", type="case_opened", body=f"{c.title} · {client.client_code}",
+           entity_type="case", entity_id=c.id, exclude=user.id)
     return case_out(c, db, names(db), detail=True)
 
 
@@ -227,6 +239,15 @@ def give_finding(case_id: int, body: FindingIn, db: Session = Depends(get_db), u
     case_event(db, c.id, user, "finding", f"Final finding: {label}. {f.reason} (sealed in block #{block.block_index})")
     case_event(db, c.id, user, "closed", "Case closed.")
     log_activity(db, user, "finding", f"Gave the finding {label} on case {c.case_code} (block #{block.block_index})")
+    client = db.get(Client, c.client_id)
+    doc = c.document_ref or c.title
+    latest_log = max(logs, key=lambda l: l.id)
+    notify(db, client_account_ids(db, c.client_id), "Your examiner reached a decision",
+           link=f"/app/records/{latest_log.id}", type="decision",
+           body=f"Your examiner reached a decision on {doc}.", entity_type="screening", entity_id=latest_log.id)
+    notify(db, staff_ids(db, "admin"), f"Decision on case {c.case_code}: {label}", link=f"/app/cases/{c.id}",
+           type="decision", body=f"{doc} · {client.client_code if client else ''}".rstrip(" ·"),
+           entity_type="case", entity_id=c.id, exclude=user.id)
     return case_out(c, db, names(db), detail=True)
 
 

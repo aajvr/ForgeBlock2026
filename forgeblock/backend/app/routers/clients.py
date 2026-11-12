@@ -29,12 +29,15 @@ from ..ml.quality import dynamic_quality, static_quality
 from ..models import Case, Client, ClientAccess, ClientGroup, SignatureProfile, User, VerificationLog, utcnow
 from ..security import hash_password, require_admin, require_staff, temporary_password
 from ..services import (
+    assigned_examiner_id,
     delete_file,
     get_setting,
+    group_examiner_id,
     load_image,
     load_strokes,
     log_activity,
     next_code,
+    notify,
     save_image,
     save_strokes,
     storage_path,
@@ -199,12 +202,23 @@ def update_client(client_id: int, body: ClientUpdate, db: Session = Depends(get_
         c.full_name = body.full_name.strip()
     if body.notes is not None:
         c.notes = body.notes
+    old_group = c.group_id
     if body.group_id is not None or body.remove_from_group:
         if not is_admin(user):
             raise HTTPException(403, "Only an administrator can move a client to another group.")
         c.group_id = None if body.remove_from_group else _group_or_422(db, body.group_id).id
     db.commit()
     log_activity(db, user, "client", f"Updated client {c.client_code}")
+    if c.group_id != old_group:
+        old_ex, new_ex = group_examiner_id(db, old_group), group_examiner_id(db, c.group_id)
+        new_name = db.get(ClientGroup, c.group_id).name if c.group_id else "no group"
+        if old_ex != new_ex:
+            notify(db, [old_ex], f"{c.client_code} moved out of your group", link="/app/clients", type="client_moved",
+                   body=f"{c.full_name} is now in {new_name}. You no longer see this client.",
+                   entity_type="client", entity_id=c.id, exclude=user.id)
+            notify(db, [new_ex], f"{c.client_code} moved into your group", link=f"/app/clients/{c.id}",
+                   type="client_moved", body=f"{c.full_name} is now one of your clients.",
+                   entity_type="client", entity_id=c.id, exclude=user.id)
     return client_out(c, db)
 
 
@@ -247,6 +261,13 @@ def _room(db: Session, client_id: int, modality: str, adding: int) -> int:
     return have
 
 
+def _notify_references(db: Session, user: User, c: Client, n: int, modality: str) -> None:
+    """Tell the client's examiner that references were added (not when they added them)."""
+    notify(db, [assigned_examiner_id(db, c)], f"New references for {c.client_code}", link=f"/app/clients/{c.id}",
+           type="enrollment", body=f"{n} {modality} reference signature{'s' if n != 1 else ''} added to {c.full_name}'s card.",
+           entity_type="client", entity_id=c.id, exclude=user.id)
+
+
 @router.post("/clients/{client_id}/static/enroll")
 async def enroll_static(client_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db),
                         user: User = Depends(require_staff)):
@@ -278,6 +299,7 @@ async def enroll_static(client_id: int, files: list[UploadFile] = File(...), db:
     if accepted:
         log_activity(db, user, "enrollment", f"Added {len(accepted)} static reference(s) to {c.client_code}",
                      modality="static")
+        _notify_references(db, user, c, len(accepted), "static")
     return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db)}
 
 
@@ -377,6 +399,7 @@ def enroll_dynamic(client_id: int, body: DynamicEnrollIn, db: Session = Depends(
     if accepted:
         log_activity(db, user, "enrollment", f"Added {len(accepted)} dynamic reference(s) to {c.client_code}",
                      modality="dynamic")
+        _notify_references(db, user, c, len(accepted), "dynamic")
     return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db),
             "limited_notice": (f"{len(limited)} of the saved signature(s) have no pen pressure or tilt and are "
                                f"labelled \"{pen_data.LIMITED_LABEL}\". Your saved signature or pen did not record "

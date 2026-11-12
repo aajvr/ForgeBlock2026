@@ -288,13 +288,20 @@ class ActivityLog(Base):
 
 
 class Notification(Base):
+    """One notification for one user. `text` is the title (kept from the first
+    release); `read` mirrors read_at for older code."""
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     text: Mapped[str] = mapped_column(Text)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
     link: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    entity_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

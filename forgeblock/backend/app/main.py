@@ -29,6 +29,9 @@ _ADDED_COLUMNS = {
     "clients": {"group_id": "INTEGER"},
     "signature_profiles": {"capture_device": "VARCHAR(20)"},
     "verification_logs": {"capture_device": "VARCHAR(20)", "sample_hash": "VARCHAR(64)"},
+    # v8.18 notifications (see supabase/migrations/2026-11-12_notifications.sql)
+    "notifications": {"type": "VARCHAR(30)", "body": "TEXT", "entity_type": "VARCHAR(30)",
+                      "entity_id": "INTEGER", "read_at": "TIMESTAMP"},
 }
 
 

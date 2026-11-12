@@ -135,10 +135,53 @@ def log_activity(
     db.commit()
 
 
-def notify(db: Session, user_ids, text: str, link: str | None = None) -> None:
-    for uid in set(user_ids):
-        db.add(Notification(user_id=uid, text=text, link=link))
-    db.commit()
+def notify(db: Session, user_ids, title: str, link: str | None = None, *, type: str = "info",
+           body: str | None = None, entity_type: str | None = None, entity_id: int | None = None,
+           exclude: int | None = None) -> None:
+    """Add one notification per user (deduplicated). `exclude` skips the user
+    who caused the event, so nobody is told about their own action."""
+    ids = {uid for uid in user_ids if uid is not None and uid != exclude}
+    for uid in ids:
+        db.add(Notification(user_id=uid, type=type, text=title, body=body, link=link,
+                            entity_type=entity_type, entity_id=entity_id))
+    if ids:
+        db.commit()
+
+
+def client_account_ids(db: Session, client_id: int | None) -> list[int]:
+    """The client's own sign-in account(s)."""
+    if not client_id:
+        return []
+    return list(db.scalars(select(User.id).where(User.role == "client", User.client_id == client_id,
+                                                 User.status == "active")))
+
+
+def assigned_examiner_id(db: Session, client: Client | None) -> int | None:
+    """The examiner of the client's group; for a client without a group, the
+    examiner who registered it."""
+    if client is None:
+        return None
+    if client.group_id:
+        return db.scalar(select(User.id).where(User.group_id == client.group_id, User.role == "examiner",
+                                               User.status == "active").order_by(User.id))
+    creator = db.get(User, client.created_by) if client.created_by else None
+    return creator.id if creator is not None and creator.role == "examiner" and creator.status == "active" else None
+
+
+def group_examiner_id(db: Session, group_id: int | None) -> int | None:
+    if not group_id:
+        return None
+    return db.scalar(select(User.id).where(User.group_id == group_id, User.role == "examiner",
+                                           User.status == "active").order_by(User.id))
+
+
+def document_label(document_ref: str | None, case: Case | None = None) -> str:
+    """How a questioned document is named to the client (no scores)."""
+    if document_ref:
+        return document_ref
+    if case is not None and case.document_ref:
+        return case.document_ref
+    return "a document in your name"
 
 
 def staff_ids(db: Session, role: str = "admin") -> list[int]:
@@ -279,4 +322,32 @@ def record_verification(
                    verification_log_id=log.id)
     if auto_case is not None:
         log_activity(db, user, "case", f"Case {auto_case.case_code} opened automatically for {client.client_code}")
+    if mode == "verify" and client is not None and expected_label is None:
+        _notify_screening(db, user, client, log, auto_case)
     return log, block.block_index
+
+
+def _notify_screening(db: Session, user: User, client: Client, log: VerificationLog, auto_case: Case | None) -> None:
+    """A screening was completed (and maybe opened a case). The client gets
+    one plain message, never a score; staff get a link to the record or case."""
+    doc = document_label(log.document_ref)
+    examiner = assigned_examiner_id(db, client)
+    if auto_case is not None:
+        notify(db, client_account_ids(db, client.id), "Your document is being reviewed",
+               link=f"/app/records/{log.id}", type="case_opened",
+               body=f"{doc[0].upper()}{doc[1:]} was screened and your examiner will review it.",
+               entity_type="screening", entity_id=log.id)
+        notify(db, [examiner, *staff_ids(db, "admin")], f"Case {auto_case.case_code} opened",
+               link=f"/app/cases/{auto_case.id}", type="case_opened",
+               body=f"{log.screening_result.capitalize()} {log.modality} screening for {client.client_code}. "
+                    f"It needs the examiner's decision.",
+               entity_type="case", entity_id=auto_case.id, exclude=user.id)
+        return
+    notify(db, client_account_ids(db, client.id), "A screening was completed",
+           link=f"/app/records/{log.id}", type="screening",
+           body=f"{doc[0].upper()}{doc[1:]} was screened. Open it to see the result.",
+           entity_type="screening", entity_id=log.id)
+    notify(db, [examiner], f"Screening {log.receipt_code} completed",
+           link=f"/app/records/{log.id}", type="screening",
+           body=f"{log.modality.capitalize()} screening for {client.client_code}: {log.screening_result.capitalize()}.",
+           entity_type="screening", entity_id=log.id, exclude=user.id)

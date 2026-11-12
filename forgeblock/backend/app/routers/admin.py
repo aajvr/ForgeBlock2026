@@ -35,7 +35,7 @@ from ..models import (
     utcnow,
 )
 from ..security import hash_password, require_admin, temporary_password
-from ..services import get_setting, load_strokes, log_activity, set_setting
+from ..services import get_setting, load_strokes, log_activity, notify, set_setting
 from .auth import user_out
 from .clients import delete_client_data
 from . import pen_data
@@ -188,6 +188,7 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db), a
     if u.id == admin.id and (body.status == "disabled" or (body.role and body.role != "admin")):
         raise HTTPException(400, "You cannot disable or demote your own account.")
     changes = []
+    old_role = u.role
     if body.role is not None:
         if body.role not in ROLES:
             raise HTTPException(422, "Role must be admin, examiner or client.")
@@ -209,6 +210,11 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db), a
         changes.append("linked client")
     db.commit()
     log_activity(db, admin, "account", f"Updated {u.account_code or u.email}: {', '.join(changes) or 'no change'}")
+    if body.role is not None and body.role != old_role:
+        label = {"admin": "Administrator", "examiner": "Examiner", "client": "Client"}
+        notify(db, [u.id], "Your role was changed", link="/app/help", type="role",
+               body=f"Your role is now {label[body.role]} (was {label.get(old_role, old_role)}). "
+                    f"Sign out and back in to see the change.", entity_type="user", entity_id=u.id)
     return user_out(u, db)
 
 

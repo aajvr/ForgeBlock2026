@@ -311,22 +311,55 @@ def ledger_demo_restore(log_id: int, body: TamperIn, db: Session = Depends(get_d
 
 # ---------------------------------------------------------- notifications ---
 
+def _unread(db: Session, user: User) -> int:
+    return db.scalar(select(func.count()).select_from(Notification)
+                     .where(Notification.user_id == user.id, Notification.read.is_(False))) or 0
+
+
+def _notification_out(n: Notification) -> dict:
+    return {"id": n.id, "type": n.type or "info", "title": n.text, "body": n.body, "link": n.link,
+            "entity_type": n.entity_type, "entity_id": n.entity_id, "read": n.read,
+            "read_at": n.read_at, "created_at": n.created_at,
+            "text": n.text}  # older clients read "text"
+
+
 @router.get("/notifications")
-def my_notifications(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    rows = db.scalars(select(Notification).where(Notification.user_id == user.id)
-                      .order_by(Notification.id.desc()).limit(30)).all()
-    unread = db.scalar(select(func.count()).select_from(Notification)
-                       .where(Notification.user_id == user.id, Notification.read.is_(False))) or 0
-    return {"unread": unread, "items": [{"id": n.id, "text": n.text, "link": n.link, "read": n.read,
-                                         "created_at": n.created_at} for n in rows]}
+def my_notifications(limit: int = Query(20, ge=1, le=100), before: int | None = None,
+                     db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """The signed-in user's own notifications, newest first. Page with
+    `before` = the id of the last item already shown."""
+    stmt = select(Notification).where(Notification.user_id == user.id)
+    if before:
+        stmt = stmt.where(Notification.id < before)
+    rows = db.scalars(stmt.order_by(Notification.id.desc()).limit(limit + 1)).all()
+    return {"unread": _unread(db, user), "items": [_notification_out(n) for n in rows[:limit]],
+            "has_more": len(rows) > limit}
 
 
-@router.post("/notifications/read")
+@router.get("/notifications/unread-count")
+def unread_count(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    return {"unread": _unread(db, user)}
+
+
+@router.post("/notifications/{notification_id}/read")
+def read_one(notification_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    n = db.get(Notification, notification_id)
+    if n is None or n.user_id != user.id:
+        raise HTTPException(404, "Notification not found.")
+    if not n.read:
+        n.read, n.read_at = True, utcnow()
+        db.commit()
+    return {"ok": True, "unread": _unread(db, user)}
+
+
+@router.post("/notifications/read-all")
+@router.post("/notifications/read")  # older name
 def read_all(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    now = utcnow()
     for n in db.scalars(select(Notification).where(Notification.user_id == user.id, Notification.read.is_(False))):
-        n.read = True
+        n.read, n.read_at = True, now
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "unread": 0}
 
 
 # ----------------------------------------------------------------- search ---
