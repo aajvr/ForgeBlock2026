@@ -667,9 +667,18 @@ function RefTile({ p, modality, onRemove, selecting = false, selected = false, o
       </div>
       {p.flagged && <div className="mt-1 text-[12.5px] font-medium text-warn-700">Looks different from the others</div>}
       {p.pen_label && <div className="mt-1"><LimitedPenBadge missing={p.pen_missing} /></div>}
-      {onRemove && !selecting && <button onClick={() => onRemove(p)} className="absolute right-1 top-1 hidden rounded-md bg-white/90 p-1 text-slate-500 shadow-sm hover:text-bad-600 group-hover:block" aria-label="Remove reference">
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>}
+      {onRemove && !selecting && (
+        // Touch (and any device that cannot hover): always shown, a 40px round button with a 44px hit area.
+        // Mouse: the small button that appears on hover or keyboard focus, as before.
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemove(p) }}
+          aria-label={`Remove reference #${p.id}`}
+          className="absolute right-1 top-1 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-bad-600 shadow-md ring-1 ring-slate-200 transition before:absolute before:-inset-0.5 before:rounded-full before:content-[''] active:scale-95 active:bg-bad-50 can-hover:hidden can-hover:h-auto can-hover:w-auto can-hover:rounded-md can-hover:bg-white/90 can-hover:p-1 can-hover:text-slate-500 can-hover:shadow-sm can-hover:ring-0 can-hover:hover:text-bad-600 can-hover:focus-visible:flex can-hover:group-hover:flex"
+        >
+          <Trash2 className="h-[18px] w-[18px] can-hover:h-3.5 can-hover:w-3.5" />
+        </button>
+      )}
     </div>
   )
 }

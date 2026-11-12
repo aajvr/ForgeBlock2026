@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Input type, from media queries (never the user agent): touch screens such as
+   the iPad have no hover, so hover-only actions must stay visible there.
+   touch:     finger or pen as the main pointer, no hover
+   can-hover: mouse or trackpad */
+@custom-variant touch (@media (hover: none) and (pointer: coarse));
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
+
 @theme {
   /* Brand blue (#0F6CBD) scale */
   --color-brand-50: #ebf3fc;

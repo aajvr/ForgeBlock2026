@@ -31,7 +31,7 @@ export function Button({ variant = 'primary', size = 'md', className = '', loadi
   const sz = size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition disabled:cursor-not-allowed ${sz} ${BUTTON_STYLES[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 ${sz} ${BUTTON_STYLES[variant]} ${className}`}
       disabled={loading || props.disabled}
       {...props}
     >
@@ -174,15 +174,24 @@ export function Stat({ label, value, hint, icon: Icon, tone = 'brand', to, ariaL
 }
 
 // A short explanation on hover or keyboard focus.
+// Tapping the icon toggles it too, for touch screens without hover.
 export function InfoTip({ label, children, align = 'left' }) {
+  const [open, setOpen] = useState(false)
   return (
     <span className="group relative inline-flex align-middle">
-      <button type="button" aria-label={label} className="rounded-full text-slate-400 transition hover:text-brand-600 focus-visible:text-brand-600">
-        <Info className="h-3.5 w-3.5" />
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        onBlur={() => setOpen(false)}
+        className="relative rounded-full text-slate-400 transition before:absolute before:-inset-3 before:content-[''] hover:text-brand-600 focus-visible:text-brand-600 active:text-brand-700 can-hover:before:hidden"
+      >
+        <Info className="h-3.5 w-3.5 touch:h-4 touch:w-4" />
       </button>
       <span
         role="tooltip"
-        className={`pointer-events-none invisible absolute bottom-full z-30 mb-2 w-[min(16rem,58vw)] rounded-xl bg-slate-900 px-3 py-2 text-left font-sans text-xs font-normal normal-case leading-relaxed tracking-normal text-white opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${align === 'right' ? 'right-0' : 'left-0'}`}
+        className={`pointer-events-none absolute bottom-full z-30 mb-2 w-[min(16rem,58vw)] rounded-xl bg-slate-900 px-3 py-2 text-left font-sans text-xs font-normal normal-case leading-relaxed tracking-normal text-white shadow-lg transition group-focus-within:visible group-focus-within:opacity-100 can-hover:group-hover:visible can-hover:group-hover:opacity-100 ${open ? 'visible opacity-100' : 'invisible opacity-0'} ${align === 'right' ? 'right-0' : 'left-0'}`}
       >
         {children}
       </span>
@@ -326,8 +335,8 @@ export function ConfirmDialog({ open, title, children, confirmLabel = 'Confirm',
       </div>
       <Alert className="mt-4">{error}</Alert>
       <div className="mt-5 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose} disabled={busy} autoFocus>Cancel</Button>
-        <Button variant={danger ? 'danger' : 'primary'} loading={busy} onClick={run}>{confirmLabel}</Button>
+        <Button variant="secondary" onClick={onClose} disabled={busy} autoFocus className="touch:min-h-11 touch:px-5">Cancel</Button>
+        <Button variant={danger ? 'danger' : 'primary'} loading={busy} onClick={run} className="touch:min-h-11 touch:px-5">{confirmLabel}</Button>
       </div>
     </Modal>
   )

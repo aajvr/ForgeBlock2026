@@ -76,8 +76,8 @@ function ConfirmModal({ title = 'Are you sure?', message, confirmLabel = 'Confir
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-          <Button ref={cancelRef} variant="secondary" onClick={() => onAnswer(false)}>{cancelLabel}</Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={() => onAnswer(true)}>{confirmLabel}</Button>
+          <Button ref={cancelRef} variant="secondary" onClick={() => onAnswer(false)} className="touch:min-h-11 touch:px-5">{cancelLabel}</Button>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={() => onAnswer(true)} className="touch:min-h-11 touch:px-5">{confirmLabel}</Button>
         </div>
       </div>
     </div>
