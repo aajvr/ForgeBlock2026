@@ -4,7 +4,8 @@ import { SIGNATURE_HEIGHT, SIGNATURE_PATHS, SIGNATURE_WIDTH } from './signatureP
 // with a flourish that ends in a small block (the ForgeBlock mark).
 const FLOURISH = `M4 ${SIGNATURE_HEIGHT + 7} C 40 ${SIGNATURE_HEIGHT + 1}, 90 ${SIGNATURE_HEIGHT + 11}, ${SIGNATURE_WIDTH - 14} ${SIGNATURE_HEIGHT + 4}`
 
-export default function SignatureTrace({ className = 'w-full', color = 'currentColor', duration = 3.4, delay = 0.3, strokeWidth = 1.7 }) {
+// timing: easing of each stroke (linear by default; the tour uses an ease so the pen slows between strokes).
+export default function SignatureTrace({ className = 'w-full', color = 'currentColor', duration = 3.4, delay = 0.3, strokeWidth = 1.7, timing = 'linear' }) {
   const total = SIGNATURE_PATHS.reduce((s, p) => s + p.len, 0)
   let start = delay
   const strokes = SIGNATURE_PATHS.map((p) => {
@@ -24,7 +25,7 @@ export default function SignatureTrace({ className = 'w-full', color = 'currentC
     >
       <g transform="skewX(-6) translate(4 0)" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
         {strokes.map((p, i) => (
-          <path key={i} d={p.d} pathLength="1" style={{ '--len': 1, '--dur': `${p.dur}s`, '--delay': `${p.delay}s`, animationTimingFunction: 'linear' }} />
+          <path key={i} d={p.d} pathLength="1" style={{ '--len': 1, '--dur': `${p.dur}s`, '--delay': `${p.delay}s`, animationTimingFunction: timing }} />
         ))}
         <path d={FLOURISH} pathLength="1" strokeWidth={strokeWidth * 0.8} style={{ '--len': 1, '--dur': '0.6s', '--delay': `${flourishDelay}s` }} />
       </g>

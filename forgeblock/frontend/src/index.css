@@ -422,27 +422,22 @@ html.lenis {
     scroll-behavior: smooth;
   }
 }
-/* Guided tour: soft pulse around the spotlight, card and example result fade in. */
+/* Guided tour: a slow, faint glow ring around the spotlighted element. */
 .tour-spot::after {
   content: '';
   position: absolute;
-  inset: -2px;
+  inset: -1px;
   border-radius: inherit;
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.95), 0 0 0 6px rgb(15 108 189 / 0.45);
-  animation: tour-pulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.55), 0 0 22px 6px rgb(58 150 221 / 0.45);
+  opacity: 0.35;
+  animation: tour-glow 2.4s ease-in-out infinite;
 }
-@keyframes tour-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(1.015); }
+@keyframes tour-glow {
+  50% { opacity: 0.8; }
 }
-.tour-card { animation: tour-in 0.24s ease-out both; }
-@keyframes tour-in { from { opacity: 0; transform: translateY(6px); } }
-.tour-pop { animation: tour-in 0.5s ease-out 0.5s both; }
-.tour-bar { transform-origin: left; animation: tour-bar 0.9s cubic-bezier(0.2, 0, 0, 1) 0.8s both; }
-@keyframes tour-bar { from { transform: scaleX(0); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .tour-spot::after, .tour-card, .tour-pop, .tour-bar { animation: none !important; }
+  .tour-spot::after { animation: none !important; opacity: 0.6; }
   .trace path { animation: none; stroke-dashoffset: 0; }
   .fade-up { animation: none; opacity: 1; transform: none; }
   .hero-strokes, .blob, .bob { animation: none; }
