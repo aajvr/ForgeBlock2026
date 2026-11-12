@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, PlayCircle, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { ArrowLeft, Briefcase, Check, CheckSquare, PlayCircle, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
@@ -628,13 +628,36 @@ function StrengthMeter({ strength }) {
   )
 }
 
-function RefTile({ p, modality, onRemove }) {
+// One reference thumbnail. In select mode the whole card toggles its checkbox.
+function RefTile({ p, modality, onRemove, selecting = false, selected = false, onToggle }) {
   const [strokes, setStrokes] = useState(null)
   useEffect(() => {
     if (modality === 'dynamic') api.get(`/api/references/${p.id}/strokes`).then((d) => setStrokes(d.strokes)).catch(() => {})
   }, [p.id, modality])
+  const border = selected ? 'border-brand-600 bg-brand-50/60 ring-2 ring-brand-600'
+    : p.flagged ? 'border-warn-600 bg-white' : 'border-slate-200 bg-white'
+  const selectProps = selecting
+    ? {
+        role: 'checkbox',
+        'aria-checked': selected,
+        'aria-label': `Select reference #${p.id}`,
+        tabIndex: 0,
+        onClick: () => onToggle(p),
+        onKeyDown: (e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault()
+            onToggle(p)
+          }
+        },
+      }
+    : {}
   return (
-    <div className={`group relative rounded-lg border bg-white p-2 ${p.flagged ? 'border-warn-600' : 'border-slate-200'}`}>
+    <div className={`group relative rounded-lg border p-2 transition-colors ${border} ${selecting ? 'cursor-pointer select-none' : ''}`} {...selectProps}>
+      {selecting && (
+        <span aria-hidden className={`absolute left-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-md border-2 shadow-sm transition-colors ${selected ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'}`}>
+          {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+        </span>
+      )}
       <div className="flex h-20 items-center justify-center">
         {modality === 'static' ? <AuthImage src={`/api/references/${p.id}/image?view=model`} className="h-20 w-full object-contain" /> : strokes && <StrokePreview strokes={strokes} className="h-16 w-full" />}
       </div>
@@ -644,7 +667,7 @@ function RefTile({ p, modality, onRemove }) {
       </div>
       {p.flagged && <div className="mt-1 text-[12.5px] font-medium text-warn-700">Looks different from the others</div>}
       {p.pen_label && <div className="mt-1"><LimitedPenBadge missing={p.pen_missing} /></div>}
-      {onRemove && <button onClick={() => onRemove(p)} className="absolute right-1 top-1 hidden rounded-md bg-white/90 p-1 text-slate-500 shadow-sm hover:text-bad-600 group-hover:block" aria-label="Remove reference">
+      {onRemove && !selecting && <button onClick={() => onRemove(p)} className="absolute right-1 top-1 hidden rounded-md bg-white/90 p-1 text-slate-500 shadow-sm hover:text-bad-600 group-hover:block" aria-label="Remove reference">
         <Trash2 className="h-3.5 w-3.5" />
       </button>}
     </div>
@@ -798,6 +821,8 @@ export function ClientDetail() {
   const [deleting, setDeleting] = useState(false)
   const [toRemove, setToRemove] = useState(null)
   const [removeError, setRemoveError] = useState('')
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
   const [dirty, setDirty] = useState(false) // images picked or strokes kept but not saved yet
   const location = useLocation()
   const confirm = useConfirm()
@@ -812,6 +837,19 @@ export function ClientDetail() {
   useEffect(() => {
     load()
   }, [load])
+  const leaveSelect = useCallback(() => {
+    setSelecting(false)
+    setSelected(new Set())
+  }, [])
+  // Esc leaves select mode (the confirm dialog handles its own Esc first).
+  useEffect(() => {
+    if (!selecting) return
+    const onKey = (e) => e.key === 'Escape' && leaveSelect()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selecting, leaveSelect])
+  // Switching between Static and Dynamic starts fresh.
+  useEffect(() => leaveSelect(), [tab, leaveSelect])
   if (error) return <Alert>{error}</Alert>
   if (!c) return <Spinner />
 
@@ -833,6 +871,62 @@ export function ClientDetail() {
   }
   const refs = c[`${tab}_references`]
   const strength = c[`${tab}_strength`]
+  const toggle = (p) => setSelected((cur) => {
+    const next = new Set(cur)
+    if (next.has(p.id)) next.delete(p.id)
+    else next.add(p.id)
+    return next
+  })
+  // Remove the chosen cards right away, delete them on the server in one call,
+  // and put back any the server could not delete.
+  const bulkDelete = async () => {
+    const ids = refs.filter((r) => selected.has(r.id)).map((r) => r.id)
+    const n = ids.length
+    if (!n) return
+    const remaining = c[`${tab}_count`] - n
+    const ok = await confirm({
+      title: `Delete ${n} reference signature${n === 1 ? '' : 's'}?`,
+      message: (
+        <>
+          This can't be undone.
+          {remaining < strength.minimum && (
+            <span className="mt-2 block rounded-lg bg-warn-50 px-3 py-2 text-sm text-warn-700">
+              Only {remaining} {tab} reference{remaining === 1 ? '' : 's'} will be left, below the minimum of {strength.minimum}. Screening needs at least {strength.minimum}.
+            </span>
+          )}
+        </>
+      ),
+      confirmLabel: `Delete ${n}`,
+      danger: true,
+      icon: Trash2,
+    })
+    if (!ok) return
+    const before = c
+    const listKey = `${tab}_references`
+    const countKey = `${tab}_count`
+    const strengthKey = `${tab}_strength`
+    const gone = new Set(ids)
+    const update = (deleted) => (cur) => ({
+      ...cur,
+      [listKey]: before[listKey].filter((r) => !deleted.has(r.id)),
+      [countKey]: Math.max(0, before[countKey] - deleted.size),
+      [strengthKey]: { ...cur[strengthKey], count: Math.max(0, before[countKey] - deleted.size) },
+    })
+    setRemoveError('')
+    setC(update(gone))
+    leaveSelect()
+    try {
+      const r = await api.post(`/api/clients/${c.id}/references/bulk-delete`, { ids })
+      if (r.failed.length) {
+        setC(update(new Set(r.deleted)))
+        setRemoveError(`Could not delete ${r.failed.length} of ${n}: ${r.failed.map((f) => `#${f.id} (${f.reason})`).join(', ')}. ${r.failed.length === 1 ? 'It is' : 'They are'} back on the card.`)
+      }
+    } catch (err) {
+      setC(before)
+      setRemoveError(`Could not delete the selected references: ${err.message}`)
+    }
+    load() // refresh strength and similarity flags
+  }
   // Back to the Clients page, in the folder the user came from (or the client's own group).
   const backTo = location.state?.from?.startsWith('/app/clients') ? location.state.from
     : user.role === 'admin' ? `/app/clients?group=${c.group_id || 'none'}` : '/app/clients'
@@ -872,12 +966,34 @@ export function ClientDetail() {
           <div className="space-y-6 p-5">
             <div data-tour="enroll-strength"><StrengthMeter strength={strength} /></div>
             <Alert>{removeError}</Alert>
+            {c.can_edit && refs.length > 0 && (
+              <div className="-mb-3 flex items-center justify-between gap-2">
+                <span className="text-sm text-slate-500">{selecting ? 'Tap cards to select them.' : `${refs.length} reference${refs.length === 1 ? '' : 's'}`}</span>
+                {selecting ? (
+                  <Button variant="ghost" size="sm" onClick={leaveSelect}>Done</Button>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => setSelecting(true)}><CheckSquare className="h-3.5 w-3.5" /> Select</Button>
+                )}
+              </div>
+            )}
             {refs.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {refs.map((p) => <RefTile key={p.id} p={p} modality={tab} onRemove={c.can_edit ? setToRemove : null} />)}
+                {refs.map((p) => (
+                  <RefTile key={p.id} p={p} modality={tab} onRemove={c.can_edit ? setToRemove : null}
+                    selecting={selecting} selected={selected.has(p.id)} onToggle={toggle} />
+                ))}
               </div>
             ) : (
               <Empty>No {tab} references yet.</Empty>
+            )}
+            {selecting && (
+              <div role="toolbar" aria-label="Selected references" className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-xl backdrop-blur">
+                <span className="mr-auto text-sm font-semibold text-slate-900">{selected.size} selected</span>
+                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set(refs.map((r) => r.id)))} disabled={selected.size === refs.length}>Select all</Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} disabled={!selected.size}>Clear</Button>
+                <Button variant="danger" size="sm" onClick={bulkDelete} disabled={!selected.size}><Trash2 className="h-3.5 w-3.5" /> Delete selected</Button>
+                <Button variant="secondary" size="sm" onClick={leaveSelect}>Done</Button>
+              </div>
             )}
             {refs.some((p) => p.flagged) && (
               <Alert kind="warn">A highlighted reference is much less similar to the others. If it is the client's own signature and a clean capture, keep it: natural variation makes screening more reliable. Remove it only if the capture is bad (smudged, cut off, blurry) or it is not the client's signature.</Alert>

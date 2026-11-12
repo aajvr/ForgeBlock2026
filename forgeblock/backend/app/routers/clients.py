@@ -431,6 +431,34 @@ def remove_reference(profile_id: int, db: Session = Depends(get_db), user: User 
     return {"ok": True}
 
 
+class BulkDeleteIn(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=MAX_REFERENCES * 2)
+
+
+@router.post("/clients/{client_id}/references/bulk-delete")
+def bulk_remove_references(client_id: int, body: BulkDeleteIn, db: Session = Depends(get_db),
+                           user: User = Depends(require_staff)):
+    """Remove several references of one client at once (same rules as the
+    single delete). Ids that are missing or belong to another client are
+    reported in `failed` and nothing else changes for them."""
+    c = editable_client_or_404(db, client_id, user)
+    deleted, failed = [], []
+    for pid in dict.fromkeys(body.ids):
+        p = db.get(SignatureProfile, pid)
+        if p is None or p.status != "active" or p.client_id != c.id:
+            failed.append({"id": pid, "reason": "Reference not found."})
+            continue
+        p.status = "removed"
+        deleted.append(p)
+    db.commit()
+    for modality in ("static", "dynamic"):
+        n = sum(p.modality == modality for p in deleted)
+        if n:
+            log_activity(db, user, "enrollment", f"Removed {n} {modality} reference(s) from {c.client_code}",
+                         modality=modality)
+    return {"deleted": [p.id for p in deleted], "failed": failed}
+
+
 @router.get("/references/{profile_id}/image")
 def reference_image(profile_id: int, view: str = Query("original", pattern="^(original|model)$"),
                     db: Session = Depends(get_db), user: User = Depends(require_staff)):
