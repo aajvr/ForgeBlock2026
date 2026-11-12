@@ -27,7 +27,7 @@ export default function Dashboard() {
           {d.deletion_requests > 0 && <Link to="/app/admin/settings" className="font-medium underline">{d.deletion_requests} deletion request(s)</Link>}
         </Alert>
       )}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-tour="home-stats">
         <Stat label="Clients on file" value={t.clients} icon={Users} tone="indigo" to="/app/clients" />
         <Stat label="Cases needing a decision" value={t.open_cases} icon={Briefcase} tone="amber" to="/app/cases?status=open" />
         <Stat label="Screenings (all time)" value={t.screenings} icon={ScanSearch} to="/app/records" hint={d.average_confidence !== null ? `Average confidence ${d.average_confidence}% in this period` : undefined} />

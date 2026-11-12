@@ -222,11 +222,10 @@ export default function Layout() {
   const items = navFor(user.role)
   const staff = user.role !== 'client'
   const style = ROLE_STYLE[user.role] || ROLE_STYLE.examiner
-  const touring = tourOpen || !user.tour_completed
   // Desktop starts as an icon rail that opens over the page; pinned, it stays open beside it.
-  // Phones always get the full drawer. The tour opens it so its labels can be pointed at.
+  // Phones always get the full drawer.
   const floating = desktop && !pinned
-  const expanded = !desktop || pinned || peek || touring
+  const expanded = !desktop || pinned || peek
   const rail = desktop && !expanded
   useEffect(() => () => clearTimeout(timer.current), [])
 
@@ -399,7 +398,7 @@ export default function Layout() {
             <Outlet />
           </main>
         </div>
-        {(tourOpen || !user.tour_completed) && <Tour />}
+        {(tourOpen || !user.tour_completed) && <Tour key={tourOpen || 'first'} kind={typeof tourOpen === 'string' ? tourOpen : 'full'} />}
       </div>
       </div>
     </div>

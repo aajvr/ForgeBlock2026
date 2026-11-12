@@ -184,7 +184,7 @@ export default function Users() {
         {me.study_mode && <Button variant="secondary" onClick={() => setModal('bulk')}><UsersIcon className="h-4 w-4" /> Evaluation accounts</Button>}
         <Button onClick={() => setModal('one')}><UserPlus className="h-4 w-4" /> New account</Button>
       </PageHeader>
-      <Card bodyClass="p-0">
+      <Card bodyClass="p-0" data-tour="users-list">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
           <Segmented value={role} onChange={setRole} options={[{ value: '', label: 'All' }, { value: 'admin', label: 'Admins' }, { value: 'examiner', label: 'Examiners' }, { value: 'client', label: 'Clients' }]} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or code" className="ml-auto w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm" />

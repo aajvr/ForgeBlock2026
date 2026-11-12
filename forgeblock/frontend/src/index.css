@@ -415,7 +415,27 @@ html.lenis {
     scroll-behavior: smooth;
   }
 }
+/* Guided tour: soft pulse around the spotlight, card and example result fade in. */
+.tour-spot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.95), 0 0 0 6px rgb(15 108 189 / 0.45);
+  animation: tour-pulse 1.8s ease-in-out infinite;
+}
+@keyframes tour-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.015); }
+}
+.tour-card { animation: tour-in 0.24s ease-out both; }
+@keyframes tour-in { from { opacity: 0; transform: translateY(6px); } }
+.tour-pop { animation: tour-in 0.5s ease-out 0.5s both; }
+.tour-bar { transform-origin: left; animation: tour-bar 0.9s cubic-bezier(0.2, 0, 0, 1) 0.8s both; }
+@keyframes tour-bar { from { transform: scaleX(0); } }
+
 @media (prefers-reduced-motion: reduce) {
+  .tour-spot::after, .tour-card, .tour-pop, .tour-bar { animation: none !important; }
   .trace path { animation: none; stroke-dashoffset: 0; }
   .fade-up { animation: none; opacity: 1; transform: none; }
   .hero-strokes, .blob, .bob { animation: none; }

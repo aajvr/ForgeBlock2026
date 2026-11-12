@@ -57,7 +57,7 @@ export default function Profile() {
           <Card title="Guided tour">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-slate-600">See the short tour of your workspace again.</p>
-              <Button variant="secondary" onClick={() => setTourOpen(true)}><Compass className="h-4 w-4" /> Replay the tour</Button>
+              <Button variant="secondary" onClick={() => setTourOpen('full')}><Compass className="h-4 w-4" /> Replay the tour</Button>
             </div>
           </Card>
         </div>

@@ -152,7 +152,7 @@ export default function Cases() {
           <Plus className="h-4 w-4" /> Open a case
         </Button>
       </PageHeader>
-      <Card bodyClass="p-0">
+      <Card bodyClass="p-0" data-tour="cases-list">
         <div className="px-5 pt-2">
           <Tabs
             value={status}

@@ -117,7 +117,7 @@ export default function Ledger() {
       {(check || data.demo_mode) && (
         <div className={`mb-6 grid items-start gap-4 ${check && data.demo_mode ? 'lg:grid-cols-[1fr_380px]' : ''}`}>
           {check && (
-            <Card>
+            <Card data-tour="ledger-check">
               <div className={`flex items-start gap-3 ${check.valid ? 'text-ok-700' : 'text-bad-700'}`}>
                 {check.valid ? <ShieldCheck className="mt-0.5 h-6 w-6" /> : <ShieldAlert className="mt-0.5 h-6 w-6" />}
                 <div>

@@ -76,7 +76,7 @@ export default function Help() {
   return (
     <>
       <PageHeader title="Help Center" description="Search, or browse by topic.">
-        <Button variant="secondary" onClick={() => setTourOpen(true)}><Compass className="h-4 w-4" /> Replay the guided tour</Button>
+        <Button variant="secondary" onClick={() => setTourOpen('full')}><Compass className="h-4 w-4" /> Replay full tour</Button>
       </PageHeader>
       <div className="relative mb-6 max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

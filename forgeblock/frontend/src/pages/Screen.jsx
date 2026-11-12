@@ -1,7 +1,8 @@
-import { Eye, PenLine, ScanSearch, Upload } from 'lucide-react'
+import { Eye, PenLine, PlayCircle, ScanSearch, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import { useAuth } from '../auth'
 import ImagePicker from '../components/ImagePicker'
 import SignaturePad from '../components/SignaturePad'
 import { CasePicker, ClientPicker, DevPenNotice, PenDataHint } from '../components/shared'
@@ -42,6 +43,7 @@ function ModelView({ file }) {
 }
 
 export default function Screen() {
+  const { setTourOpen } = useAuth()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [modality, setModality] = useState('static')
@@ -93,7 +95,9 @@ export default function Screen() {
       <PageHeader
         title="Screen a signature"
         description="Compare a questioned signature with a client’s signatures on file. Use Static for a signature on paper and Dynamic for one signed live with a pen."
-      />
+      >
+        <Button variant="ghost" onClick={() => setTourOpen('screen')}><PlayCircle className="h-4 w-4" /> Replay tour</Button>
+      </PageHeader>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <Card bodyClass="p-0">
           <div className="px-5 pt-2" data-tour="modules">
@@ -132,7 +136,7 @@ export default function Screen() {
         </Card>
 
         <div className="space-y-6">
-          <Card title="Screen against">
+          <Card title="Screen against" data-tour="screen-client">
             <div className="space-y-4">
               <ClientPicker value={clientId} onChange={(v) => { setClientId(v); setCaseId('') }} modality={modality} />
               <CasePicker clientId={clientId} value={caseId} onChange={setCaseId} />

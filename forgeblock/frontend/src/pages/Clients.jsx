@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { ArrowLeft, Briefcase, PlayCircle, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
@@ -790,7 +790,7 @@ function DynamicEnroll({ client, onDone, onDirty }) {
 
 export function ClientDetail() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const { user, setTourOpen } = useAuth()
   const navigate = useNavigate()
   const [c, setC] = useState(null)
   const [tab, setTab] = useState('static')
@@ -847,13 +847,14 @@ export function ClientDetail() {
         eyebrow={`Signature card · ${c.client_code}`}
         title={(
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2"><ArrowLeft className="h-4 w-4" /> Back to clients</Button>
+            <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2" data-tour="enroll-back"><ArrowLeft className="h-4 w-4" /> Back to clients</Button>
             <span className="min-w-0">{c.full_name}</span>
           </span>
         )}
         description={c.notes || undefined}
       >
         {user.study_mode && c.is_practice && <Badge tone="violet">Practice client</Badge>}
+        <Button variant="ghost" onClick={() => setTourOpen('enroll')}><PlayCircle className="h-4 w-4" /> Replay tour</Button>
         <Link to={`/app/cases?new=1&client=${c.id}`}>
           <Button variant="secondary"><Briefcase className="h-4 w-4" /> Open a case</Button>
         </Link>
@@ -865,11 +866,11 @@ export function ClientDetail() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card bodyClass="p-0">
-          <div className="px-5 pt-2">
+          <div className="px-5 pt-2" data-tour="enroll-tabs">
             <Tabs value={tab} onChange={setTab} tabs={[{ value: 'static', label: `Static (${c.static_count})` }, { value: 'dynamic', label: `Dynamic (${c.dynamic_count})` }]} />
           </div>
           <div className="space-y-6 p-5">
-            <StrengthMeter strength={strength} />
+            <div data-tour="enroll-strength"><StrengthMeter strength={strength} /></div>
             <Alert>{removeError}</Alert>
             {refs.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -881,7 +882,7 @@ export function ClientDetail() {
             {refs.some((p) => p.flagged) && (
               <Alert kind="warn">A highlighted reference is much less similar to the others. If it is the client's own signature and a clean capture, keep it: natural variation makes screening more reliable. Remove it only if the capture is bad (smudged, cut off, blurry) or it is not the client's signature.</Alert>
             )}
-            <div className="border-t border-slate-100 pt-5">
+            <div className="border-t border-slate-100 pt-5" data-tour="enroll-add">
               <h3 className="mb-3 font-semibold">Add {tab} references</h3>
               {!c.can_edit ? (
                 <Alert kind="info">

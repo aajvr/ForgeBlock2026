@@ -8,7 +8,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(!!getToken())
   const [notice, setNotice] = useState('')
-  // The guided tour can be replayed from the Help Center or the Profile page.
+  // Which guided tour is open: false, 'full' (first sign-in, Help Center, Profile)
+  // or a page's mini-tour ('screen', 'enroll').
   const [tourOpen, setTourOpen] = useState(false)
   const lastActive = useRef(Date.now())
 

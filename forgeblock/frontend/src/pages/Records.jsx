@@ -208,7 +208,7 @@ export default function Records() {
           : 'Every screening you made, with its result, your decision and its receipt code.'}
       />
       {data && <Summary s={data.summary} />}
-      <Card bodyClass="p-0">
+      <Card bodyClass="p-0" data-tour="records-list">
         {isAdmin ? (
           <div className="border-b border-slate-100 p-4">
             <div className="flex flex-wrap items-center gap-2.5">
