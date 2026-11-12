@@ -53,7 +53,7 @@ export default function SystemPage() {
       <Alert kind="success" className="mb-4">{msg}</Alert>
       <Alert className="mb-4">{error}</Alert>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Health">
+        <Card title="Health" data-tour="system-health">
           <Row ok={s.models.static.trained} label="Static model" detail={s.models.static.trained ? 'Loaded' : 'Not loaded'} />
           <Row ok={s.models.dynamic.trained} label="Dynamic model" detail={s.models.dynamic.trained ? 'Loaded' : 'Not loaded'} />
           <Row ok={s.database.ok} label="Database" detail={`${s.database.kind}, ${s.database.ok ? 'connected' : 'not reachable'}`} />

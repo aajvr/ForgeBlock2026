@@ -17,6 +17,14 @@ import { RESULT } from './ui'
 
 const HOME = { admin: '/app/admin', examiner: '/app/home', client: '/app/me' }
 
+// The last step of every full tour: back on the home page, a short wrap-up and
+// where to find the tour again, so it does not just stop.
+const finish = (role, text) => ({
+  path: HOME[role],
+  title: 'You’re all set',
+  text: `${text} Replay this tour any time from the Help Center or your Profile.`,
+})
+
 function staffSteps(role) {
   const admin = role === 'admin'
   return [
@@ -27,7 +35,23 @@ function staffSteps(role) {
         ? 'Screening activity, cases waiting for a decision and ledger health. Click a card to open the list behind it.'
         : 'Cases waiting for your decision and your latest screenings. Click a card to open that list.',
     },
+    ...(admin
+      ? [
+          { path: HOME[role], target: 'dash-activity', title: 'Screenings per day', text: 'Each day’s screenings by result. Point at a day to see its counts, and change the period with 7, 14 or 30 days at the top.' },
+          { path: HOME[role], target: 'dash-workload', title: 'Examiner workload', text: 'How many screenings each examiner made in this period. Click a name to open their records.' },
+        ]
+      : [
+          { path: HOME[role], target: 'home-actions', title: 'Shortcuts', text: 'Screen a signature, register a client or open your records in one click.' },
+          { path: HOME[role], target: 'home-decisions', title: 'Waiting for your decision', text: 'Open a case to compare the signatures and decide Genuine or Forged, with notes. Your decision is sealed in the ledger.' },
+        ]),
+    { target: 'global-search', title: 'Search', text: 'Find a client, a case or a receipt code from any page. Press Ctrl K to jump here.' },
     { path: '/app/clients', target: 'new-client', title: 'Clients', text: 'Register a client here. Each client gets a signature card that holds their genuine signatures.' },
+    {
+      path: '/app/clients', target: 'clients-list', title: admin ? 'Groups' : 'Your clients',
+      text: admin
+        ? 'Clients are kept in groups. Each group has one examiner, the only examiner who can see its clients. Open a folder to see them.'
+        : 'The clients of your group. Open one to see their signature card, or right-click for quick actions.',
+    },
     {
       path: '/app/clients', demo: 'enroll', title: 'Signature card',
       text: 'Open a client to add reference signatures: the printable sheet or images for Static, live pen signing for Dynamic. At least 7 per module, 20 recommended.',
@@ -35,22 +59,33 @@ function staffSteps(role) {
     { path: '/app/screen', target: 'modules', demo: 'screen', title: 'Screen a signature', text: 'Pick Static for paper or Dynamic for live signing, choose the client, then press Screen signature.' },
     { path: '/app/screen', target: 'screen-button', demo: 'result', title: 'Reading a result', text: 'Each screening is Consistent, Inconclusive or Inconsistent, with a confidence score. ForgeBlock screens; the examiner makes the final call.' },
     { path: '/app/cases', target: 'cases-list', title: 'Cases', text: 'Inconclusive and Inconsistent screenings open a case here. The examiner decides Genuine or Forged, with notes.' },
-    { path: '/app/records', target: 'records-list', title: 'Records', text: 'Every screening, with its result, the examiner’s decision and its receipt code.' },
+    { path: '/app/records', target: 'records-filters', title: 'Records', text: 'Every screening, with its result, the examiner’s decision and its receipt code. Filter by result, module, decision or date.' },
     ...(admin
       ? [
           { path: '/app/admin/users', target: 'users-list', title: 'Users and roles', text: 'Create accounts and set roles. A role change asks you to confirm first.' },
           { path: '/app/admin/ledger', target: 'ledger-check', title: 'Ledger', text: 'Every screening and decision is sealed in a hash-linked chain. Check it here; it is also checked every day.' },
+          { path: '/app/admin/audit', target: 'audit-list', title: 'Audit log', text: 'Who did what and when: sign-ins, account changes, screenings, decisions and deletions. Filter by person or activity.' },
+          { path: '/app/admin/settings', target: 'policy-settings', title: 'Policy and retention', text: 'How borderline results are handled, how long signature data is kept, and deletion requests.' },
+          { path: '/app/admin/system', target: 'system-health', title: 'System', text: 'Check that the models, database, storage and ledger are working. Model upkeep after a retrain is here too.' },
         ]
       : []),
-    { target: 'notifications', title: 'Notifications', text: 'New cases, decisions and references show up here. Replay this tour any time from the Help Center.' },
+    { target: 'notifications', title: 'Notifications', text: admin ? 'New cases, decisions, role changes and references show up here.' : 'New cases, decisions and references for your clients show up here.' },
+    { target: 'nav-help', title: 'Help Center', text: 'Answers to common questions, searchable and grouped by topic.' },
+    { target: 'nav-profile', title: 'Profile', text: 'Your account details, how you sign in, and your password.' },
+    finish(role, admin
+      ? 'That is the whole workspace: screening, casework, the ledger and administration.'
+      : 'Register a client, add their references, then screen a signature. Anything not clearly Consistent comes back to you as a case.'),
   ]
 }
 
 const CLIENT_STEPS = [
   { path: '/app/me', target: 'home-stats', title: 'Home', text: 'Your examiner and the signatures kept on file for you.' },
   { path: '/app/me', target: 'client-screenings', demo: 'result-client', title: 'Screenings on your documents', text: 'Each screening shows Consistent, Inconclusive or Inconsistent. Your examiner makes the final decision. Click one to see it.' },
+  { path: '/app/me', target: 'report-problem', title: 'Report a problem', text: 'If something looks wrong, for example a document you did not sign, tell us here. An administrator looks into it.' },
   { target: 'notifications', title: 'Notifications', text: 'We let you know here when a document in your name is screened or decided.' },
+  { path: '/app/profile', target: 'profile-data', title: 'Your signature data', text: 'Your account details are on your Profile. You can also ask for your signatures on file to be deleted here.' },
   { target: 'nav-help', title: 'Help Center', text: 'Answers to common questions, and this tour again.' },
+  finish('client', 'You can check every screening on documents in your name from Home.'),
 ]
 
 const MINI = {

@@ -21,7 +21,7 @@ export default function ClientHome() {
   return (
     <>
       <PageHeader eyebrow={`Client · ${c.client_code}`} title={`Hello, ${user.full_name.split(' ')[0]}`} description="Your signatures on file and every screening made on documents in your name.">
-        <Button variant="secondary" onClick={() => setOpen(true)}>
+        <Button variant="secondary" onClick={() => setOpen(true)} data-tour="report-problem">
           <MessageSquareWarning className="h-4 w-4" /> Report a problem
         </Button>
       </PageHeader>

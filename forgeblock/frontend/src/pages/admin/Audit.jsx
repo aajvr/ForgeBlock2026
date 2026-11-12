@@ -80,7 +80,7 @@ export default function Audit() {
   return (
     <>
       <PageHeader title="Audit log" description="Who did what and when: sign-ins, account changes, enrollments, screenings, findings, deletions and ledger actions." />
-      <Card bodyClass="p-0">
+      <Card bodyClass="p-0" data-tour="audit-list">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
           <Combobox label="Who" anyLabel="Anyone" placeholder="Search people" value={who} onChange={set('who')} options={options} extra={extra} tabs={tabs} className="w-64" />
           <select value={type} onChange={(e) => set('type')(e.target.value)} aria-label="Activity type" className={fieldClass}>

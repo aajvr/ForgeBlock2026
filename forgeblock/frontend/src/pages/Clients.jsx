@@ -574,9 +574,9 @@ export default function Clients() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} aria-label={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} className={`${fieldClass} w-full max-w-sm shadow-raised`} />
       </div>
       {showGrid ? (
-        <FolderGrid data={groups} clients={clients} onOpen={open_} onNew={() => setEditGroup('new')} />
+        <div data-tour="clients-list"><FolderGrid data={groups} clients={clients} onOpen={open_} onNew={() => setEditGroup('new')} /></div>
       ) : (
-        <Card bodyClass="p-0">
+        <Card bodyClass="p-0" data-tour="clients-list">
           {inFolder.length === 0 ? (
             <Empty icon={Users}>{q ? 'No clients match.' : 'No clients in this group yet. Register a client and add their reference signatures.'}</Empty>
           ) : (

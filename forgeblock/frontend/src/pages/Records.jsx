@@ -210,7 +210,7 @@ export default function Records() {
       {data && <Summary s={data.summary} />}
       <Card bodyClass="p-0" data-tour="records-list">
         {isAdmin ? (
-          <div className="border-b border-slate-100 p-4">
+          <div className="border-b border-slate-100 p-4" data-tour="records-filters">
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="w-full sm:w-56">{search}</div>
               <Combobox label="Examiner" anyLabel="Any examiner" placeholder="Search examiners" value={filters.examiner} onChange={(v) => setVal('examiner', v)} options={examinerOptions} className="w-full sm:w-56" />
@@ -240,7 +240,7 @@ export default function Records() {
             )}
           </div>
         ) : (
-          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8" data-tour="records-filters">
             <div className="lg:col-span-2">{search}</div>
             {modalitySelect}
             {resultSelect}

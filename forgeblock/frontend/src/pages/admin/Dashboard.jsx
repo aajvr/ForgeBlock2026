@@ -47,7 +47,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="Screenings per day" subtitle={`Last ${days} days, by screening result`}>
+        <Card title="Screenings per day" subtitle={`Last ${days} days, by screening result`} data-tour="dash-activity">
           <StackedDays series={d.series} />
         </Card>
         <Card title="Screening results" subtitle={`Last ${days} days`}>
@@ -64,7 +64,7 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="Examiner workload" subtitle={`Screenings in the last ${days} days`}>
+        <Card title="Examiner workload" subtitle={`Screenings in the last ${days} days`} data-tour="dash-workload">
           {d.workload.length ? (
             <ul className="grid gap-x-6 sm:grid-cols-2">
               {d.workload.map((w) => {

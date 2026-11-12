@@ -48,13 +48,13 @@ export default function ExaminerHome() {
         <Stat label="Decisions made" value={c.decided} icon={CheckCircle2} tone="green" to="/app/cases?status=closed" />
         <Stat label="Clients you can screen" value={c.clients} icon={Users} tone="violet" to="/app/clients" />
       </div>
-      <div className="mb-5 grid gap-4 md:grid-cols-3">
+      <div className="mb-5 grid gap-4 md:grid-cols-3" data-tour="home-actions">
         <Action to="/app/screen" icon={ScanSearch} title="Screen a signature" text="Compare a questioned signature with a client on file." />
         <Action to="/app/clients" icon={UserPlus} title="Register a client" text="Add a client and enroll their signatures." />
         <Action to="/app/records" icon={ClipboardList} title="See all records" text="Every screening you made, with receipt codes." />
       </div>
       <div className="grid items-start gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Card title="Needs your decision" subtitle="Screenings that were not clearly Consistent" bodyClass="p-0"
+        <Card title="Needs your decision" subtitle="Screenings that were not clearly Consistent" bodyClass="p-0" data-tour="home-decisions"
           actions={<Link to="/app/cases" className={headerLink}>All cases</Link>}>
           {d.open_cases.length === 0 ? <Empty icon={CheckCircle2}>Nothing is waiting for you.</Empty> : <CasesTable cases={d.open_cases} compact />}
         </Card>

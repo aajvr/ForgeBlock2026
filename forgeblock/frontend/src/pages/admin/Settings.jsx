@@ -21,7 +21,7 @@ export default function Settings() {
   return (
     <>
       <PageHeader title="Policy and retention" description="How borderline results are handled, and how long client signature data is kept." />
-      <Card title="Screening policy" className="mb-6">
+      <Card title="Screening policy" className="mb-6" data-tour="policy-settings">
         <p className="text-sm text-slate-700">
           Results that land close to the decision thresholds are shown as <b>Inconclusive</b> and open a case for the examiner, so the model never
           leans on a borderline result. The cut-off is set by the research team from the evaluation results and is not shown in the app.

@@ -37,7 +37,7 @@ function LedgerIntro({ data, check }) {
     { icon: Timer, title: 'Last checked automatically', text: auto ? `${fmtDate(auto.checked_at)}: ${auto.valid ? 'intact' : 'FAILED'}.` : 'The daily auto-check has not run yet.' },
   ]
   return (
-    <section className="mb-6 rounded-[16px] border border-line bg-white p-6 shadow-raised">
+    <section className="mb-6 rounded-[16px] border border-line bg-white p-6 shadow-raised" data-tour="ledger-check">
       <div className="grid gap-6 md:grid-cols-3">
         {items.map((it) => (
           <div key={it.title} className="flex gap-3">
@@ -117,7 +117,7 @@ export default function Ledger() {
       {(check || data.demo_mode) && (
         <div className={`mb-6 grid items-start gap-4 ${check && data.demo_mode ? 'lg:grid-cols-[1fr_380px]' : ''}`}>
           {check && (
-            <Card data-tour="ledger-check">
+            <Card>
               <div className={`flex items-start gap-3 ${check.valid ? 'text-ok-700' : 'text-bad-700'}`}>
                 {check.valid ? <ShieldCheck className="mt-0.5 h-6 w-6" /> : <ShieldAlert className="mt-0.5 h-6 w-6" />}
                 <div>

@@ -23,7 +23,7 @@ export default function Profile() {
     <>
       <PageHeader title="Profile" description="Your account details, how you sign in, and your password." />
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Account">
+        <Card title="Account" data-tour="profile-account">
           <div className="mb-5 flex items-center gap-4">
             <Avatar name={user.full_name} role={user.role} size="h-14 w-14 text-lg" />
             <div>
@@ -66,7 +66,7 @@ export default function Profile() {
           <PasswordForm onDone={() => setDone('Your password was changed.')} />
         </Card>
         {user.role === 'client' && (
-          <Card title="Your signature data" subtitle="You can ask for your signatures on file to be deleted.">
+          <Card title="Your signature data" subtitle="You can ask for your signatures on file to be deleted." data-tour="profile-data">
             <p className="text-sm text-slate-600">
               Deleting removes your reference signatures and stored images. Screening records keep only their hashes in the ledger so the chain stays
               valid; they contain no images.

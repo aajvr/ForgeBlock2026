@@ -50,11 +50,11 @@ const ADMIN_NAV = [
   { to: '/app/records', label: 'Records', icon: ClipboardList, tour: 'nav-records' },
   { section: 'Integrity' },
   { to: '/app/admin/ledger', label: 'Ledger', icon: Link2, tour: 'nav-ledger' },
-  { to: '/app/admin/audit', label: 'Audit log', icon: ShieldCheck },
+  { to: '/app/admin/audit', label: 'Audit log', icon: ShieldCheck, tour: 'nav-audit' },
   { section: 'Administration' },
   { to: '/app/admin/users', label: 'Users and roles', icon: ShieldHalf, tour: 'nav-users' },
   { to: '/app/admin/settings', label: 'Policy and retention', icon: Settings2, tour: 'nav-policy' },
-  { to: '/app/admin/system', label: 'System', icon: Activity },
+  { to: '/app/admin/system', label: 'System', icon: Activity, tour: 'nav-system' },
 ]
 
 const CLIENT_NAV = [
@@ -151,7 +151,7 @@ function GlobalSearch() {
   const total = res ? res.clients.length + res.cases.length + res.receipts.length : 0
 
   return (
-    <div ref={box} className="relative mx-auto hidden w-full max-w-[520px] flex-1 md:block">
+    <div ref={box} className="relative mx-auto hidden w-full max-w-[520px] flex-1 md:block" data-tour="global-search">
       <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-white/80" />
       <input
         ref={input}
