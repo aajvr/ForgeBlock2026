@@ -45,7 +45,7 @@ export default function Dashboard() {
             </div>
           </Card>
           <Card title="Examiner workload" subtitle={`Screenings in the last ${days} days`}>
-            {d.workload.length ? <HBars rows={d.workload.map((w) => ({ label: w.name, value: w.count }))} /> : <p className="text-sm text-slate-500">No screenings in this period.</p>}
+            {d.workload.length ? <HBars rows={d.workload.map((w) => ({ label: w.name, value: w.count, to: w.user_id ? `/app/records?examiner=${w.user_id}&date_from=${since}` : undefined }))} /> : <p className="text-sm text-slate-500">No screenings in this period.</p>}
           </Card>
           <Card title="Ledger health">
             {d.ledger ? (

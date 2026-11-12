@@ -213,6 +213,7 @@ def log_out(l: VerificationLog, db: Session, names_map: dict | None = None) -> d
         "performed_by": l.performed_by,
         "performed_by_name": names_map.get(l.performed_by),
         "performed_by_code": performer.account_code if performer else None,
+        "group_id": group.id if group else None,
         "group_name": group.name if group else None,
         "client_id": l.client_id,
         "client_code": client.client_code if client else None,

@@ -81,7 +81,7 @@ def dashboard(days: int = Query(14, ge=7, le=90), db: Session = Depends(get_db),
         "by_modality": {m: sum(l.modality == m for l in logs) for m in ("static", "dynamic")},
         "average_confidence": round(float(np.mean([l.confidence_score for l in logs])), 1) if logs else None,
         "series": series,
-        "workload": [{"name": nm.get(uid, "?"), "count": n} for uid, n in workload.most_common(8)],
+        "workload": [{"user_id": uid, "name": nm.get(uid, "?"), "count": n} for uid, n in workload.most_common(8)],
         "ledger": last_auto_check(),
         "deletion_requests": _count(db, Client, Client.deletion_requested.is_(True), Client.status == "active"),
     }

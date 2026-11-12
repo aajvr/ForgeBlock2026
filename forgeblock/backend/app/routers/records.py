@@ -45,13 +45,24 @@ def records(
     decision: str | None = Query(None, pattern="^(genuine|forged|pending|none)$"),
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    examiner_id: int | None = None,
+    group_id: int | None = None,
     limit: int = Query(300, le=1000),
     db: Session = Depends(get_db),
     user: User = Depends(require_staff),
 ):
     """Every screening the user may see (admins: all; examiners: their own),
-    newest first, with a summary of the filtered set."""
+    newest first, with a summary of the filtered set. Admins can also filter
+    by the examiner who screened (examiner_id) and the client's group
+    (group_id; 0 = clients without a group)."""
+    if (examiner_id is not None or group_id is not None) and user.role != "admin":
+        raise HTTPException(403, "Only administrators can filter by examiner or group.")
     stmt = own_logs(select(VerificationLog).where(VerificationLog.mode == "verify"), user)
+    if examiner_id is not None:
+        stmt = stmt.where(VerificationLog.performed_by == examiner_id)
+    if group_id is not None:
+        in_group = Client.group_id.is_(None) if group_id == 0 else Client.group_id == group_id
+        stmt = stmt.where(VerificationLog.client_id.in_(select(Client.id).where(in_group)))
     if modality:
         stmt = stmt.where(VerificationLog.modality == modality)
     if result:

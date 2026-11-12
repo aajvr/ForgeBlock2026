@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { useConfirm } from '../components/ConfirmDialog'
+import { groupColour } from '../components/groupColors'
 import ImagePicker from '../components/ImagePicker'
 import SheetEnroll from '../components/SheetEnroll'
 import SignaturePad from '../components/SignaturePad'
@@ -344,18 +345,8 @@ function RowMenu({ menu, onClose, onDelete, onMove, isAdmin }) {
   )
 }
 
-// Groups have no stored colour, so each one keeps a fixed colour from its id.
-const FOLDER_COLOURS = [
-  ['#0f6cbd', '#0c4f8c'],
-  ['#0f766e', '#0b4f4a'],
-  ['#4338ca', '#312e81'],
-  ['#7e22ce', '#581c87'],
-  ['#0369a1', '#0c4a6e'],
-  ['#a21caf', '#701a75'],
-]
-const GREY_FOLDER = ['#64748b', '#475569']
 const folderStyle = (group) => {
-  const [folder, deep] = group ? FOLDER_COLOURS[group.id % FOLDER_COLOURS.length] : GREY_FOLDER
+  const [folder, deep] = groupColour(group?.id)
   return { '--folder': folder, '--folder-deep': deep }
 }
 
