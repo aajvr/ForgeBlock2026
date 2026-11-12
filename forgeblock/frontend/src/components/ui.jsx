@@ -326,8 +326,8 @@ export function ConfirmDialog({ open, title, children, confirmLabel = 'Confirm',
       </div>
       <Alert className="mt-4">{error}</Alert>
       <div className="mt-5 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
-        <Button variant={danger ? 'danger' : 'primary'} loading={busy} onClick={run} autoFocus>{confirmLabel}</Button>
+        <Button variant="secondary" onClick={onClose} disabled={busy} autoFocus>Cancel</Button>
+        <Button variant={danger ? 'danger' : 'primary'} loading={busy} onClick={run}>{confirmLabel}</Button>
       </div>
     </Modal>
   )

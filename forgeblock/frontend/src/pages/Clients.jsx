@@ -503,6 +503,8 @@ export default function Clients() {
   const [toMove, setToMove] = useState(null)
   const [editGroup, setEditGroup] = useState(null) // null | 'new' | group
   const [msg, setMsg] = useState('')
+  const [groupError, setGroupError] = useState('')
+  const confirm = useConfirm()
   // Admins start at the folder list; an examiner is always inside their own folder.
   const folder = isAdmin ? params.get('group') : (user.group_id ? String(user.group_id) : 'none')
   const loadGroups = useCallback(() => api.get('/api/groups').then(setGroups), [])
@@ -513,6 +515,24 @@ export default function Clients() {
     return () => clearTimeout(t)
   }, [loadClients])
   const reload = () => { loadGroups(); loadClients() }
+  const deleteGroup = async (g) => {
+    const ok = await confirm({
+      title: 'Delete this group?',
+      message: <>Delete the group <b>{g.name}</b>? It has no clients.{g.examiner ? ` ${g.examiner.full_name} will no longer be assigned to a group.` : ''}</>,
+      confirmLabel: 'Delete group',
+      danger: true,
+    })
+    if (!ok) return
+    setGroupError('')
+    try {
+      await api.del(`/api/groups/${g.id}`)
+      setMsg(`Group ${g.name} deleted.`)
+      open_(null)
+      reload()
+    } catch (err) {
+      setGroupError(err.message)
+    }
+  }
   const closeMenu = useCallback(() => setMenu(null), [])
   if (!groups || !clients) return <Spinner />
 
@@ -540,13 +560,14 @@ export default function Clients() {
         </Button>
       </PageHeader>
       <Alert kind="success" className="mb-4">{msg}</Alert>
+      <Alert className="mb-4">{groupError}</Alert>
       {!isAdmin && !user.group_id && (
         <Alert kind="info" className="mb-4">You are not assigned to a group yet. You see only the clients you registered. An administrator assigns you to a group.</Alert>
       )}
       {(folder || !isAdmin) && (group || folder === 'none' ? (
         <FolderHeader group={group} isAdmin={isAdmin} mine={!isAdmin}
           onEdit={() => setEditGroup(group)}
-          onDelete={async () => { await api.del(`/api/groups/${group.id}`); open_(null); reload() }} />
+          onDelete={() => deleteGroup(group)} />
       ) : null)}
       <div className="mb-4">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} className="w-full max-w-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100" />

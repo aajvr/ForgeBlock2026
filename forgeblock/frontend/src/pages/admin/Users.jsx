@@ -2,7 +2,21 @@ import { KeyRound, Lock, Unlock, UserPlus, Users as UsersIcon } from 'lucide-rea
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, fmtDate, td } from '../../components/ui'
+
+const ROLE_NAME = { admin: 'Administrator', examiner: 'Examiner', client: 'Client' }
+
+// What a role change means for the person, in plain words.
+function roleEffect(from, to) {
+  const parts = []
+  if (from === 'admin') parts.push('lose access to the Admin pages')
+  if (to === 'admin') parts.push('be able to open the Admin pages (users, ledger, settings and audit log)')
+  if (to === 'examiner' && from !== 'admin') parts.push('be able to screen signatures and decide cases')
+  if (from === 'examiner') parts.push('be removed from their client group')
+  if (to === 'client') parts.push('only see the client portal')
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0] || 'get the new access'
+}
 
 function Credentials({ rows }) {
   return (
@@ -127,14 +141,42 @@ export default function Users() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, q])
   const [patchError, setPatchError] = useState('')
+  const confirm = useConfirm()
+  // Show the change right away; put the old values back if saving fails.
   const patch = async (u, body) => {
     setPatchError('')
+    setUsers((list) => list.map((x) => (x.id === u.id ? { ...x, ...body } : x)))
     try {
       await api.patch(`/api/admin/users/${u.id}`, body)
     } catch (err) {
-      setPatchError(err.message)
+      setUsers((list) => list.map((x) => (x.id === u.id ? u : x)))
+      setPatchError(`Could not update ${u.full_name}: ${err.message}`)
+      return
     }
     load()
+  }
+  // The role dropdown is controlled by u.role, so Cancel leaves it on the old value.
+  const changeRole = async (u, role) => {
+    if (role === u.role) return
+    const ok = await confirm({
+      title: 'Change role?',
+      message: <>Change <b>{u.full_name}</b>’s role from {ROLE_NAME[u.role]} to {ROLE_NAME[role]}? They will {roleEffect(u.role, role)} the next time they sign in.</>,
+      confirmLabel: 'Change role',
+      danger: u.role === 'admin',
+    })
+    if (ok) patch(u, { role })
+  }
+  const toggleStatus = async (u) => {
+    if (u.status === 'active') {
+      const ok = await confirm({
+        title: 'Disable this account?',
+        message: <><b>{u.full_name}</b> will no longer be able to sign in. Their records stay, and you can enable the account again later.</>,
+        confirmLabel: 'Disable account',
+        danger: true,
+      })
+      if (!ok) return
+    }
+    patch(u, { status: u.status === 'active' ? 'disabled' : 'active' })
   }
   return (
     <>
@@ -155,7 +197,7 @@ export default function Users() {
                 <td className={td}><div className="font-medium">{u.full_name}</div><div className="text-xs text-slate-500">{u.email}{u.client_code ? ` · ${u.client_code}` : ''}</div></td>
                 <td className={`${td} font-mono text-xs`}>{u.account_code}</td>
                 <td className={td}>
-                  <select value={u.role} disabled={u.id === me.id} onChange={(e) => patch(u, { role: e.target.value })} className="rounded-md border border-slate-300 px-2 py-1 text-xs">
+                  <select value={u.role} disabled={u.id === me.id} onChange={(e) => changeRole(u, e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-xs">
                     <option value="admin" disabled={u.is_test_account}>Administrator</option>
                     <option value="examiner">Examiner</option>
                     <option value="client">Client</option>
@@ -181,7 +223,7 @@ export default function Users() {
                     {u.locked && <Button size="sm" variant="ghost" onClick={async () => { await api.post(`/api/admin/users/${u.id}/unlock`); load() }}><Unlock className="h-3.5 w-3.5" /> Unlock</Button>}
                     <Button size="sm" variant="ghost" onClick={() => setToReset(u)}><KeyRound className="h-3.5 w-3.5" /> Reset</Button>
                     {u.id !== me.id && (
-                      <Button size="sm" variant="ghost" onClick={() => patch(u, { status: u.status === 'active' ? 'disabled' : 'active' })}>
+                      <Button size="sm" variant="ghost" onClick={() => toggleStatus(u)}>
                         {u.status === 'active' ? 'Disable' : 'Enable'}
                       </Button>
                     )}
