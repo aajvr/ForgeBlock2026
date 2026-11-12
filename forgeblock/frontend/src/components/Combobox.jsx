@@ -59,14 +59,14 @@ export function Combobox({ label, value, onChange, options, anyLabel = 'Any', pl
         aria-expanded={open}
         aria-label={`${label}: ${current.label}`}
         onClick={() => setOpen((o) => !o)}
-        className={`flex w-full min-w-0 items-center gap-2 rounded-xl border bg-white px-3 py-2 text-left text-sm transition hover:border-slate-400 ${value ? 'border-brand-300 text-slate-900' : 'border-slate-300 text-slate-600'}`}
+        className={`flex w-full min-w-0 items-center gap-2 rounded-[10px] border bg-white px-3 py-2 text-left text-sm outline-none transition hover:border-slate-300 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-100 ${value ? 'border-brand-300 text-ink' : 'border-[#dde3ec] text-slate-600'}`}
       >
         <span className="shrink-0 text-slate-500">{label}:</span>
         <span className="min-w-0 flex-1 truncate font-medium">{current.label}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute left-0 z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+        <div className="absolute left-0 z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-[12px] border border-line bg-white p-1 shadow-xl">
           {tabs && (
             <div role="tablist" aria-label={`${label} by role`} className="flex flex-wrap gap-1 p-1">
               {[{ value: '', label: 'All' }, ...tabs].map((t) => (
@@ -96,7 +96,7 @@ export function Combobox({ label, value, onChange, options, anyLabel = 'Any', pl
               aria-controls={id}
               aria-expanded
               aria-activedescendant={shown[active] ? `${id}-${active}` : undefined}
-              className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-2 text-sm outline-none focus:border-brand-500"
+              className="w-full rounded-[8px] border border-[#dde3ec] py-1.5 pl-8 pr-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
             />
           </div>
           <ul ref={listRef} id={id} role="listbox" aria-label={label} className="max-h-64 overflow-y-auto py-1">

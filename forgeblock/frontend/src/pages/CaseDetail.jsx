@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { AuthImage, StrokePreview } from '../components/shared'
-import { Alert, Badge, Button, Card, Empty, FINDING, PageHeader, ScreeningBadge, Spinner, Textarea, fmtDate } from '../components/ui'
+import { Alert, Badge, Button, Card, Empty, FINDING, PageHeader, ScreeningBadge, Spinner, Textarea, fieldClass, fmtDate } from '../components/ui'
 import { STATUS_TONE } from './Cases'
 
 const EVENT_ICON = { opened: Stamp, screening: ScanSearch, note: MessageSquare, finding: Gavel, second_opinion: ShieldCheck, closed: Stamp, reopened: Stamp, reference_added: PlusCircle }
@@ -30,7 +30,7 @@ function SignaturePair({ id }) {
     if (r.best_match_profile_id) api.get(`/api/references/${r.best_match_profile_id}/strokes`).then((d) => setStrokes((s) => ({ ...s, ref: d.strokes }))).catch(() => {})
   }, [dynamic, id, r])
   if (r === false || (r && !r.stored_sample)) return null
-  const box = 'flex h-28 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-2'
+  const box = 'flex h-28 items-center justify-center overflow-hidden rounded-[12px] border border-line bg-white p-2'
   const pane = (label, content) => (
     <div className="min-w-0">
       <div className="mb-1 text-xs font-medium text-slate-500">{label}</div>
@@ -73,7 +73,7 @@ function FindingForm({ c, onSaved }) {
             type="button"
             key={o.value}
             onClick={() => setFinding(o.value)}
-            className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition ${finding === o.value ? o.on : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+            className={`flex items-start gap-3 rounded-[12px] border-2 p-4 text-left transition ${finding === o.value ? o.on : 'border-line hover:border-slate-300 hover:bg-[#f7fafd]'}`}
           >
             <o.Icon className="mt-0.5 h-5 w-5 shrink-0" />
             <span>
@@ -132,7 +132,7 @@ export default function CaseDetail() {
 
   return (
     <>
-      <Link to="/app/cases" className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+      <Link to="/app/cases" className="mb-2.5 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-white/85 hover:text-white">
         <ArrowLeft className="h-4 w-4" /> Cases
       </Link>
       <PageHeader eyebrow={`Case ${c.case_code}`} title={c.title} description={c.document_ref ? `Document reference ${c.document_ref}` : undefined}>
@@ -178,7 +178,7 @@ export default function CaseDetail() {
               </ul>
             )}
             {decidedGenuine && canEdit && (
-              <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+              <p className="mt-3 rounded-[10px] bg-[#f6f8fc] p-3 text-sm text-slate-600">
                 Decided Genuine. You can add the questioned signature to {c.client_code}’s references, so later screenings of this client can match it.
               </p>
             )}
@@ -198,7 +198,7 @@ export default function CaseDetail() {
             <Card title="Decision">
               <ul className="space-y-4">
                 {c.findings.map((f) => (
-                  <li key={f.id} className="rounded-lg border border-slate-200 p-4">
+                  <li key={f.id} className="rounded-[12px] border border-line p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <Badge tone={FINDING[f.finding].tone}>{f.finding_label}</Badge>
                       <span className="text-xs text-slate-500">
@@ -221,7 +221,7 @@ export default function CaseDetail() {
           {c.status === 'closed' && (
             <Card title="Reopen case">
               <div className="flex gap-2">
-                <input value={reopen} onChange={(e) => setReopen(e.target.value)} placeholder="Reason for reopening" className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                <input value={reopen} onChange={(e) => setReopen(e.target.value)} placeholder="Reason for reopening" className={`${fieldClass} min-w-0 flex-1`} />
                 <Button variant="secondary" disabled={reopen.length < 1} onClick={async () => setC(await api.post(`/api/cases/${c.id}/reopen`, { text: reopen }))}>Reopen</Button>
               </div>
             </Card>
@@ -233,19 +233,19 @@ export default function CaseDetail() {
             <Link to={`/app/clients/${c.client_id}`} className="font-medium text-brand-700 hover:underline">{c.client_name}</Link>
             <div className="text-sm text-slate-500">{c.client_code}</div>
             <div className="mt-3 text-sm text-slate-600">Examiner: {c.examiner_name}</div>
-            {c.notes && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{c.notes}</p>}
+            {c.notes && <p className="mt-3 rounded-[10px] bg-[#f6f8fc] p-3 text-sm text-slate-700">{c.notes}</p>}
           </Card>
           <Card title="Timeline">
             <form onSubmit={addNote} className="mb-4 flex gap-2">
-              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm" />
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" aria-label="Add a note" className={`${fieldClass} min-w-0 flex-1 py-1.5`} />
               <Button size="sm" disabled={!note.trim()}>Add</Button>
             </form>
-            <ol className="relative space-y-4 border-l border-slate-200 pl-5">
+            <ol className="relative space-y-4 border-l border-line pl-5">
               {c.timeline.slice().reverse().map((e) => {
                 const Icon = EVENT_ICON[e.kind] || MessageSquare
                 return (
                   <li key={e.id} className="relative">
-                    <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white">
+                    <span className="absolute -left-[29px] flex h-6 w-6 items-center justify-center rounded-full border border-line bg-white">
                       <Icon className="h-3.5 w-3.5 text-brand-600" />
                     </span>
                     <div className="text-sm text-slate-800">

@@ -7,6 +7,10 @@
 @custom-variant touch (@media (hover: none) and (pointer: coarse));
 @custom-variant can-hover (@media (hover: hover) and (pointer: fine));
 
+/* band: anything inside .on-band (the page header, which sits on the coloured
+   band) switches to the translucent white style. */
+@custom-variant band (&:where(.on-band, .on-band *));
+
 @theme {
   /* Brand blue (#0F6CBD) scale */
   --color-brand-50: #ebf3fc;
@@ -21,19 +25,29 @@
   --color-brand-900: #0c3b5e;
   --color-brand-950: #082338;
 
-  /* Screening results */
-  --color-ok-50: #f1faf1;
-  --color-ok-100: #dff6dd;
-  --color-ok-600: #107c10;
-  --color-ok-700: #0e700e;
-  --color-warn-50: #fff9f0;
-  --color-warn-100: #fdeacc;
-  --color-warn-600: #bc4b09;
-  --color-warn-700: #8a3707;
-  --color-bad-50: #fdf3f4;
-  --color-bad-100: #fde7e9;
-  --color-bad-600: #c50f1f;
-  --color-bad-700: #a80000;
+  /* Status colours (v3). Result colours are the same for every role:
+     Consistent = brand blue, Inconclusive = amber, Inconsistent = red. */
+  --color-ok-50: #f2faf5;
+  --color-ok-100: #e3f4ea;
+  --color-ok-600: #107c41;
+  --color-ok-700: #0b6a37;
+  --color-warn-50: #fff8ec;
+  --color-warn-100: #fff1db;
+  --color-warn-500: #e8950c;
+  --color-warn-600: #b25e00;
+  --color-warn-700: #8a4a00;
+  --color-bad-50: #fef4f6;
+  --color-bad-100: #fde7eb;
+  --color-bad-500: #d13438;
+  --color-bad-600: #c4314b;
+  --color-bad-700: #a4243b;
+
+  /* v3 surfaces and text */
+  --color-page: #f4f7fb;
+  --color-ink: #0b1b2e;
+  --color-muted: #5b6b80;
+  --color-line: #e3e9f1;
+  --color-track: #eef2f7;
 
   /* Larger type (v7): every size is a little bigger and easier to read. */
   --text-xs: 0.8125rem;
@@ -46,8 +60,9 @@
   --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Soft layered depth for cards and panels. */
-  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.05), 0 10px 28px -14px rgb(16 24 40 / 0.16);
+  /* Depth. soft: ordinary cards. raised: cards that overlap the coloured band. */
+  --shadow-soft: 0 2px 8px rgb(12 59 94 / 0.05);
+  --shadow-raised: 0 8px 24px rgb(12 59 94 / 0.1);
   --shadow-lift: 0 2px 6px rgb(16 24 40 / 0.06), 0 24px 44px -18px rgb(12 59 94 / 0.34);
 }
 
@@ -56,7 +71,46 @@ html {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-page text-slate-900 antialiased;
+}
+
+/* Role themes (v3). Set on the app root with data-role. Each role keeps its own
+   colour (Examiner blue, Admin indigo, Client teal) with the same lightness steps.
+   The band's second stop sits at 44% (not 36%) so the white page description
+   keeps at least 4.5:1 contrast on all three bands.
+   --role-band   header band behind the top bar and page header
+   --role-top    the band's top colour (rings around badges on the band)
+   --role-active active rail tile, selected segment text on the band
+   --role-chip   main stat icon chip
+   --role-soft   light tint for avatars and icon bubbles */
+.app-shell,
+[data-role="examiner"] {
+  --role-band: linear-gradient(180deg, #0e559c 0%, #1a65b2 44%, #5a92cb 64%, #bcd3ec 85%, #f4f7fb 100%);
+  --role-top: #0e559c;
+  --role-active: #0c3b5e;
+  --role-chip: linear-gradient(135deg, #2886de, #0f548c);
+  --role-soft: #cfe4fa;
+}
+[data-role="admin"] {
+  --role-band: linear-gradient(180deg, #1b2f7e 0%, #2b42a3 44%, #6877c6 64%, #c4caec 85%, #f4f7fb 100%);
+  --role-top: #1b2f7e;
+  --role-active: #172f73;
+  --role-chip: linear-gradient(135deg, #4f67d0, #1f3a93);
+  --role-soft: #d5dbf4;
+}
+[data-role="client"] {
+  --role-band: linear-gradient(180deg, #0a5c76 0%, #147597 44%, #57a1bc 64%, #bedde8 85%, #f4f7fb 100%);
+  --role-top: #0a5c76;
+  --role-active: #083f52;
+  --role-chip: linear-gradient(135deg, #1c9cc2, #0a5e7a);
+  --role-soft: #cde9f1;
+}
+.app-band {
+  background: var(--role-band);
+}
+/* A page-level loading spinner sits on the band, so it is white there. */
+.app-main > .fb-spinner {
+  color: rgb(255 255 255 / 0.85);
 }
 
 /* Sidebar colour per role, all in the ForgeBlock blue family. */
@@ -94,35 +148,24 @@ body {
   transition-duration: 220ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-/* Glass sidebar: the role gradient, see-through, blurring the colour blobs behind it.
-   When it lies over the white page (opened over it, or the phone drawer) it turns
-   almost solid so the white labels stay readable. */
-.sidebar-glass {
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
-  /* No right border or inner line: the gradient runs to the edge and the
-     content panel sits directly against it (see .app-content padding). */
+/* v3 sidebar: one floating white pill. */
+.pill-rail {
+  box-shadow: 0 10px 30px rgb(12 59 94 / 0.14);
 }
-.sidebar-glass.is-over {
-  --glass-a: 0.9;
+/* Opened over the page (peek, or the phone drawer): a deeper shadow. */
+.pill-rail.is-lifted {
+  box-shadow: 0 18px 48px rgb(12 59 94 / 0.24);
 }
-/* Opened over the content: a soft shadow on its right edge. */
-.sidebar-glass.is-lifted {
-  box-shadow: 8px 0 28px -10px rgb(0 0 0 / 0.35);
-}
-.sidebar-glass.sidebar-examiner {
-  background: linear-gradient(180deg, rgb(15 108 189 / var(--glass-a, 0.5)) 0%, rgb(12 79 140 / var(--glass-a, 0.55)) 55%, rgb(12 59 94 / var(--glass-a, 0.6)) 100%);
-}
-.sidebar-glass.sidebar-admin {
-  background: linear-gradient(180deg, rgb(31 58 147 / var(--glass-a, 0.5)) 0%, rgb(23 47 115 / var(--glass-a, 0.55)) 55%, rgb(16 31 77 / var(--glass-a, 0.6)) 100%);
-}
-.sidebar-glass.sidebar-client {
-  background: linear-gradient(180deg, rgb(11 122 156 / var(--glass-a, 0.5)) 0%, rgb(10 94 122 / var(--glass-a, 0.55)) 55%, rgb(8 63 82 / var(--glass-a, 0.6)) 100%);
+/* Short screens (laptops around 768px tall): slightly smaller tiles so the
+   admin's nine links still fit without scrolling the menu. */
+@media (max-height: 820px) {
+  .pill-rail .rail-tile { height: 38px; }
+  .pill-rail .rail-stack { gap: 4px; }
 }
 
 .nav-scroll {
   scrollbar-width: none;
-  mask-image: linear-gradient(#000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 12px), transparent);
 }
 .nav-scroll::-webkit-scrollbar {
   display: none;
@@ -454,9 +497,8 @@ html.lenis {
 }
 
 @media print {
-  aside, header.topbar { display: none !important; }
-  .app-blobs { display: none !important; }
+  aside, header.topbar, .app-band { display: none !important; }
   .app-shell { display: block !important; height: auto !important; overflow: visible !important; background: none !important; }
   .app-content { padding: 0 !important; height: auto !important; }
-  .app-panel, .app-scroll { overflow: visible !important; height: auto !important; margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+  .on-band, .on-band * { color: #0b1b2e !important; }
 }

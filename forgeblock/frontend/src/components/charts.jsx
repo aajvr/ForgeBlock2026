@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 
-// Status colours for screening results (always shown with a label).
-export const RESULT_COLORS = { consistent: '#107c10', inconclusive: '#e8a317', inconsistent: '#c50f1f' }
+// Result colours (v3, the same for every role; always shown with a label).
+export const RESULT_COLORS = { consistent: '#0f6cbd', inconclusive: '#e8950c', inconsistent: '#d13438' }
 const RESULT_LABELS = { consistent: 'Consistent', inconclusive: 'Inconclusive', inconsistent: 'Inconsistent' }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export function Legend({ items }) {
   return (
-    <div className="flex flex-wrap gap-4 text-xs text-slate-600">
+    <div className="flex flex-wrap gap-x-[18px] gap-y-1 text-[12.5px] text-[#4b5a6e]">
       {items.map((i) => (
         <span key={i.label} className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: i.color }} />
+          <span className="h-[9px] w-[9px] rounded-[3px]" style={{ background: i.color }} />
           {i.label}
         </span>
       ))}
@@ -18,84 +19,138 @@ export function Legend({ items }) {
   )
 }
 
-// Screenings per day, stacked by screening result, with a hover tooltip.
-export function StackedDays({ series, height = 180 }) {
+// A round step for the y axis, so the gridlines land on 1, 2, 5, 10, 20, 50 ...
+function niceStep(max) {
+  const raw = Math.max(1, max / 3)
+  const mag = 10 ** Math.floor(Math.log10(raw))
+  return [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw)
+}
+
+// "2026-11-01" -> "Nov 1"; other days just "2". The month shows on the first label and when it changes.
+function dayLabel(date, prevShown) {
+  const [, m, d] = date.split('-').map(Number)
+  const newMonth = !prevShown || prevShown.split('-')[1] !== date.split('-')[1]
+  return newMonth ? `${MONTHS[m - 1]} ${d}` : String(d)
+}
+
+// Screenings per day, stacked by screening result (v3): solid rounded bars,
+// light gridlines, legend chips and a dark tooltip. Each day can be focused
+// with the keyboard and reads out its counts.
+export function StackedDays({ series, height = 224 }) {
   const [hover, setHover] = useState(null)
   const keys = ['consistent', 'inconclusive', 'inconsistent']
   const max = Math.max(1, ...series.map((d) => d.total))
-  const W = 640
-  const H = height
-  const pad = { l: 28, r: 8, t: 8, b: 22 }
-  const bw = (W - pad.l - pad.r) / series.length
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / max)
-  const ticks = [0, Math.ceil(max / 2), max]
+  const step = niceStep(max)
+  const top = Math.ceil(max / step) * step
+  const ticks = Array.from({ length: top / step + 1 }, (_, i) => i * step)
+  const every = series.length > 16 ? 3 : 1
+  let prevShown = null
+  const labels = series.map((d, i) => {
+    if (i % every !== 0) return ''
+    const l = dayLabel(d.date, prevShown)
+    prevShown = d.date
+    return l
+  })
+  const say = (d) => `${d.date}: ${keys.map((k) => `${d[k]} ${RESULT_LABELS[k].toLowerCase()}`).join(', ')}`
   return (
-    <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Screenings per day by result">
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#e2e8f0" />
-            <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize="10" fill="#64748b">{t}</text>
-          </g>
-        ))}
-        {series.map((d, i) => {
-          let acc = 0
-          const x = pad.l + i * bw + bw * 0.18
-          const w = bw * 0.64
-          return (
-            <g key={d.date} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-              <rect x={pad.l + i * bw} y={pad.t} width={bw} height={H - pad.t - pad.b} fill={hover === i ? '#f1f5f9' : 'transparent'} />
-              {keys.map((k) => {
-                if (!d[k]) return null
-                const y0 = y(acc)
-                acc += d[k]
-                const y1 = y(acc)
-                return <rect key={k} x={x} y={y1 + 1} width={w} height={Math.max(0, y0 - y1 - 2)} rx="2" fill={RESULT_COLORS[k]} />
-              })}
-              {(i % Math.ceil(series.length / 7) === 0 || i === series.length - 1) && (
-                <text x={pad.l + i * bw + bw / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="#64748b">
-                  {d.date.slice(5)}
-                </text>
-              )}
-            </g>
-          )
-        })}
-      </svg>
-      {hover !== null && (
-        <div className="pointer-events-none absolute top-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md" style={{ left: `${((hover + 0.5) / series.length) * 100}%`, transform: 'translateX(-50%)' }}>
-          <div className="font-medium">{series[hover].date}</div>
-          {keys.map((k) => (
-            <div key={k} className="flex items-center gap-1.5 text-slate-600">
-              <span className="h-2 w-2 rounded-sm" style={{ background: RESULT_COLORS[k] }} /> {RESULT_LABELS[k]}: {series[hover][k]}
-            </div>
+    <div>
+      <Legend items={keys.map((k) => ({ label: RESULT_LABELS[k], color: RESULT_COLORS[k] }))} />
+      <div className="relative mt-4 flex" role="group" aria-label="Screenings per day by result">
+        {/* y axis */}
+        <div className="relative w-8 shrink-0 text-[11px] text-[#94a0b2]" style={{ height }} aria-hidden="true">
+          {ticks.map((t) => (
+            <span key={t} className="absolute right-2.5 -translate-y-1/2 tabular-nums" style={{ top: `${(1 - t / top) * 100}%` }}>{t}</span>
           ))}
         </div>
-      )}
-      <div className="mt-2">
-        <Legend items={keys.map((k) => ({ label: RESULT_LABELS[k], color: RESULT_COLORS[k] }))} />
+        <div className="min-w-0 flex-1">
+          <div className="relative" style={{ height }}>
+            {ticks.map((t) => (
+              <span key={t} className="absolute inset-x-0 h-px bg-track" style={{ top: `${(1 - t / top) * 100}%` }} aria-hidden="true" />
+            ))}
+            <div className="absolute inset-0 flex items-end gap-[3%] px-1 sm:gap-2">
+              {series.map((d, i) => (
+                <div
+                  key={d.date}
+                  tabIndex={0}
+                  aria-label={say(d)}
+                  onMouseEnter={() => setHover(i)}
+                  onMouseLeave={() => setHover(null)}
+                  onFocus={() => setHover(i)}
+                  onBlur={() => setHover(null)}
+                  className="flex h-full min-w-0 flex-1 cursor-default items-end justify-center rounded-md outline-none focus-visible:bg-brand-50"
+                >
+                  <div
+                    className={`flex w-full max-w-[24px] flex-col-reverse gap-[2px] transition-shadow ${hover === i ? 'rounded-[6px] shadow-[0_0_0_3px_rgb(15_108_189/0.18)]' : ''}`}
+                    style={{ height: `${(d.total / top) * 100}%` }}
+                  >
+                    {keys.map((k) => (d[k] ? (
+                      <span key={k} className="block min-h-[3px] rounded-[3px] first:rounded-b-[3px] last:rounded-t-[6px]" style={{ flexGrow: d[k], background: RESULT_COLORS[k] }} />
+                    ) : null))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {hover !== null && (
+              <div
+                className="pointer-events-none absolute bottom-full z-10 mb-[-24px] flex -translate-x-1/2 flex-col gap-[3px] whitespace-nowrap rounded-[10px] px-[13px] py-2.5 text-[12px] text-white shadow-[0_10px_24px_rgb(12_59_94/0.3)]"
+                style={{
+                  background: 'var(--role-active)',
+                  left: `clamp(70px, ${((hover + 0.5) / series.length) * 100}%, calc(100% - 70px))`,
+                }}
+                aria-hidden="true"
+              >
+                <b className="text-[13px] font-semibold">{dayLabel(series[hover].date, null)}</b>
+                {keys.map((k) => (
+                  <span key={k} className="flex items-center">
+                    <i className="mr-1.5 inline-block h-[9px] w-[9px] rounded-[3px]" style={{ background: RESULT_COLORS[k] }} />
+                    {series[hover][k]} {RESULT_LABELS[k].toLowerCase()}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* x axis */}
+          <div className="mt-2 flex gap-[3%] px-1 sm:gap-2" aria-hidden="true">
+            {labels.map((l, i) => (
+              <span key={series[i].date} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-center text-[10.5px] text-[#94a0b2]">{l}</span>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
-// Horizontal bars with labels (single series, no legend needed).
+// Horizontal bars (v3): an optional icon bubble, the label and count on one line,
+// and a thin bar under them. With `to` the row links to the matching records.
+// rows: [{ label, value, color, to, icon, tint }]
 export function HBars({ rows, color = '#0f6cbd' }) {
   const max = Math.max(1, ...rows.map((r) => r.value))
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {rows.map((r) => {
+        const Icon = r.icon
         const inner = (
           <>
-            <span className={`truncate ${r.to ? 'text-brand-700 group-hover:underline' : 'text-slate-600'}`}>{r.label}</span>
-            <div className="h-2.5 rounded-full bg-slate-100">
-              <div className="h-full rounded-full" style={{ width: `${(r.value / max) * 100}%`, background: r.color || color }} />
-            </div>
-            <span className="text-right tabular-nums text-slate-700">{r.value}</span>
+            {Icon && (
+              <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] ${r.tint || 'bg-brand-50 text-brand-600'}`}>
+                <Icon className="h-4 w-4" aria-hidden="true" />
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline justify-between gap-3 text-[13.5px]">
+                <span className={`truncate text-ink ${r.to ? 'group-hover:text-brand-700 group-hover:underline' : ''}`}>{r.label}</span>
+                <b className="font-semibold tabular-nums text-ink">{r.value}</b>
+              </span>
+              <span className="mt-1.5 block h-[7px] overflow-hidden rounded-full bg-track">
+                <span className="block h-full rounded-full" style={{ width: `${(r.value / max) * 100}%`, background: r.color || color }} />
+              </span>
+            </span>
           </>
         )
-        const cls = 'grid grid-cols-[120px_1fr_40px] items-center gap-3 text-sm'
+        const cls = 'flex items-center gap-3 rounded-[10px] py-1.5'
         return r.to ? (
-          <Link key={r.label} to={r.to} className={`group -mx-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-slate-50 ${cls}`} title={`${r.label}: ${r.value}. Open these records`}>{inner}</Link>
+          <Link key={r.label} to={r.to} className={`group -mx-2 px-2 transition-colors hover:bg-[#f5f8fc] focus-visible:outline-2 focus-visible:outline-brand-600 ${cls}`} title={`${r.label}: ${r.value}. Open these records`}>{inner}</Link>
         ) : (
           <div key={r.label} className={cls} title={`${r.label}: ${r.value}`}>{inner}</div>
         )

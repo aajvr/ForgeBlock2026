@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import ResultView, { DetailsToggle, KeyFacts, LedgerBlockValue, PenDataNote, ResultHeader } from '../components/ResultView'
+import ResultView, { KeyFacts, LedgerBlockValue, PenDataNote, ResultHeader } from '../components/ResultView'
 import { Alert, Badge, FindingBadge, PageHeader, Spinner, fmtDate } from '../components/ui'
 
 // What a client sees of a screening on a document in their name: the result,
@@ -16,8 +16,9 @@ function ClientResult({ r }) {
       : r.screening_result === 'consistent' ? 'Not needed' : 'Not reviewed'
   return (
     <div className="space-y-5">
-      <ResultHeader r={r} whose="your" />
       <PenDataNote r={r} />
+      <div className="grid items-stretch gap-5 lg:grid-cols-[1.35fr_1fr]">
+      <ResultHeader r={r} whose="your" client />
       <KeyFacts facts={[
         ['Client', r.client_name || r.client_code || '-'],
         ['Examiner’s decision', decision],
@@ -27,24 +28,24 @@ function ClientResult({ r }) {
         ['Document', r.document_ref || r.case_code || 'Not given'],
         ['Screened by', r.examiner_name || '-'],
       ]}>
-        <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">The screening result supports the examiner. The examiner’s decision is final.</p>
+        <p className="border-t border-track pt-3.5 text-[12.5px] text-muted">The screening result supports the examiner. The examiner’s decision is final.</p>
       </KeyFacts>
-      <DetailsToggle tabs={[{ value: 'ledger', label: 'Ledger proof' }]}>
-        {() => (
-          <>
-            <div className="flex items-start gap-3">
-              {r.integrity?.valid ? <ShieldCheck className="h-6 w-6 shrink-0 text-ok-600" /> : <ShieldAlert className="h-6 w-6 shrink-0 text-bad-600" />}
-              <p className="text-sm text-slate-700">
-                {r.integrity?.valid
-                  ? `This screening is sealed in ledger block #${r.block?.block_index}. The record has not been changed since it was made.`
-                  : 'This record could not be verified against the ledger. Please report a problem.'}
-              </p>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">Anyone can check the receipt code on the sign-in page.</p>
-          </>
-        )}
-      </DetailsToggle>
-      <p className="text-sm text-slate-500">{r.disclaimer}</p>
+      </div>
+      <section className="flex items-start gap-3.5 rounded-[16px] border border-line bg-white px-5 py-5 shadow-soft sm:px-[22px]" aria-label="Ledger proof">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] ${r.integrity?.valid ? 'bg-ok-100 text-ok-600' : 'bg-bad-100 text-bad-600'}`}>
+          {r.integrity?.valid ? <ShieldCheck className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[17px] font-semibold text-ink">Ledger proof</h2>
+          <p className="mt-1 text-sm text-slate-700">
+            {r.integrity?.valid
+              ? `This screening is sealed in ledger block #${r.block?.block_index}. The record has not been changed since it was made.`
+              : 'This record could not be verified against the ledger. Please report a problem.'}
+          </p>
+          <p className="mt-2 text-[12.5px] text-muted">Anyone can check the receipt code on the sign-in page.</p>
+        </div>
+      </section>
+      <p className="mx-0.5 text-[13px] text-muted">{r.disclaimer}</p>
     </div>
   )
 }
@@ -63,7 +64,7 @@ export default function Record() {
   if (!r) return <Spinner label="Loading result…" />
   return (
     <>
-      <button onClick={() => navigate(-1)} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800">
+      <button onClick={() => navigate(-1)} className="mb-2.5 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-white/85 hover:text-white">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
       <PageHeader

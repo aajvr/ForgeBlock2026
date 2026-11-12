@@ -25,10 +25,10 @@ export default function ClientHome() {
           <MessageSquareWarning className="h-4 w-4" /> Report a problem
         </Button>
       </PageHeader>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-tour="home-stats">
-        <Stat label="Your examiner" value={<span className="text-lg">{c.assigned_examiner ? c.assigned_examiner.full_name : 'Not assigned yet'}</span>}
-          hint={c.assigned_examiner ? `${c.assigned_examiner.account_code}${c.group_name ? ` · ${c.group_name}` : ''}` : undefined} icon={UserCheck} tone="teal" />
-        <Stat label="Static signatures on file" value={c.static_count} hint={<StrengthBadge strength={c.static_strength} />} icon={FileSignature} />
+      <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" data-tour="home-stats">
+        <Stat label="Your examiner" value={<span className="block truncate text-[22px] leading-[36px] tracking-[-0.01em]">{c.assigned_examiner ? c.assigned_examiner.full_name : 'Not assigned yet'}</span>}
+          hint={c.assigned_examiner ? `${c.assigned_examiner.account_code}${c.group_name ? ` · ${c.group_name}` : ''}` : undefined} icon={UserCheck} />
+        <Stat label="Static signatures on file" value={c.static_count} hint={<StrengthBadge strength={c.static_strength} />} icon={FileSignature} tone="sky" />
         <Stat label="Dynamic signatures on file" value={c.dynamic_count} hint={<StrengthBadge strength={c.dynamic_strength} />} icon={FileSignature} tone="violet" />
         <Stat label="Screenings on your documents" value={c.checks.length} icon={ScanSearch} tone="green" />
       </div>
@@ -38,14 +38,21 @@ export default function ClientHome() {
         ) : (
           <Table head={['Document', 'Module', 'Screening', 'Examiner', 'Examiner’s decision', 'Receipt', 'Date']}>
             {c.checks.map((k) => (
-              <tr key={k.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/app/records/${k.id}`)}>
-                <td className={td}>{k.document || <span className="text-slate-500">Screening</span>}{k.case_code && <span className="ml-1 text-xs text-slate-500">({k.case_code})</span>}</td>
+              <tr
+                key={k.id}
+                tabIndex={0}
+                aria-label={`Open the screening ${k.receipt_code}`}
+                className="cursor-pointer outline-none hover:bg-[#f7fafd] focus-visible:bg-brand-50"
+                onClick={() => navigate(`/app/records/${k.id}`)}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/app/records/${k.id}`)}
+              >
+                <td className={`${td} font-medium text-ink`}>{k.document || <span className="font-normal text-muted">Screening</span>}{k.case_code && <span className="ml-1 text-xs font-normal text-muted">({k.case_code})</span>}</td>
                 <td className={td}><Badge tone={k.modality === 'static' ? 'blue' : 'violet'}>{k.modality === 'static' ? 'Static' : 'Dynamic'}</Badge></td>
                 <td className={td}><ScreeningBadge value={k.screening_result} /></td>
-                <td className={td}>{k.examiner_name || '-'}</td>
+                <td className={`${td} whitespace-nowrap`}>{k.examiner_name || '-'}</td>
                 <td className={td}>{k.case_code ? (k.finding && k.case_status !== 'open' ? <FindingBadge value={k.finding} /> : <span className="text-sm text-slate-500">Being examined</span>) : <span className="text-sm text-slate-400">{k.screening_result === 'consistent' ? 'Not needed' : 'Not reviewed'}</span>}</td>
-                <td className={`${td} font-mono text-xs`}>{k.receipt_code}</td>
-                <td className={`${td} text-slate-500`}>{fmtDate(k.created_at)}</td>
+                <td className={`${td} whitespace-nowrap font-mono text-[13px] text-ink`}>{k.receipt_code}</td>
+                <td className={`${td} whitespace-nowrap text-muted`}>{fmtDate(k.created_at)}</td>
               </tr>
             ))}
           </Table>

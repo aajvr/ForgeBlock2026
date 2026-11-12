@@ -1,7 +1,7 @@
 import { BookOpen, ChevronDown, Compass, Search } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../auth'
-import { Button, Card, PageHeader } from '../components/ui'
+import { Button, Card, PageHeader, fieldClass } from '../components/ui'
 
 // Questions shown only in study mode (research labels on).
 const STUDY_FAQ = {
@@ -80,7 +80,7 @@ export default function Help() {
       </PageHeader>
       <div className="relative mb-6 max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the help articles" className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the help articles" aria-label="Search the help articles" className={`${fieldClass} w-full rounded-[12px] py-3 pl-10 pr-4 shadow-raised`} />
       </div>
       <div className="space-y-6">
         {topics.length === 0 && <p className="text-sm text-slate-500">No articles match “{q}”.</p>}
@@ -91,7 +91,7 @@ export default function Help() {
                 const isOpen = open === question || !!term
                 return (
                   <li key={question}>
-                    <button onClick={() => setOpen(open === question ? null : question)} className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left text-[15px] font-medium hover:bg-slate-50">
+                    <button onClick={() => setOpen(open === question ? null : question)} className="flex w-full items-center justify-between gap-3 px-[22px] py-3.5 text-left text-[15px] font-medium text-ink transition-colors hover:bg-[#f7fafd]">
                       {question}
                       <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${isOpen ? 'rotate-180' : ''}`} />
                     </button>

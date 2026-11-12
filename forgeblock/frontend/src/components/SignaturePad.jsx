@@ -119,11 +119,11 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 220, penOnly = 
 
   return (
     <div>
-      <div className="relative rounded-xl border-2 border-dashed border-slate-300 bg-white">
+      <div className="relative rounded-[12px] border-2 border-dashed border-[#cfd8e3] bg-white">
         <canvas
           ref={canvasRef}
           style={{ height, touchAction: 'none' }}
-          className="block w-full cursor-crosshair rounded-xl"
+          className="block w-full cursor-crosshair rounded-[12px]"
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import { bandButton } from './ui'
 
 const POLL_MS = 30000
 const PAGE = 15
@@ -109,21 +110,21 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={toggle}
-        className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+        className={bandButton}
         aria-label={data.unread ? `Notifications, ${data.unread} unread` : 'Notifications'}
         aria-expanded={open}
         aria-haspopup="dialog"
         data-tour="notifications"
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-[19px] w-[19px]" />
         {data.unread > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-bad-600 px-1 text-[11px] font-semibold text-white ring-2 ring-white">
+          <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bad-500 px-1 text-[10.5px] font-semibold text-white ring-2 ring-[var(--role-top)]">
             {badge}
           </span>
         )}
       </button>
       {open && (
-        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-11 z-40 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-40 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[16px] border border-line bg-white text-ink shadow-xl">
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
             <div className="text-sm font-semibold text-slate-900">Notifications</div>
             {data.unread > 0 && (
@@ -143,7 +144,7 @@ export default function NotificationBell() {
                 const t = TYPES[n.type] || TYPES.info
                 return (
                   <li key={n.id}>
-                    <button onClick={() => openItem(n)} className={`flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50 ${n.read ? '' : 'bg-brand-50/40'}`}>
+                    <button onClick={() => openItem(n)} className={`flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[#f7fafd] ${n.read ? '' : 'bg-brand-50/50'}`}>
                       <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${t.tone}`}><t.Icon className="h-4 w-4" /></span>
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-sm ${n.read ? 'text-slate-700' : 'font-semibold text-slate-900'}`}>{n.title || n.text}</span>

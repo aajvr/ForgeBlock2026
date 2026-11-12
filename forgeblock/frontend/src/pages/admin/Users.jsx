@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
 import { useConfirm } from '../../components/ConfirmDialog'
-import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, fmtDate, td } from '../../components/ui'
+import { Alert, Badge, Button, Card, ConfirmDialog, Field, Input, Modal, PageHeader, Segmented, Select, Spinner, Table, compactFieldClass, fieldClass, fmtDate, td } from '../../components/ui'
 
 const ROLE_NAME = { admin: 'Administrator', examiner: 'Examiner', client: 'Client' }
 
@@ -22,9 +22,9 @@ function Credentials({ rows }) {
   return (
     <div>
       <Alert kind="warn" className="mb-3">Copy these temporary passwords now. They are shown only once; users must change them at first sign-in.</Alert>
-      <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200">
+      <div className="max-h-80 overflow-y-auto rounded-[12px] border border-line">
         <table className="w-full text-sm">
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-track">
             {rows.map((r) => (
               <tr key={r.email}>
                 <td className="px-3 py-2 font-medium">{r.account_code}</td>
@@ -187,7 +187,7 @@ export default function Users() {
       <Card bodyClass="p-0" data-tour="users-list">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
           <Segmented value={role} onChange={setRole} options={[{ value: '', label: 'All' }, { value: 'admin', label: 'Admins' }, { value: 'examiner', label: 'Examiners' }, { value: 'client', label: 'Clients' }]} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or code" className="ml-auto w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email or code" aria-label="Search name, email or code" className={`${fieldClass} w-full sm:ml-auto sm:w-64`} />
         </div>
         {patchError && <Alert className="mx-5 my-3">{patchError}</Alert>}
         {!users ? <Spinner /> : (
@@ -195,15 +195,15 @@ export default function Users() {
             {users.map((u) => (
               <tr key={u.id}>
                 <td className={td}><div className="font-medium">{u.full_name}</div><div className="text-xs text-slate-500">{u.email}{u.client_code ? ` · ${u.client_code}` : ''}</div></td>
-                <td className={`${td} font-mono text-xs`}>{u.account_code}</td>
+                <td className={`${td} whitespace-nowrap font-mono text-xs`}>{u.account_code}</td>
                 <td className={td}>
-                  <select value={u.role} disabled={u.id === me.id} onChange={(e) => changeRole(u, e.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-xs">
+                  <select value={u.role} disabled={u.id === me.id} onChange={(e) => changeRole(u, e.target.value)} aria-label={`Role of ${u.full_name}`} className={compactFieldClass}>
                     <option value="admin" disabled={u.is_test_account}>Administrator</option>
                     <option value="examiner">Examiner</option>
                     <option value="client">Client</option>
                   </select>
                 </td>
-                <td className={`${td} text-sm`}>
+                <td className={`${td} whitespace-nowrap text-sm`}>
                   {u.role === 'examiner' ? (u.group_name || <span className="text-warn-700">No group</span>)
                     : u.role === 'client' ? <span className="text-slate-500">{u.client_code || '-'}</span>
                       : <span className="text-slate-400">-</span>}
@@ -217,7 +217,7 @@ export default function Users() {
                     {me.study_mode && !u.must_change_password && !u.research_use_accepted && <Badge tone="gray">terms not accepted</Badge>}
                   </div>
                 </td>
-                <td className={`${td} text-xs text-slate-500`}>{fmtDate(u.last_login)}</td>
+                <td className={`${td} min-w-[6.5rem] text-xs text-slate-500`}>{fmtDate(u.last_login)}</td>
                 <td className={`${td} text-right`}>
                   <div className="flex justify-end gap-1">
                     {u.locked && <Button size="sm" variant="ghost" onClick={async () => { await api.post(`/api/admin/users/${u.id}/unlock`); load() }}><Unlock className="h-3.5 w-3.5" /> Unlock</Button>}

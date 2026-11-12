@@ -26,8 +26,8 @@ function ModelView({ file }) {
   }, [file])
   if (!file) return null
   return (
-    <div className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[140px_1fr]">
-      {url ? <img src={url} alt="Preprocessed signature" className="h-[140px] w-[140px] rounded-md border border-slate-200 bg-white" /> : <div className="h-[140px] w-[140px] animate-pulse rounded-md bg-slate-200" />}
+    <div className="grid gap-4 rounded-[12px] border border-line bg-[#f6f8fc] p-4 sm:grid-cols-[140px_1fr]">
+      {url ? <img src={url} alt="Preprocessed signature" className="h-[140px] w-[140px] rounded-[10px] border border-line bg-white" /> : <div className="h-[140px] w-[140px] animate-pulse rounded-md bg-slate-200" />}
       <div className="text-sm">
         <div className="flex items-center gap-1.5 font-medium"><Eye className="h-4 w-4 text-brand-600" /> What the model sees</div>
         <p className="mt-1 text-slate-600">Cleaned (illumination, contrast, sharpening), cropped to the signature and resized to 224 × 224.</p>

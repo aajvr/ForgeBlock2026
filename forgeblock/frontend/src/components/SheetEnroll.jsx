@@ -155,8 +155,8 @@ export default function SheetEnroll({ client, onDone, onDirty }) {
                   type="button"
                   onClick={() => toggle(b)}
                   disabled={b.empty}
-                  className={`relative rounded-xl border-2 bg-white p-2 text-left transition ${
-                    on ? 'border-brand-500 shadow-sm' : 'border-slate-200 opacity-60 hover:opacity-90'
+                  className={`relative rounded-[12px] border-2 bg-white p-2 text-left transition ${
+                    on ? 'border-brand-500 shadow-sm' : 'border-line opacity-60 hover:opacity-90'
                   } ${b.empty ? 'cursor-not-allowed' : ''}`}
                 >
                   <span className={`absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-md border ${on ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'}`}>

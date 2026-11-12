@@ -95,7 +95,7 @@ export default function StrokeReplay({ strokes, title, height = 180, speed = 1, 
   return (
     <div>
       {title && <div className="mb-1 text-xs font-medium text-slate-500">{title}</div>}
-      <div className="rounded-lg border border-slate-200 bg-white">
+      <div className="rounded-[12px] border border-line bg-white">
         <canvas ref={canvasRef} style={{ height }} className="block w-full" />
       </div>
       <div className="mt-1 flex justify-between text-[12.5px] text-slate-400">
@@ -112,10 +112,10 @@ export function ReplayControls({ playing, setPlaying, speed, setSpeed, onRestart
       <button onClick={() => setPlaying(!playing)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700">
         {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />} {playing ? 'Pause' : 'Replay'}
       </button>
-      <button onClick={onRestart} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50">
+      <button onClick={onRestart} className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#dde3ec] bg-white px-3 py-1.5 text-xs font-semibold text-[#3b4a5e] hover:bg-slate-50">
         <RotateCcw className="h-3.5 w-3.5" /> Show full
       </button>
-      <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
+      <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="Replay speed" className="rounded-[8px] border border-[#dde3ec] bg-white px-2 py-1.5 text-xs outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100">
         <option value={0.5}>0.5× speed</option>
         <option value={1}>1× (real time)</option>
         <option value={2}>2× speed</option>

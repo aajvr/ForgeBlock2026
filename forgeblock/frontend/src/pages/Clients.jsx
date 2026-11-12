@@ -33,13 +33,14 @@ import {
   fmtDate,
   fmtDay,
   td,
+  fieldClass,
 } from '../components/ui'
 
 // A client account's sign-in details, shown once after it is created.
 export function AccountCreated({ account }) {
   if (!account) return null
   return (
-    <div className="rounded-xl border border-ok-100 bg-ok-50 p-4 text-sm">
+    <div className="rounded-[12px] border border-ok-100 bg-ok-50 p-4 text-sm">
       <div className="font-semibold text-ok-700">Client account created</div>
       <p className="mt-1 text-slate-700">Give these to the client. The temporary password is shown only once; they change it at first sign-in, or they can sign in with Microsoft or Google using this email.</p>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
@@ -134,7 +135,7 @@ function NewClientModal({ open, onClose, groups, defaultGroup }) {
         {study && (user.is_test_account ? (
           <Alert kind="info">Test accounts register practice clients only (PR- code).</Alert>
         ) : (
-          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm">
+          <label className="flex items-start gap-2 rounded-[12px] border border-line p-3 text-sm">
             <input type="checkbox" className="mt-0.5" checked={form.is_practice} onChange={(e) => setForm({ ...form, is_practice: e.target.checked })} />
             <span>
               <span className="font-medium">Practice client</span>
@@ -143,7 +144,7 @@ function NewClientModal({ open, onClose, groups, defaultGroup }) {
           </label>
         ))}
         {study && (
-          <label className="flex items-start gap-2 rounded-lg border border-warn-100 bg-warn-50 p-3 text-sm">
+          <label className="flex items-start gap-2 rounded-[12px] border border-[#f4d49c] bg-warn-50 p-3 text-sm">
             <input type="checkbox" className="mt-0.5" checked={ack} onChange={(e) => setAck(e.target.checked)} required />
             <span>The signatures I add will be samples prepared by the researchers or made-up practice signatures, not my own or anyone else's legal signature.</span>
           </label>
@@ -324,7 +325,7 @@ function RowMenu({ menu, onClose, onDelete, onMove, isAdmin }) {
   return (
     <div
       ref={ref}
-      className="fixed z-50 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl"
+      className="fixed z-50 w-56 rounded-[12px] border border-line bg-white p-1 shadow-xl"
       style={{ top: Math.min(menu.y, window.innerHeight - 260), left: Math.min(menu.x, window.innerWidth - 240) }}
       role="menu"
     >
@@ -353,15 +354,15 @@ const folderStyle = (group) => {
 // The bar at the top of a folder: group name and its assigned examiner.
 function FolderHeader({ group, isAdmin, onEdit, onDelete, mine }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200/70 bg-white px-5 py-4 shadow-soft" style={folderStyle(group)}>
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[linear-gradient(150deg,var(--folder),var(--folder-deep))] text-white shadow-sm"><FolderOpen className="h-6 w-6" /></span>
+    <div className="mb-5 flex flex-wrap items-center gap-4 rounded-[16px] border border-line bg-white px-5 py-4 shadow-raised" style={folderStyle(group)}>
+      <span className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[linear-gradient(150deg,var(--folder),var(--folder-deep))] text-white shadow-sm"><FolderOpen className="h-6 w-6" /></span>
       <div className="min-w-0">
         <div className="text-xl font-semibold tracking-tight">{group ? group.name : 'Clients without a group'}</div>
         {group?.description && <div className="text-sm text-slate-600">{group.description}</div>}
       </div>
       <div className="ml-auto flex flex-wrap items-center gap-3">
         {group && (
-          <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-[12px] bg-[#f6f8fc] px-3 py-2">
             {group.examiner ? (
               <>
                 <Avatar name={group.examiner.full_name} size="h-8 w-8 text-xs" />
@@ -570,7 +571,7 @@ export default function Clients() {
           onDelete={() => deleteGroup(group)} />
       ) : null)}
       <div className="mb-4">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} className="w-full max-w-sm rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} aria-label={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} className={`${fieldClass} w-full max-w-sm shadow-raised`} />
       </div>
       {showGrid ? (
         <FolderGrid data={groups} clients={clients} onOpen={open_} onNew={() => setEditGroup('new')} />
@@ -635,7 +636,7 @@ function RefTile({ p, modality, onRemove, selecting = false, selected = false, o
     if (modality === 'dynamic') api.get(`/api/references/${p.id}/strokes`).then((d) => setStrokes(d.strokes)).catch(() => {})
   }, [p.id, modality])
   const border = selected ? 'border-brand-600 bg-brand-50/60 ring-2 ring-brand-600'
-    : p.flagged ? 'border-warn-600 bg-white' : 'border-slate-200 bg-white'
+    : p.flagged ? 'border-warn-600 bg-white' : 'border-line bg-white'
   const selectProps = selecting
     ? {
         role: 'checkbox',
@@ -652,7 +653,7 @@ function RefTile({ p, modality, onRemove, selecting = false, selected = false, o
       }
     : {}
   return (
-    <div className={`group relative rounded-lg border p-2 transition-colors ${border} ${selecting ? 'cursor-pointer select-none' : ''}`} {...selectProps}>
+    <div className={`group relative rounded-[12px] border p-2 transition-colors ${border} ${selecting ? 'cursor-pointer select-none' : ''}`} {...selectProps}>
       {selecting && (
         <span aria-hidden className={`absolute left-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-md border-2 shadow-sm transition-colors ${selected ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'}`}>
           {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
@@ -798,7 +799,7 @@ function DynamicEnroll({ client, onDone, onDirty }) {
       {samples.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {samples.map((s, i) => (
-            <div key={i} className="rounded-md border border-slate-200 bg-white p-1">
+            <div key={i} className="rounded-[8px] border border-line bg-white p-1">
               <StrokePreview strokes={s} className="h-10 w-24" />
               {penMissing(s).length > 0 && <LimitedPenBadge missing={penMissing(s)} className="mt-1" />}
             </div>
@@ -996,7 +997,7 @@ export function ClientDetail() {
               <Empty>No {tab} references yet.</Empty>
             )}
             {selecting && (
-              <div role="toolbar" aria-label="Selected references" className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-xl backdrop-blur">
+              <div role="toolbar" aria-label="Selected references" className="sticky bottom-4 z-20 flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-white/95 px-4 py-2.5 shadow-xl backdrop-blur">
                 <span className="mr-auto text-sm font-semibold text-slate-900">{selected.size} selected</span>
                 <Button variant="ghost" size="sm" onClick={() => setSelected(new Set(refs.map((r) => r.id)))} disabled={selected.size === refs.length}>Select all</Button>
                 <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} disabled={!selected.size}>Clear</Button>

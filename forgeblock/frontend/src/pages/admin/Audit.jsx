@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api } from '../../api'
 import { Combobox, FilterChip } from '../../components/Combobox'
 import { patchParams } from '../../components/params'
-import { Avatar, Badge, Card, PageHeader, Spinner, Table, fmtDate, td } from '../../components/ui'
+import { Avatar, Badge, Card, PageHeader, Spinner, Table, fieldClass, fmtDate, td } from '../../components/ui'
 
 const TYPES = ['login', 'login_failed', 'lockout', 'password', 'account', 'client', 'enrollment', 'case', 'screening', 'compare', 'finding', 'ledger', 'tamper_demo', 'settings', 'model', 'retention', 'report', 'deletion']
 const TONE = { lockout: 'red', login_failed: 'amber', tamper_demo: 'red', deletion: 'red', retention: 'amber', finding: 'violet', screening: 'blue' }
@@ -83,11 +83,11 @@ export default function Audit() {
       <Card bodyClass="p-0">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-3">
           <Combobox label="Who" anyLabel="Anyone" placeholder="Search people" value={who} onChange={set('who')} options={options} extra={extra} tabs={tabs} className="w-64" />
-          <select value={type} onChange={(e) => set('type')(e.target.value)} aria-label="Activity type" className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+          <select value={type} onChange={(e) => set('type')(e.target.value)} aria-label="Activity type" className={fieldClass}>
             <option value="">All activity</option>
             {TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
           </select>
-          <input value={q} onChange={(e) => set('q')(e.target.value)} placeholder="Search descriptions" className="ml-auto w-64 rounded-lg border border-slate-300 px-3 py-1.5 text-sm" />
+          <input value={q} onChange={(e) => set('q')(e.target.value)} placeholder="Search descriptions" aria-label="Search descriptions" className={`${fieldClass} w-full sm:ml-auto sm:w-64`} />
         </div>
         {(who || type) && (
           <div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-2">

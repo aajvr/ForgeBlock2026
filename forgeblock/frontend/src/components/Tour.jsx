@@ -216,7 +216,7 @@ function ExampleTag() {
 function Demo({ kind, play, reduced }) {
   if (kind === 'screen' || kind === 'enroll') {
     return (
-      <div className="relative mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-hidden>
+      <div className="relative mt-3 rounded-[12px] border border-line bg-[#f6f8fc] p-3" aria-hidden>
         <div className="absolute right-2 top-2"><ExampleTag /></div>
         <div className="mb-1 text-[11.5px] font-medium text-slate-500">{kind === 'screen' ? 'Questioned signature' : 'Reference signatures'}</div>
         {kind === 'screen' ? (
@@ -238,7 +238,7 @@ function Demo({ kind, play, reduced }) {
   const on = play || reduced
   return (
     <div
-      className="relative mt-3 rounded-xl border border-ok-100 bg-gradient-to-br from-ok-50 to-white p-3"
+      className="relative mt-3 rounded-[12px] border border-line bg-white p-3"
       style={{ opacity: on ? 1 : 0, transition: reduced ? `opacity ${T_FADE}ms ease` : `opacity 600ms ${EASE}` }}
       aria-hidden
     >
@@ -427,7 +427,7 @@ export default function Tour({ kind = 'full' }) {
     : reduced ? `opacity ${T_FADE}ms ease`
       : card.visible ? `opacity ${T_IN}ms ${EASE}, transform ${T_IN}ms ${EASE}` : `opacity ${T_OUT}ms ease`
   const cardTransform = reduced || card.visible ? 'none' : `translate(${fx}px, ${fy}px)`
-  const btn = 'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-default disabled:opacity-50'
+  const btn = 'inline-flex items-center gap-1 rounded-[10px] px-3 py-2 text-sm font-semibold transition disabled:cursor-default disabled:opacity-50'
 
   return (
     <div
@@ -452,7 +452,7 @@ export default function Tour({ kind = 'full' }) {
       <div
         ref={cardRef}
         aria-live="polite"
-        className="absolute rounded-2xl bg-white p-5 shadow-2xl"
+        className="absolute rounded-[16px] border border-line bg-white p-5 shadow-2xl"
         style={{
           top: card.top,
           left: card.left,
@@ -472,7 +472,7 @@ export default function Tour({ kind = 'full' }) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
+        <h3 className="mt-1 text-[17px] font-semibold text-ink">{step.title}</h3>
         <p className="mt-1 text-[15px] leading-relaxed text-slate-600">{step.text}</p>
         {step.demo && <Demo key={i} kind={step.demo} play={settled} reduced={reduced} />}
         <div className="mt-4 flex items-center gap-1.5" aria-label={`Step ${i + 1} of ${steps.length}`}>
@@ -484,14 +484,14 @@ export default function Tour({ kind = 'full' }) {
           <button onClick={close} className="text-sm text-slate-500 hover:text-slate-800">Skip</button>
           <div className="flex gap-2">
             {i > 0 && (
-              <button onClick={() => goTo(i - 1, -1)} disabled={busy} className={`${btn} border border-slate-300 hover:bg-slate-50`}>
+              <button onClick={() => goTo(i - 1, -1)} disabled={busy} className={`${btn} border border-line text-[#3b4a5e] hover:bg-slate-50`}>
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>
             )}
             <button
               onClick={() => (last ? close() : goTo(i + 1, 1))}
               disabled={busy}
-              className={`${btn} bg-brand-600 px-4 text-white hover:bg-brand-700`}
+              className={`${btn} bg-brand-600 px-4 text-white shadow-[0_4px_12px_rgb(15_108_189/0.22)] hover:bg-brand-700`}
             >
               {last ? 'Finish' : 'Next'} {!last && <ArrowRight className="h-4 w-4" />}
             </button>

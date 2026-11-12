@@ -45,13 +45,13 @@ export default function ImagePicker({ label, files, onChange, multiple = false, 
           setDrag(false)
           take(e.dataTransfer.files)
         }}
-        className={`flex min-h-36 cursor-pointer flex-wrap items-center justify-center gap-3 rounded-xl border-2 border-dashed p-4 transition ${
-          drag ? 'border-brand-500 bg-brand-50' : 'border-slate-300 bg-white hover:border-brand-400'
+        className={`flex min-h-36 cursor-pointer flex-wrap items-center justify-center gap-3 rounded-[12px] border-2 border-dashed p-4 transition ${
+          drag ? 'border-brand-500 bg-brand-50' : 'border-[#cfd8e3] bg-[#fbfcfe] hover:border-brand-400'
         }`}
       >
         {previews.length ? (
           previews.map((u, i) => (
-            <div key={u} className="relative rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+            <div key={u} className="relative rounded-[8px] border border-line bg-white p-1 shadow-sm">
               <img src={u} alt="" className={`${multiple ? 'h-16' : 'h-32'} object-contain`} />
               <button
                 className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white"

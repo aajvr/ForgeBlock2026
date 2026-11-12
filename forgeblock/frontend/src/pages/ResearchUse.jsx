@@ -33,17 +33,19 @@ export default function ResearchUse() {
     }
   }
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-10">
-      <div className="w-full max-w-xl">
+    <div data-role={user.role} className="app-shell relative min-h-screen overflow-x-clip bg-page px-6 py-10">
+      {/* The role's colour band, as in the app; the account pages sit on it. */}
+      <div className="app-band pointer-events-none absolute inset-x-0 top-0 h-[440px]" aria-hidden="true" />
+      <div className="relative mx-auto w-full max-w-xl pt-[6vh]">
         <div className="mb-6">
-          <Brand />
+          <Brand light />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="rounded-[16px] border border-line bg-white p-6 shadow-raised sm:p-8">
           <div className="mb-1 flex items-center gap-2 text-brand-700">
             <FlaskConical className="h-5 w-5" /> <span className="text-sm font-semibold">Research use only</span>
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight">Before you start</h2>
-          <p className="mb-5 mt-1 text-sm text-slate-500">
+          <h2 className="text-[26px] font-bold leading-tight tracking-[-0.01em] text-ink">Before you start</h2>
+          <p className="mb-5 mt-1 text-sm text-muted">
             {user.is_test_account
               ? 'This is a test account for the system evaluation. Please read and accept these terms.'
               : 'Please read and accept these terms to use ForgeBlock.'}
@@ -53,7 +55,7 @@ export default function ResearchUse() {
               <li key={t}>{t}</li>
             ))}
           </ol>
-          <label className="mt-6 flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm">
+          <label className="mt-6 flex items-start gap-2 rounded-[12px] border border-line bg-[#f6f8fc] p-3 text-sm">
             <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
             <span>I have read these terms and will use ForgeBlock only as described.</span>
           </label>

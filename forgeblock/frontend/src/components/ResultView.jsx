@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronDown, ChevronUp, Grid3x3, Info, Link2, ShieldAlert, ShieldCheck, X, ZoomIn } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Link2, ShieldAlert, ShieldCheck, X, ZoomIn } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -53,8 +53,9 @@ function HowCalculated({ r }) {
   )
 }
 
-// The "How is this calculated?" explanation, opened from an info button.
-function HowPopover({ r }) {
+// The "How is this calculated?" explanation (staff only). `children` is the
+// trigger's content: the info icon by the label, or the text link under the ring.
+function HowPopover({ r, children, className = '', label = 'How is this calculated?' }) {
   const [open, setOpen] = useState(false)
   const box = useRef(null)
   useEffect(() => {
@@ -69,18 +70,12 @@ function HowPopover({ r }) {
     }
   }, [open])
   return (
-    <div ref={box} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-label="How is this calculated?"
-        title="How is this calculated?"
-        className="flex rounded-full p-0.5 text-slate-400 transition hover:bg-white hover:text-brand-600"
-      >
-        <Info className="h-4 w-4" />
+    <span ref={box} className="relative inline-flex">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="dialog" aria-label={typeof children === 'string' ? undefined : label} className={className}>
+        {children}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 max-h-96 text-left text-slate-900 w-[min(30rem,calc(100vw-4rem))] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-lift" role="dialog" aria-label="How is this calculated?">
+        <div className="absolute right-0 top-full z-20 mt-2 max-h-96 w-[min(30rem,calc(100vw-4rem))] overflow-y-auto rounded-[16px] border border-line bg-white p-4 text-left normal-case tracking-normal text-ink shadow-lift" role="dialog" aria-label="How is this calculated?">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="font-semibold">How is this calculated?</div>
             <button onClick={() => setOpen(false)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
@@ -90,6 +85,25 @@ function HowPopover({ r }) {
           <HowCalculated r={r} />
         </div>
       )}
+    </span>
+  )
+}
+
+// A ring gauge in the result colour with the confidence score inside.
+function ConfidenceRing({ score, color, size = 92 }) {
+  const pct = Math.max(0, Math.min(100, score))
+  const R = 42
+  const C = 2 * Math.PI * R
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Confidence score ${pct.toFixed(0)}%`}>
+      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+        <circle cx="50" cy="50" r={R} fill="none" stroke="#e3e9f1" strokeWidth="10" />
+        <circle cx="50" cy="50" r={R} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(C * pct) / 100} ${C}`} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
+        <b className="text-[28px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink">{pct.toFixed(0)}</b>
+        <small className="mt-2 text-[13px] text-muted">%</small>
+      </div>
     </div>
   )
 }
@@ -102,35 +116,48 @@ function shortCaption(r, whose) {
   return 'Too close to call; an examiner should review it.'
 }
 
-// Header card: result, confidence, caption and receipt, tinted with the result colour.
-export function ResultHeader({ r, label = 'Screening result', whose = 'the client’s', how, notice, children }) {
+// The result card (v3): a white card with a 5px top edge in the result colour.
+// Left: the result pill, the short caption and why. Right: the confidence score
+// panel with a ring. Footer: the receipt and, as children, the next action.
+// `how` (staff only) adds "How is this calculated?"; `client` uses the
+// client's plain-language line instead.
+export function ResultHeader({ r, label = 'Screening result', whose = 'the client’s', how = false, client = false, children }) {
   const res = RESULT[r.screening_result]
   const score = r.confidence_score
+  const first = r.client_name ? r.client_name.trim().split(/\s+/)[0] : null
+  const against = r.mode === 'compare' ? 'the other signature' : first ? `${first}’s own signature variation` : 'the client’s own signature variation'
   return (
-    <section className={`rounded-2xl border p-5 shadow-soft sm:p-6 ${res.tint}`} aria-label="Result">
-      {notice}
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
-          <div className={`mt-2 inline-flex items-center gap-2.5 rounded-xl bg-white px-3.5 py-2 text-2xl font-semibold shadow-sm ${res.text}`}>
-            <res.Icon className="h-7 w-7" />
+    <section className={`min-w-0 rounded-[16px] border border-t-[5px] border-line ${res.edge} bg-white px-5 pb-5 pt-6 shadow-raised sm:px-[26px]`} aria-label="Result">
+      <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">{label}</div>
+          <div className={`mt-2.5 inline-flex items-center gap-2.5 rounded-[12px] px-4 py-2 text-[26px] font-bold leading-tight ${res.pill}`}>
+            <res.Icon className="h-[26px] w-[26px]" aria-hidden="true" />
             {res.label}
           </div>
-          <p className="mt-2.5 text-base text-slate-700">{shortCaption(r, whose)}</p>
-          {r.explain?.why && <p className="mt-1.5 max-w-xl text-sm text-slate-600">{r.explain.why}</p>}
+          <p className="mt-3 text-[16px] font-medium text-ink">{shortCaption(r, whose)}</p>
+          {r.explain?.why && <p className="mt-1 max-w-[430px] text-[14px] leading-normal text-muted">{r.explain.why}</p>}
         </div>
-        <div className="sm:text-right">
-          <div className="flex items-center gap-1.5 text-sm text-slate-500 sm:justify-end">Confidence score {how}</div>
-          <div className="text-5xl font-semibold tabular-nums text-slate-900">
-            {score.toFixed(0)}<span className="text-2xl text-slate-400">%</span>
+        <div className="flex w-full flex-col rounded-[14px] border border-[#e8edf4] bg-[#f6f8fc] px-4 py-3.5 md:w-[300px] md:shrink-0">
+          {/* One way in to the explanation: the "How is this calculated?" link under the ring. */}
+          <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">Confidence score</div>
+          <div className="mt-2 flex items-center gap-3">
+            <ConfidenceRing score={score} color={res.hex} />
+            <p className="m-0 text-[12.5px] leading-[1.45] text-[#4b5a6e]">
+              {client
+                ? 'How sure the screening is about this result. Your examiner makes the final decision.'
+                : <>How sure ForgeBlock is about <b className="font-semibold text-ink">this result</b>, measured against {against}. Never above 99%.</>}
+            </p>
           </div>
+          {how && (
+            <HowPopover r={r} className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline">
+              How is this calculated? <ArrowRight className="h-3.5 w-3.5" />
+            </HowPopover>
+          )}
         </div>
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/90" role="img" aria-label={`Confidence score ${score.toFixed(0)}%`}>
-        <div className={`h-full rounded-full ${res.bar}`} style={{ width: `${Math.max(2, Math.min(100, score))}%` }} />
-      </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-        <span className="flex items-center gap-2 text-slate-500">Receipt <span className="font-medium text-slate-900"><ReceiptValue r={r} /></span></span>
+      <div className="mt-[18px] flex flex-wrap items-center justify-between gap-3 border-t border-track pt-4 text-[13.5px]">
+        <span className="flex items-center gap-2 text-muted">Receipt <span className="text-[13px] font-medium text-ink"><ReceiptValue r={r} /></span></span>
         {children}
       </div>
     </section>
@@ -139,21 +166,23 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
 
 export function ReceiptValue({ r }) {
   return (
-    <span className="flex items-center gap-1.5 font-mono">
-      {r.integrity?.valid ? <ShieldCheck className="h-4 w-4 text-ok-600" /> : <ShieldAlert className="h-4 w-4 text-bad-600" />}
+    <span className="inline-flex items-center gap-1.5 font-mono">
+      {r.integrity?.valid ? <ShieldCheck className="h-[15px] w-[15px] text-ok-600" /> : <ShieldAlert className="h-[15px] w-[15px] text-bad-600" />}
       {r.receipt_code}
     </span>
   )
 }
 
-export function KeyFacts({ facts, children }) {
+// Key facts (v3): a card of rows, label left and value right, thin dividers.
+export function KeyFacts({ facts, children, title = 'Key facts' }) {
   return (
-    <section className="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-soft sm:p-6" aria-label="Key facts">
-      <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+    <section className="min-w-0 rounded-[16px] border border-line bg-white px-5 py-5 shadow-raised sm:px-[22px]" aria-label={title}>
+      <h2 className="text-[17px] font-semibold text-ink">{title}</h2>
+      <dl className="mt-3.5">
         {facts.map(([k, v]) => (
-          <div key={k} className="min-w-0">
-            <dt className="text-sm text-slate-500">{k}</dt>
-            <dd className="mt-0.5 font-medium">{v}</dd>
+          <div key={k} className="flex items-center justify-between gap-4 border-t border-track px-0.5 py-3">
+            <dt className="shrink-0 text-[13.5px] text-muted">{k}</dt>
+            <dd className="m-0 min-w-0 text-right text-[14.5px] font-semibold text-ink">{v}</dd>
           </div>
         ))}
       </dl>
@@ -165,7 +194,7 @@ export function KeyFacts({ facts, children }) {
 export function LedgerBlockValue({ r }) {
   if (!r.block) return '-'
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5">
       {r.integrity?.valid ? <ShieldCheck className="h-4 w-4 text-ok-600" /> : <ShieldAlert className="h-4 w-4 text-bad-600" />}
       Block #{r.block.block_index}
     </span>
@@ -181,24 +210,24 @@ export function DetailsToggle({ tabs, children }) {
       <button
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50"
+        className="inline-flex items-center gap-2 rounded-[10px] border border-line bg-white px-4 py-[9px] text-[14px] font-semibold text-ink shadow-soft transition hover:border-slate-300 hover:bg-slate-50"
       >
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         {open ? 'Hide details' : 'Show details'}
-        <span className="hidden font-normal text-slate-500 sm:inline">{tabs.map((t) => t.label.toLowerCase()).join(', ')}</span>
+        <span className="hidden font-normal text-muted sm:inline">{tabs.map((t) => t.label.toLowerCase()).join(', ')}</span>
       </button>
       {open && (
-        <section className="mt-3 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-soft sm:p-6" aria-label="Details">
+        <section className="mt-3 rounded-[16px] border border-line bg-white px-5 py-5 shadow-soft sm:px-[22px]" aria-label="Details">
           {tabs.length > 1 && (
-            <div role="tablist" aria-label="Details" className="mb-5 inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+            <div role="tablist" aria-label="Details" className="mb-[18px] inline-flex max-w-full flex-wrap gap-0.5 rounded-[12px] bg-track p-1">
               {tabs.map((t) => (
                 <button
                   key={t.value}
                   role="tab"
                   aria-selected={tab === t.value}
                   onClick={() => setTab(t.value)}
-                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    tab === t.value ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
+                  className={`whitespace-nowrap rounded-[9px] px-3.5 py-1.5 text-[14px] transition ${
+                    tab === t.value ? 'bg-white font-semibold text-brand-600 shadow-[0_1px_3px_rgb(0_0_0/0.1)]' : 'font-medium text-[#4b5a6e] hover:text-ink'
                   }`}
                 >
                   {t.label}
@@ -217,7 +246,7 @@ export function DetailsToggle({ tabs, children }) {
 function DecisionNote({ d, prior }) {
   if (!d.reason && !prior) return null
   return (
-    <div className="mt-5 border-t border-slate-100 pt-4 text-sm">
+    <div className="border-t border-track pt-3.5 text-sm">
       {prior && (
         <p className="text-slate-600">
           This exact signature was examined before{d.examiner_name ? ` by ${d.examiner_name}` : ''}{d.decided_at ? ` on ${fmtDay(d.decided_at)}` : ''}.
@@ -246,22 +275,61 @@ function StaffFacts({ r }) {
   )
   return (
     <KeyFacts facts={[
-      ['Client', <>{r.client_name || '-'} <span className="font-normal text-slate-500">{r.client_code}</span></>],
+      ['Client', <>{r.client_name || '-'} <span className="font-normal text-muted">{r.client_code}</span></>],
       ['Examiner’s decision', <>{decision}{caseLink}</>],
-      ['Date', <>{fmtDate(r.created_at)}<span className="block text-sm font-normal text-slate-500">by {r.performed_by_name}</span></>],
+      ['Date', <>{fmtDate(r.created_at)}<span className="block text-[12.5px] font-normal text-muted">by {r.performed_by_name}</span></>],
       ['Ledger block', <LedgerBlockValue key="block" r={r} />],
     ]}>
       {decided && <DecisionNote d={decided} prior={prior} />}
-      {!r.integrity.valid && <Alert className="mt-4">This record was changed after it was sealed in the ledger.</Alert>}
+      {!r.integrity.valid && <Alert className="mt-3">This record was changed after it was sealed in the ledger.</Alert>}
     </KeyFacts>
   )
 }
 
-function Signatures({ r }) {
+// Faint ruled paper behind the signature tiles.
+const RULED = { backgroundImage: 'repeating-linear-gradient(transparent 0 27px, #f1f4f8 27px 28px)' }
+
+// A tag on a signature tile ("Questioned", "Closest reference · #4").
+function TileTag({ children, tone = 'grey' }) {
   return (
-    <section className="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-soft sm:p-6" aria-label="Signatures">
-      <h2 className="mb-3 text-lg font-semibold">Questioned signature and closest reference</h2>
-      {r.modality === 'static' ? <StaticViewer r={r} measures={false} /> : <SideBySide r={r} />}
+    <span className={`pointer-events-none absolute left-3 top-3 z-10 rounded-[8px] px-2.5 py-1 text-[12.5px] font-semibold ${tone === 'blue' ? 'bg-brand-50 text-brand-800' : 'bg-track text-[#3b4a5e]'}`}>
+      {children}
+    </span>
+  )
+}
+
+// Where a reference sits in the client's list, for its "#n" tag.
+const refNumber = (r, id) => {
+  const i = (r.reference_profile_ids || []).indexOf(id)
+  return i >= 0 ? i + 1 : null
+}
+
+function Signatures({ r }) {
+  const [tools, setTools] = useState(false)
+  const isStatic = r.modality === 'static'
+  const q = r.analysis?.quality
+  return (
+    <section className="rounded-[16px] border border-line bg-white px-5 py-5 shadow-soft sm:px-[22px]" aria-label="Signatures">
+      <div className="mb-3.5 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[17px] font-semibold text-ink">Questioned signature and closest reference</h2>
+          <p className="mt-[3px] text-[12.5px] text-muted">{r.reference_count} {r.modality} reference{r.reference_count === 1 ? '' : 's'} on file</p>
+        </div>
+        {isStatic && (
+          <button
+            type="button"
+            onClick={() => setTools(!tools)}
+            aria-pressed={tools}
+            aria-label="Zoom, grid and other references"
+            title="Zoom, grid and other references"
+            className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[12px] border transition-colors ${tools ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-line bg-white text-[#3b4a5e] hover:bg-slate-50'}`}
+          >
+            <ZoomIn className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+      {isStatic ? <StaticViewer r={r} measures={false} tools={tools} /> : <SideBySide r={r} />}
+      {q && <p className="mt-3.5 text-[13px] text-muted">Input quality {q.score}/100{q.issues.length ? `: ${q.issues.join(' ')}` : '.'}</p>}
     </section>
   )
 }
@@ -274,18 +342,18 @@ function SideBySide({ r }) {
     api.get(`/api/verifications/${r.id}/strokes`).then((d) => setTest(d.strokes)).catch(() => setTest([]))
     if (r.best_match_profile_id) api.get(`/api/references/${r.best_match_profile_id}/strokes`).then((d) => setRef(d.strokes)).catch(() => setRef([]))
   }, [r.id, r.best_match_profile_id])
-  const box = 'flex h-48 items-center justify-center rounded-xl border border-slate-200 bg-white p-3'
+  const box = 'relative flex h-48 items-center justify-center rounded-[12px] border border-line bg-white px-4 pb-4 pt-11'
+  const n = refNumber(r, r.best_match_profile_id)
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <div>
-        <div className="mb-1.5 text-sm font-medium text-slate-600">Questioned signature</div>
-        <div className={box}>{test ? <StrokePreview strokes={test} className="h-full w-full" /> : null}</div>
-      </div>
-      <div>
-        <div className="mb-1.5 text-sm font-medium text-slate-600">Closest reference on file</div>
-        {!r.best_match_profile_id ? <div className={`${box} text-sm text-slate-400`}>Not available</div>
-          : <div className={box}>{ref ? <StrokePreview strokes={ref} className="h-full w-full" /> : null}</div>}
-      </div>
+      <figure className={`m-0 ${box}`} style={RULED}>
+        <TileTag tone="blue">Questioned</TileTag>
+        {test ? <StrokePreview strokes={test} className="h-full w-full" /> : null}
+      </figure>
+      <figure className={`m-0 ${box} ${r.best_match_profile_id ? '' : 'text-sm text-slate-400'}`} style={RULED}>
+        <TileTag>Closest reference{n ? ` · #${n}` : ''}</TileTag>
+        {!r.best_match_profile_id ? 'Not available' : ref ? <StrokePreview strokes={ref} className="h-full w-full" /> : null}
+      </figure>
     </div>
   )
 }
@@ -342,16 +410,17 @@ function measures(r) {
   return ['slant', 'aspect_ratio', 'pieces', 'duration', 'pen_lifts', 'speed'].map(pick).filter(Boolean)
 }
 
-function StaticViewer({ r, measures = true }) {
+// Static tiles on ruled paper. `tools` shows zoom, grid and the reference picker.
+function StaticViewer({ r, measures = true, tools = true }) {
   const [zoom, setZoom] = useState(1)
   const [grid, setGrid] = useState(false)
   const [refId, setRefId] = useState(r.best_match_profile_id)
-  const pane = (src, label) => (
-    <div>
-      <div className="mb-1 text-xs font-medium text-slate-500">{label}</div>
-      <div className="relative h-56 overflow-auto rounded-lg border border-slate-200 bg-white">
-        <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }} className="relative">
-          <AuthImage src={src} className="h-full w-full object-contain" />
+  const pane = (src, tag, tone) => (
+    <figure className="relative m-0">
+      <TileTag tone={tone}>{tag}</TileTag>
+      <div className="relative h-56 overflow-auto rounded-[12px] border border-line bg-white" style={RULED}>
+        <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }} className="relative px-4 pb-3 pt-11">
+          <AuthImage src={src} className="h-full w-full object-contain mix-blend-multiply" />
           {grid && (
             <svg className="pointer-events-none absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
               {[10, 20, 30, 40, 50, 60, 70, 80, 90].map((v) => (
@@ -364,34 +433,39 @@ function StaticViewer({ r, measures = true }) {
           )}
         </div>
       </div>
-    </div>
+    </figure>
   )
   const refs = r.reference_profile_ids || []
+  const n = refNumber(r, refId)
+  const refTag = `${refId === r.best_match_profile_id ? 'Closest reference' : 'Reference'}${n ? ` · #${n}` : ''}`
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-2">
-          <ZoomIn className="h-4 w-4 text-slate-500" />
-          <input type="range" min="1" max="4" step="0.25" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
-          <span className="w-10 tabular-nums text-slate-500">{zoom}×</span>
-        </label>
-        <button onClick={() => setGrid(!grid)} className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium ${grid ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-300'}`}>
-          <Grid3x3 className="h-3.5 w-3.5" /> Grid
-        </button>
-        {refs.length > 1 && (
-          <select value={refId || ''} onChange={(e) => setRefId(Number(e.target.value))} className="rounded-lg border border-slate-300 px-2 py-1 text-xs">
-            {refs.map((id, i) => (
-              <option key={id} value={id}>
-                Reference {i + 1}
-                {id === r.best_match_profile_id ? ' (best match)' : ''}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+      {tools && (
+        <div className="mb-3.5 flex flex-wrap items-center gap-3 rounded-[12px] bg-[#f6f8fc] px-3 py-2 text-sm">
+          <label className="flex items-center gap-2">
+            <ZoomIn className="h-4 w-4 text-muted" />
+            <span className="sr-only">Zoom</span>
+            <input type="range" min="1" max="4" step="0.25" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
+            <span className="w-10 tabular-nums text-muted">{zoom}×</span>
+          </label>
+          <button onClick={() => setGrid(!grid)} aria-pressed={grid} className={`inline-flex items-center gap-1.5 rounded-[8px] border px-3 py-1 text-xs font-medium ${grid ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-line bg-white'}`}>
+            <Grid3x3 className="h-3.5 w-3.5" /> Grid
+          </button>
+          {refs.length > 1 && (
+            <select value={refId || ''} onChange={(e) => setRefId(Number(e.target.value))} aria-label="Reference to compare" className="rounded-[8px] border border-line bg-white px-2 py-1 text-xs">
+              {refs.map((id, i) => (
+                <option key={id} value={id}>
+                  Reference {i + 1}
+                  {id === r.best_match_profile_id ? ' (best match)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
-        {pane(`/api/verifications/${r.id}/image`, 'Questioned signature')}
-        {refId ? pane(`/api/references/${refId}/image`, refId === r.best_match_profile_id ? 'Best-matching reference' : 'Reference') : <div />}
+        {pane(`/api/verifications/${r.id}/image`, 'Questioned', 'blue')}
+        {refId ? pane(`/api/references/${refId}/image`, refTag) : <div />}
       </div>
       {measures && <Measures r={r} />}
     </div>
@@ -452,7 +526,7 @@ function Overlay({ r }) {
   )
 }
 
-function Scores({ r }) {
+function Scores({ r, quality = true }) {
   const per = r.analysis?.per_reference || []
   return (
     <div className="space-y-5">
@@ -469,25 +543,29 @@ function Scores({ r }) {
         </dl>
       </div>
       <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-[14px]">
         <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-            <th className="py-2 font-medium">Metric</th>
-            <th className="py-2 text-right font-medium">Value</th>
-            <th className="py-2 text-right font-medium">Threshold</th>
-            <th className="py-2 text-right font-medium">Passes</th>
+          <tr className="border-b border-track text-left text-[12.5px] text-muted">
+            <th className="px-3 py-2 font-semibold">Measure</th>
+            <th className="px-3 py-2 font-semibold">Score</th>
+            <th className="px-3 py-2 font-semibold">{r.threshold_source === 'adaptive' ? 'Personal threshold' : 'Standard threshold'}</th>
+            <th className="px-3 py-2 font-semibold">Result</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-[#f3f5f9]">
           {Object.entries(r.votes).map(([k, vote]) => (
             <tr key={k}>
-              <td className="py-2">{r.metric_labels[k] || k}</td>
-              <td className="py-2 text-right font-mono tabular-nums">{fmt(r.metrics[k])}</td>
-              <td className="py-2 text-right font-mono tabular-nums text-slate-500">
+              <td className="px-3 py-[13px] text-ink">{r.metric_labels[k] || k}</td>
+              <td className="px-3 py-[13px] font-mono text-[13px] tabular-nums text-ink">{fmt(r.metrics[k])}</td>
+              <td className="px-3 py-[13px] font-mono text-[13px] tabular-nums text-ink">
                 {k === 'cosine' ? '≥ ' : '≤ '}
                 {fmt(r.thresholds[k])}
               </td>
-              <td className="py-2 text-right">{vote ? <Badge tone="green">Yes</Badge> : <Badge tone="red">No</Badge>}</td>
+              <td className="px-3 py-[13px]">
+                {vote
+                  ? <Badge tone="green"><Check className="h-3.5 w-3.5" aria-hidden="true" /> Passed</Badge>
+                  : <Badge tone="red"><X className="h-3.5 w-3.5" aria-hidden="true" /> Not passed</Badge>}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -518,7 +596,7 @@ function Scores({ r }) {
           </div>
         </div>
       )}
-      {r.analysis?.quality && (
+      {quality && r.analysis?.quality && (
         <p className="text-xs text-slate-500">
           Input quality {r.analysis.quality.score}/100{r.analysis.quality.issues.length ? `: ${r.analysis.quality.issues.join(' ')}` : '.'}
         </p>
@@ -572,31 +650,30 @@ export default function ResultView({ result: r }) {
     { value: 'ledger', label: 'Ledger proof' },
   ].filter(Boolean)
 
+  const showSignatures = staff && stored
   return (
     <div className="space-y-5">
-      <ResultHeader
-        r={r}
-        label={decided ? 'Model screening result' : 'Screening result'}
-        how={staff && <HowPopover r={r} />}
-        notice={exact && (
-          <p className="mb-4 flex items-center gap-2 text-sm text-brand-800">
-            <Info className="h-4 w-4 shrink-0" /> Same file as reference #{exact.position} on file. Use a new signature to test.
-          </p>
-        )}
-      >
-        {needsDecision && r.case.can_open && (
-          <Link to={`/app/cases/${r.case.id}`} className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700 hover:shadow-md">
-            Decide now: case {r.case.case_code} <ArrowRight className="h-4 w-4" />
-          </Link>
-        )}
-      </ResultHeader>
+      {exact && (
+        <Alert kind="info" icon={Info} raised>
+          Same file as reference #{exact.position} on file. Use a new signature to test.
+        </Alert>
+      )}
       <PenDataNote r={r} />
-      {staff && stored && <Signatures r={r} />}
-      <StaffFacts r={r} />
+      <div className="grid items-stretch gap-5 lg:grid-cols-[1.35fr_1fr]">
+        <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff}>
+          {needsDecision && r.case.can_open && (
+            <Link to={`/app/cases/${r.case.id}`} className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-[18px] py-2.5 text-[15px] font-semibold text-white shadow-[0_6px_16px_rgb(15_108_189/0.3)] transition hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+              Decide now: case {r.case.case_code} <ArrowRight className="h-4 w-4" />
+            </Link>
+          )}
+        </ResultHeader>
+        <StaffFacts r={r} />
+      </div>
+      {showSignatures && <Signatures r={r} />}
       <DetailsToggle tabs={tabs}>
         {(tab) => (
           <>
-            {tab === 'scores' && <Scores r={r} />}
+            {tab === 'scores' && <Scores r={r} quality={!showSignatures} />}
             {tab === 'features' && <FeatureAnalysis r={r} />}
             {tab === 'viewer' && <DynamicViewer r={r} />}
             {tab === 'overlay' && <Overlay r={r} />}
@@ -604,7 +681,7 @@ export default function ResultView({ result: r }) {
           </>
         )}
       </DetailsToggle>
-      <p className="text-sm text-slate-500">{r.disclaimer}</p>
+      <p className="mx-0.5 text-[13px] text-muted">{r.disclaimer}</p>
     </div>
   )
 }
@@ -615,7 +692,7 @@ export function PenDataNote({ r }) {
   const note = r.pen_note
   if (!note && r.capture_device !== 'development') return null
   return (
-    <Alert kind="warn">
+    <Alert kind="warn" raised>
       <div className="mb-1 flex items-center gap-2">
         <LimitedPenBadge missing={note?.left_out || ['tilt']} />
       </div>

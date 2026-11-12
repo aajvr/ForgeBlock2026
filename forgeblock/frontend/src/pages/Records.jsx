@@ -39,8 +39,8 @@ export function RecordsTable({ rows, showExaminer = false, hideGroup = false }) 
           </td>
           {showExaminer && (
             <td className={td}>
-              <span className="block">{l.performed_by_name || '-'}</span>
-              <span className="block text-sm text-slate-500">{l.performed_by_code}</span>
+              <span className="block whitespace-nowrap">{l.performed_by_name || '-'}</span>
+              <span className="block whitespace-nowrap text-sm text-slate-500">{l.performed_by_code}</span>
             </td>
           )}
           <td className={td}><ScreeningBadge value={l.screening_result} /></td>
@@ -72,9 +72,9 @@ function Summary({ s }) {
   return (
     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
       {items.map(([label, value, cls]) => (
-        <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <div className="text-sm text-slate-500">{label}</div>
-          <div className={`mt-1 text-2xl font-semibold tabular-nums ${cls}`}>{value}</div>
+        <div key={label} className="rounded-[16px] border border-line bg-white px-4 py-3.5 shadow-raised">
+          <div className="text-[13px] font-medium leading-snug text-muted">{label}</div>
+          <div className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${cls}`}>{value}</div>
         </div>
       ))}
     </div>
@@ -106,7 +106,7 @@ function GroupedRecords({ rows, groups }) {
               type="button"
               aria-expanded={isOpen}
               onClick={() => setClosed((c) => ({ ...c, [k]: isOpen }))}
-              className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 bg-slate-50/70 px-5 py-2.5 text-left text-sm hover:bg-slate-100/70"
+              className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 bg-[#f6f8fc] px-5 py-2.5 text-left text-sm transition-colors hover:bg-track"
             >
               <ChevronDown className={`h-4 w-4 text-slate-400 transition ${isOpen ? '' : '-rotate-90'}`} />
               <GroupTag id={sec.id} name={sec.name || 'No group'} />

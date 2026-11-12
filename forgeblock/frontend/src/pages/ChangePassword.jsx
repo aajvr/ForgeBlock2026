@@ -53,17 +53,19 @@ export default function ChangePassword() {
   if (!user) return <Navigate to="/signin" replace />
   if (!user.must_change_password) return <Navigate to={homeFor(user)} replace />
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
-      <div className="w-full max-w-md">
+    <div data-role={user.role} className="app-shell relative min-h-screen overflow-x-clip bg-page px-6 py-10">
+      {/* The role's colour band, as in the app; the account pages sit on it. */}
+      <div className="app-band pointer-events-none absolute inset-x-0 top-0 h-[440px]" aria-hidden="true" />
+      <div className="relative mx-auto w-full max-w-md pt-[6vh]">
         <div className="mb-6">
-          <Brand />
+          <Brand light />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="rounded-[16px] border border-line bg-white p-6 shadow-raised sm:p-8">
           <div className="mb-1 flex items-center gap-2 text-brand-700">
             <ShieldCheck className="h-5 w-5" /> <span className="text-sm font-semibold">First sign-in</span>
           </div>
-          <h2 className="text-2xl font-semibold tracking-tight">Choose your own password</h2>
-          <p className="mb-6 mt-1 text-sm text-slate-500">Hi {user.full_name.split(' ')[0]}, replace the temporary password your administrator gave you.</p>
+          <h2 className="text-[26px] font-bold leading-tight tracking-[-0.01em] text-ink">Choose your own password</h2>
+          <p className="mb-6 mt-1 text-sm text-muted">Hi {user.full_name.split(' ')[0]}, replace the temporary password your administrator gave you.</p>
           <PasswordForm onDone={(u) => navigate(homeFor(u))} submitLabel="Save and continue" />
           <button onClick={signOut} className="mt-4 text-sm text-slate-500 hover:underline">Sign out</button>
         </div>

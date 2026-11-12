@@ -63,7 +63,7 @@ function ConfirmModal({ title = 'Are you sure?', message, confirmLabel = 'Confir
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-message"
-        className="w-full max-w-md rounded-2xl bg-white shadow-xl"
+        className="w-full max-w-md rounded-[16px] bg-white shadow-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex gap-3 p-5">
@@ -75,7 +75,7 @@ function ConfirmModal({ title = 'Are you sure?', message, confirmLabel = 'Confir
             {message && <div id="confirm-message" className="mt-1 text-[15px] text-slate-600">{message}</div>}
           </div>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+        <div className="flex justify-end gap-2 border-t border-track px-5 py-3">
           <Button ref={cancelRef} variant="secondary" onClick={() => onAnswer(false)} className="touch:min-h-11 touch:px-5">{cancelLabel}</Button>
           <Button variant={danger ? 'danger' : 'primary'} onClick={() => onAnswer(true)} className="touch:min-h-11 touch:px-5">{confirmLabel}</Button>
         </div>

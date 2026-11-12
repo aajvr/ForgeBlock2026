@@ -48,3 +48,5 @@ desktop.ini
 .vscode/*
 !.vscode/extensions.json
 .claude/settings.local.json
+
+v3-reference/

@@ -58,7 +58,7 @@ export default function DateRange({ from, to, onChange, className = '' }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
   const item = (on) => `w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${on ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-700 hover:bg-slate-100'}`
-  const dateInput = 'w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-brand-600'
+  const dateInput = 'w-full min-w-0 rounded-[8px] border border-[#dde3ec] px-2 py-1.5 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100'
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
@@ -66,14 +66,14 @@ export default function DateRange({ from, to, onChange, className = '' }) {
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2 text-left text-sm transition hover:border-slate-400 ${from || to ? 'border-brand-300 text-slate-900' : 'border-slate-300 text-slate-600'}`}
+        className={`flex w-full items-center gap-2 rounded-[10px] border bg-white px-3 py-2 text-left text-sm outline-none transition hover:border-slate-300 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-100 ${from || to ? 'border-brand-300 text-ink' : 'border-[#dde3ec] text-slate-600'}`}
       >
         <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
         <span className="min-w-0 flex-1 truncate font-medium">{rangeLabel(from, to)}</span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div role="dialog" aria-label="Date range" className="absolute right-0 z-40 mt-1 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl sm:left-0 sm:right-auto">
+        <div role="dialog" aria-label="Date range" className="absolute right-0 z-40 mt-1 w-64 rounded-[12px] border border-line bg-white p-1.5 shadow-xl sm:left-0 sm:right-auto">
           <button type="button" className={item(!from && !to && !custom)} onClick={() => { onChange('', ''); setOpen(false) }}>Any date</button>
           {PRESETS.map((p) => (
             <button key={p.key} type="button" className={item(active?.key === p.key && !custom)} onClick={() => { const [a, b] = p.range(); onChange(a, b); setOpen(false) }}>{p.label}</button>

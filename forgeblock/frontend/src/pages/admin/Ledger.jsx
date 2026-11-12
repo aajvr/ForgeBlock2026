@@ -37,19 +37,19 @@ function LedgerIntro({ data, check }) {
     { icon: Timer, title: 'Last checked automatically', text: auto ? `${fmtDate(auto.checked_at)}: ${auto.valid ? 'intact' : 'FAILED'}.` : 'The daily auto-check has not run yet.' },
   ]
   return (
-    <section className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-white p-6 shadow-soft">
+    <section className="mb-6 rounded-[16px] border border-line bg-white p-6 shadow-raised">
       <div className="grid gap-6 md:grid-cols-3">
         {items.map((it) => (
           <div key={it.title} className="flex gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-800"><it.icon className="h-5 w-5" /></span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--role-soft)] text-[var(--role-active)]"><it.icon className="h-5 w-5" /></span>
             <div className="min-w-0">
-              <h2 className="font-semibold">{it.title}</h2>
+              <h2 className="text-[15px] font-semibold text-ink">{it.title}</h2>
               <p className="mt-0.5 text-sm text-slate-600">{it.text}</p>
             </div>
           </div>
         ))}
       </div>
-      <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3 border-t border-indigo-100 pt-4 text-sm">
+      <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3 border-t border-track pt-4 text-sm">
         <div>
           <dt className="flex items-center gap-1 text-slate-500">Chain valid <InfoTip label="What is chain valid?">{TIPS.valid}</InfoTip></dt>
           <dd className={`mt-0.5 flex items-center gap-1.5 text-base font-semibold ${valid === undefined ? 'text-slate-600' : valid ? 'text-ok-700' : 'text-bad-700'}`}>
@@ -158,10 +158,10 @@ export default function Ledger() {
           const { title, code, codeLabel } = splitSummary(b)
           return (
             <div key={b.block_index}>
-              <div className={`rounded-2xl border bg-white p-4 shadow-soft transition hover:shadow-lift sm:p-5 ${isBad ? 'border-bad-600 ring-2 ring-bad-100' : after ? 'border-warn-600' : 'border-slate-200/70'}`}>
+              <div className={`rounded-[16px] border bg-white p-4 shadow-soft transition hover:shadow-lift sm:p-5 ${isBad ? 'border-bad-600 ring-2 ring-bad-100' : after ? 'border-warn-600' : 'border-line'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className={`flex h-10 min-w-10 items-center justify-center rounded-xl px-1.5 text-sm font-semibold ${isBad ? 'bg-bad-600 text-white' : 'bg-indigo-100 text-indigo-800'}`}>#{b.block_index}</span>
+                    <span className={`flex h-10 min-w-10 items-center justify-center rounded-[12px] px-1.5 text-sm font-semibold ${isBad ? 'bg-bad-600 text-white' : 'bg-[var(--role-soft)] text-[var(--role-active)]'}`}>#{b.block_index}</span>
                     <div className="min-w-0">
                       <div className="font-medium">
                         {b.verification_log_id ? <Link to={`/app/records/${b.verification_log_id}`} className="hover:underline">{title}</Link> : title}
@@ -178,14 +178,14 @@ export default function Ledger() {
                     {after && !isBad && <Badge tone="amber">After a broken block</Badge>}
                   </div>
                 </div>
-                <dl className="mt-3 grid gap-3 rounded-xl bg-slate-50 px-3 py-2.5 font-mono text-[12.5px] text-slate-600 sm:grid-cols-3">
+                <dl className="mt-3 grid gap-3 rounded-[12px] bg-[#f6f8fc] px-3 py-2.5 font-mono text-[12.5px] text-slate-600 sm:grid-cols-3">
                   <HashField label="Block hash" tip={TIPS.block} value={b.block_hash} strong />
                   <HashField label="Previous hash" tip={TIPS.previous} value={b.previous_hash} />
                   <HashField label="Record hash" tip={TIPS.record} value={b.record_hash} right />
                 </dl>
               </div>
               {i < data.blocks.length - 1 && (
-                <div className={`flex flex-col items-center ${isBad || after ? 'text-bad-600' : 'text-indigo-300'}`} aria-hidden="true">
+                <div className={`flex flex-col items-center ${isBad || after ? 'text-bad-600' : 'text-[var(--role-soft)]'}`} aria-hidden="true">
                   <span className="h-2.5 w-0.5 bg-current" />
                   <Link2 className="h-4 w-4 rotate-90" />
                   <span className="h-2.5 w-0.5 bg-current" />
