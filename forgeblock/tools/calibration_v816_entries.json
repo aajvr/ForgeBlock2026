@@ -1,0 +1,30 @@
+{
+  "static": {
+    "b0b133c0f00d622e": {
+      "a": 1.3581,
+      "b": -1.3802,
+      "band": [
+        0.35,
+        0.65
+      ],
+      "model": "static_model.keras v8.16: MobileNetV3-Large Siamese (triplet) trained on own 55-participant data (round 1: 44) + 80 UTSig participants with cross-day pairs",
+      "fitted_on": "ForgeBlock own static dataset: 11 participants never seen by this model (round-1 test people), refs G1-10, screened G11-20 + 20 skilled forgeries; plus 35 held-out UTSig participants, refs = day-1 signatures (9), screened = day-3 genuine (9) + 6 skilled forgeries; 855 screenings; genuine weighted to 0.75 x forgeries (close to v8.12's genuine:forgery mix)",
+      "auc": 0.834,
+      "date": "2026-11-11"
+    }
+  },
+  "static_client_classifier": {
+    "b0b133c0f00d622e": {
+      "a": 5.9089,
+      "b": -4.9117,
+      "band": [
+        0.35,
+        0.65
+      ],
+      "model": "static_model.keras v8.16 + per-client LS-SVM (app/ml/client_classifier.py, gamma_scale 2, lambda 10)",
+      "fitted_on": "ForgeBlock own static dataset: 11 participants never seen by this model (round-1 test people), refs G1-10, screened G11-20 + 20 skilled forgeries; plus 35 held-out UTSig participants, refs = day-1 signatures (9), screened = day-3 genuine (9) + 6 skilled forgeries; 855 screenings; genuine weighted to 0.75 x forgeries (close to v8.12's genuine:forgery mix); background = 10 other people of the same set x 10 references",
+      "auc": 0.879,
+      "date": "2026-11-11"
+    }
+  }
+}

@@ -1,22 +1,22 @@
 {
   "thresholds": {
-    "cosine": 0.576663,
-    "euclidean": 0.913416,
-    "manhattan": 11.654791
+    "cosine": 0.651247,
+    "euclidean": 0.82562,
+    "manhattan": 10.602676
   },
   "bounds": {
     "cosine": [
-      0.21,
-      0.772
+      0.175,
+      0.89
     ],
     "euclidean": [
-      0.64,
-      1.372
+      0.517,
+      1.322
     ],
     "manhattan": [
-      8.215,
-      17.528
+      6.634,
+      17.009
     ]
   },
-  "threshold_source_note": "v8.12: ForgeBlock own static model (MobileNetV3-Large Siamese/triplet, trained on own 55-participant dataset, round 1 of 5, test participants [4, 6, 18, 30, 32, 34, 38, 39, 41, 52, 55] never seen). Default thresholds = EER point on those unseen participants (used with fewer than 7 references). Bounds = 1st-99th percentile of the adaptive thresholds of all 55 participants when unseen, widened."
+  "threshold_source_note": "v8.16: static model B = MobileNetV3-Large Siamese/triplet trained on own 55-participant dataset (round 1 of 5: own test participants [1, 3, 11, 15, 16, 20, 24, 25, 29, 42, 47] never seen) + 80 UTSig participants with cross-day pairs (35 UTSig participants held out). Default thresholds = EER point on the 11 unseen own participants (used with fewer than 7 references). Bounds = 1st-99th percentile of the personal thresholds of the 11 unseen own + 35 held-out UTSig participants, widened 10%."
 }
