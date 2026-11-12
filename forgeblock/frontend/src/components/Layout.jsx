@@ -376,8 +376,8 @@ export default function Layout() {
         </div>
       )}
       {open && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setOpen(false)} />}
-      <div className={`app-content transition-[padding-left] motion-fb lg:h-full ${pinned ? 'lg:pl-[19.5rem]' : 'lg:pl-[5.75rem]'}`}>
-      <div className="app-panel relative min-h-screen min-w-0 bg-white lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden lg:rounded-l-[16px] lg:bg-white/[0.92]">
+      <div className={`app-content transition-[padding-left] motion-fb lg:h-full ${pinned ? 'lg:pl-[calc(19rem-1px)]' : 'lg:pl-[calc(5.25rem-1px)]'}`}>
+      <div className="app-panel relative min-h-screen min-w-0 bg-white lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden lg:bg-white/[0.92]">
         <header className="topbar sticky top-0 z-10 flex h-[4.5rem] shrink-0 items-center gap-4 border-b border-slate-100 bg-white/95 px-4 backdrop-blur sm:px-8 lg:static lg:px-10">
           <button className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />

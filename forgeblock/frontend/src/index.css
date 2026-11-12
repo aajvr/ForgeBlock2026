@@ -100,15 +100,15 @@ body {
 .sidebar-glass {
   -webkit-backdrop-filter: blur(22px) saturate(1.5);
   backdrop-filter: blur(22px) saturate(1.5);
-  border-right: 1px solid rgb(255 255 255 / 0.16);
-  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.05);
+  /* No right border or inner line: the gradient runs to the edge and the
+     content panel sits directly against it (see .app-content padding). */
 }
 .sidebar-glass.is-over {
   --glass-a: 0.9;
 }
 /* Opened over the content: a soft shadow on its right edge. */
 .sidebar-glass.is-lifted {
-  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.05), 8px 0 28px -10px rgb(0 0 0 / 0.35);
+  box-shadow: 8px 0 28px -10px rgb(0 0 0 / 0.35);
 }
 .sidebar-glass.sidebar-examiner {
   background: linear-gradient(180deg, rgb(15 108 189 / var(--glass-a, 0.5)) 0%, rgb(12 79 140 / var(--glass-a, 0.55)) 55%, rgb(12 59 94 / var(--glass-a, 0.6)) 100%);
