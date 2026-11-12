@@ -253,7 +253,7 @@ export function Spinner({ label = 'Loading…' }) {
   )
 }
 
-export function Modal({ open, title, onClose, children, wide }) {
+export function Modal({ open, title, onClose, children, wide, centered }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e) => e.key === 'Escape' && onClose?.()
@@ -264,7 +264,7 @@ export function Modal({ open, title, onClose, children, wide }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:p-10" onMouseDown={onClose}>
       <div
-        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl bg-white shadow-xl`}
+        className={`w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} ${centered ? 'my-auto' : ''} rounded-2xl bg-white shadow-xl`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
@@ -301,7 +301,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel = 'Confirm',
     }
   }
   return (
-    <Modal open={open} onClose={busy ? undefined : onClose} title={title}>
+    <Modal open={open} onClose={busy ? undefined : onClose} title={title} centered>
       <div className="flex gap-3">
         {Icon && (
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${danger ? 'bg-bad-50 text-bad-600' : 'bg-brand-50 text-brand-600'}`}>
