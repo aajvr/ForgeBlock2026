@@ -16,6 +16,8 @@ function ModelView({ file, removeText }) {
   useEffect(() => {
     if (!file) return
     let u
+    setUrl(null) // v8.21: never show the previous preview while the new one loads
+    setQuality(null)
     const fd = new FormData()
     fd.append('file', file)
     if (removeText) fd.append('remove_text', 'true')

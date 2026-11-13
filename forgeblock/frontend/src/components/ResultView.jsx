@@ -979,6 +979,7 @@ export default function ResultView({ result: r }) {
         </Alert>
       )}
       <PenDataNote r={r} />
+      <TextRemovalNote r={r} />
       <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff}>
           {needsDecision && r.case.can_open && (
@@ -1003,6 +1004,34 @@ export default function ResultView({ result: r }) {
       </DetailsToggle>
       <p className="mx-0.5 text-[13px] text-muted">{r.disclaimer}</p>
     </div>
+  )
+}
+
+// v8.21: the examiner asked to remove printed text from the questioned photo.
+export function TextRemovalNote({ r }) {
+  const [show, setShow] = useState(false)
+  const t = r.analysis?.text_removal
+  if (!t || !t.requested) return null
+  if (!t.removed) {
+    return (
+      <Alert kind="info" icon={Info} raised>
+        {t.available === false
+          ? 'Printed-text removal was requested but is not available on this server, so the photo was screened as uploaded.'
+          : 'Printed-text removal was requested, but no printed text was found, so the photo was screened as uploaded.'}
+      </Alert>
+    )
+  }
+  return (
+    <Alert kind="info" icon={Info} raised>
+      <div>
+        Printed text was removed from the questioned photo before screening ({Math.round((t.printed_share || 0) * 100)}% of the ink was printed).
+        The references were not changed. Check the cleaned signature against the original photo.
+        <button type="button" onClick={() => setShow(!show)} className="ml-2 font-medium text-brand-700 underline underline-offset-2">
+          {show ? 'Hide original photo' : 'View original photo'}
+        </button>
+      </div>
+      {show && <AuthImage src={`/api/verifications/${r.id}/original-image`} alt="Questioned photo as uploaded" className="mt-3 max-h-64 rounded-[10px] border border-line bg-white" />}
+    </Alert>
   )
 }
 

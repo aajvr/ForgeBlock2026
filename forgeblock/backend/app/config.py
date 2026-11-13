@@ -83,6 +83,11 @@ MIN_ADAPTIVE_SAMPLES = int(os.getenv("MIN_ADAPTIVE_SAMPLES", "7"))
 RECOMMENDED_REFERENCES = int(os.getenv("RECOMMENDED_REFERENCES", "20"))
 MAX_REFERENCES = int(os.getenv("MAX_REFERENCES", "30"))
 
+# v8.21: "Remove printed text" option for the QUESTIONED static signature
+# (app/ml/text_removal.py, weights/text_remover.keras). The examiner ticks it
+# per screening; it is off by default. TEXT_REMOVAL=false hides the option.
+TEXT_REMOVAL = os.getenv("TEXT_REMOVAL", "true").lower() == "true"
+
 # Sign-in security: lockout after repeated failures, sign-out when idle.
 MAX_FAILED_LOGINS = int(os.getenv("MAX_FAILED_LOGINS", "5"))
 LOCKOUT_MINUTES = int(os.getenv("LOCKOUT_MINUTES", "15"))

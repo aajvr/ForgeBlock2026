@@ -88,6 +88,8 @@ def daily_jobs(stop: threading.Event) -> None:
 async def lifespan(app: FastAPI):
     init_db()
     get_engine()  # load models at startup rather than on the first request
+    from .ml import text_removal
+    text_removal.available()  # v8.21: load the printed-text remover now too (first use was slow)
     stop = threading.Event()
     threading.Thread(target=daily_jobs, args=(stop,), daemon=True).start()
     yield

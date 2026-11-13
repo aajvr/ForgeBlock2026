@@ -25,6 +25,7 @@ from ..ledger import verify_block
 from ..ml import capture
 from ..ml import client_classifier as cc
 from ..ml import decision as dec
+from ..ml import text_removal
 from ..ml.dynamic_features import points_from_payload
 from ..ml.engine import get_engine
 from ..ml.explain import overlay_png
@@ -194,17 +195,41 @@ def _exact_match(test: np.ndarray, refs: list[np.ndarray], profiles: list[Signat
 # ------------------------------------------------------------------ static ---
 
 @router.post("/api/static/preprocess")
-async def static_preprocess(file: UploadFile = File(...), user: User = Depends(require_staff)):
+async def static_preprocess(file: UploadFile = File(...), remove_text: bool = Form(False),
+                            user: User = Depends(require_staff)):
     """The preprocessed 224x224 image: what the model sees."""
-    _, img = await read_upload(file)
+    img = await _questioned_upload(file, remove_text)
     ok, png = cv2.imencode(".png", cv2.cvtColor(preprocessed_preview(img), cv2.COLOR_RGB2BGR))
     return Response(content=png.tobytes(), media_type="image/png")
 
 
 @router.post("/api/static/quality")
-async def static_quality_check(file: UploadFile = File(...), user: User = Depends(require_staff)):
-    _, img = await read_upload(file)
+async def static_quality_check(file: UploadFile = File(...), remove_text: bool = Form(False),
+                               user: User = Depends(require_staff)):
+    img = await _questioned_upload(file, remove_text)
     return static_quality(img)
+
+
+@router.get("/api/static/text-removal")
+def text_removal_status(user: User = Depends(require_staff)):
+    """Whether the Screen page shows the "Remove printed text" option (v8.21)."""
+    return {"available": text_removal.available()}
+
+
+async def _questioned_upload(file: UploadFile, remove_text: bool, keep: dict | None = None) -> np.ndarray:
+    """A questioned static image as the screening uses it. With remove_text the
+    printed-text remover runs on the RAW photo (it needs the text whole) and
+    replaces the line eraser; `keep` receives the raw bytes, image and info."""
+    if not remove_text:
+        data, img = await read_upload(file)
+        if keep is not None:
+            keep.update(data=data)
+        return img
+    data, raw = await read_upload(file, standardized=False)
+    img, info = text_removal.clean_questioned(raw)
+    if keep is not None:
+        keep.update(data=data, raw=raw, info=info)
+    return img
 
 
 _REF_WIDTHS: dict[str, int | None] = {}
@@ -264,7 +289,8 @@ def _client_classifier(db: Session, client_id: int, test: np.ndarray, refs: list
 
 def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: Case | None = None,
                         document_ref: str | None = None, expected_label: str | None = None,
-                        sample_hash: str | None = None) -> VerificationLog:
+                        sample_hash: str | None = None, text_removal_info: dict | None = None,
+                        original: np.ndarray | None = None) -> VerificationLog:
     """Screens one questioned image against a client's static references."""
     engine = get_engine()
     profiles = active_profiles(db, client.id, "static")
@@ -284,6 +310,7 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
         "quality": q,
         "size_scale": round(size_scale, 3),
         "client_classifier": classifier,
+        "text_removal": _text_removal_record(text_removal_info, original, client.id),
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
         "features": compare_features(static_features(img), [p.features for p in profiles], "static"),
@@ -299,6 +326,17 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     return log
 
 
+def _text_removal_record(info: dict | None, original: np.ndarray | None, client_id: int) -> dict | None:
+    """v8.21: what the remover did. When it changed the photo the original is
+    stored too, so the examiner can always compare (the hash is of the upload)."""
+    if not info:
+        return None
+    out = dict(info)
+    if info.get("removed") and original is not None:
+        out["original_path"] = save_image(original, f"questioned/static/{client_id}")
+    return out
+
+
 @router.post("/api/screen/static")
 async def screen_static(
     file: UploadFile = File(...),
@@ -306,14 +344,17 @@ async def screen_static(
     case_id: int | None = Form(None),
     document_ref: str | None = Form(None),
     expected_label: str | None = Form(None),
+    remove_text: bool = Form(False),
     db: Session = Depends(get_db),
     user: User = Depends(require_staff),
 ):
     client = visible_client_or_404(db, client_id, user)
     case = _check_case(db, case_id, client.id, user)
-    data, img = await read_upload(file)
+    kept: dict = {}
+    img = await _questioned_upload(file, remove_text, kept)
     log = screen_static_image(db, user, client, img, case, document_ref, _expected(expected_label),
-                              sample_hash=hashlib.sha256(data).hexdigest())
+                              sample_hash=hashlib.sha256(kept["data"]).hexdigest(),
+                              text_removal_info=kept.get("info"), original=kept.get("raw"))
     return result_out(log, db, user)
 
 
@@ -410,6 +451,16 @@ def questioned_image(log_id: int, view: str = Query("original", pattern="^(origi
         if img is None:
             raise HTTPException(404, "The questioned image is not stored for this record.")
         return Response(model_view_png(img), media_type="image/png", headers=VIEW_ONLY_HEADERS)
+    return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
+
+
+@router.get("/api/verifications/{log_id}/original-image")
+def questioned_original(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+    """v8.21: the photo as uploaded, before printed text was removed."""
+    log = _visible_log(db, log_id, user)
+    path = storage_path(((log.analysis or {}).get("text_removal") or {}).get("original_path"))
+    if path is None:
+        raise HTTPException(404, "No original photo: printed text was not removed for this record.")
     return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
 
 

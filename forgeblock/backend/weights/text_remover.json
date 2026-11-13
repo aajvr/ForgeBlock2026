@@ -1,0 +1,19 @@
+{
+ "input_hw": [
+  192,
+  384
+ ],
+ "threshold": 0.5,
+ "trigger_ink_share": 0.1,
+ "piece_threshold": 0.3,
+ "piece_share": 0.4,
+ "handwriting_threshold": 0.3,
+ "stencil_px": 9,
+ "stencil_min_px": 30,
+ "stencil_max_sig_loss": 0.05,
+ "fingerprint": "7f30a3d3d99ecc1a",
+ "setting": "FINAL 2026-11-12: remover on the RAW questioned photo; trigger >= 10% of ink printed; paper fill (closing, k=max(15,min(h,w)/12)); stencil 9x9 around handwriting >= 0.3, skipped if it lifts > 5% of signature ink; then line eraser with strokes protected",
+ "arch": "MFM: U-Net + fine feature path, 4 classes (BG/PT/HT/OV), weighted focal + dice; output = P(printed) x (1 - dilate(P(HT)+P(OV)))",
+ "trained_on": "synthetic printed text/stamps/lines on own + UTSig signatures (run 3)",
+ "applies_to": "questioned static image only, when the examiner ticks Remove printed text"
+}

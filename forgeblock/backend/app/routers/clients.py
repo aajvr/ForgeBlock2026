@@ -235,6 +235,7 @@ def delete_client_data(db: Session, c: Client) -> int:
         removed += 1
     for l in db.scalars(select(VerificationLog).where(VerificationLog.client_id == c.id)):
         delete_file(l.test_sample_path)  # the path itself stays in the sealed record
+        delete_file(((l.analysis or {}).get("text_removal") or {}).get("original_path"))  # v8.21
     c.status = "deleted"
     c.full_name = f"Deleted client {c.client_code}"
     c.notes = None
