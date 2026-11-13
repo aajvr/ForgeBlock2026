@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Layers, Link2, ShieldAlert, ShieldCheck, SlidersHorizontal, X, ZoomIn } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Layers, Link2, ShieldAlert, ShieldCheck, SlidersHorizontal, TriangleAlert, X, ZoomIn } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -374,48 +374,121 @@ function SideBySide({ r }) {
   )
 }
 
+// Handwriting feature groups. Static: shape, ink, structure. Dynamic features
+// get their own groups; anything not listed goes under "Other".
+const FEATURE_GROUPS = [
+  ['Shape and size', ['stroke_length', 'aspect_ratio', 'slant', 'baseline', 'path_length']],
+  ['Ink', ['thickness', 'ink_density']],
+  ['Timing', ['duration', 'speed', 'pauses']],
+  ['Structure', ['pieces', 'pen_lifts', 'strokes', 'loops', 'endpoints']],
+  ['Pen', ['pressure']],
+]
+const FEATURE_COLORS = { within: '#118A4B', outside: '#E8950C', band: '#CFE4FA' }
+
+// The usual range as a blue band on a grey line, and this signature as a dot.
+// Scale: the range padded by 35% on each side, extended to include the value.
+function FeatureTrack({ i }) {
+  if (i.low === null || !Number.isFinite(i.value)) return <div className="h-[10px] rounded-full bg-track" aria-hidden="true" />
+  const span = i.high - i.low || Math.max(Math.abs(i.high) * 0.1, 1)
+  const min = Math.min(i.low - span * 0.35, i.value)
+  const max = Math.max(i.high + span * 0.35, i.value)
+  const at = (x) => ((x - min) / (max - min || 1)) * 100
+  return (
+    <div className="relative mx-2 h-4" aria-hidden="true">
+      <div className="absolute inset-x-0 top-1/2 h-[10px] -translate-y-1/2 rounded-full bg-track" />
+      <div className="absolute top-1/2 h-[10px] -translate-y-1/2 rounded-full" style={{ left: `${at(i.low)}%`, width: `${at(i.high) - at(i.low)}%`, background: FEATURE_COLORS.band }} />
+      <div
+        className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_1px_3px_rgb(16_31_77/0.3)]"
+        style={{ left: `${at(i.value)}%`, background: i.outside ? FEATURE_COLORS.outside : FEATURE_COLORS.within }}
+      />
+    </div>
+  )
+}
+
+function FeatureRow({ i }) {
+  const d = digits(i)
+  const known = i.low !== null
+  return (
+    <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-[10px] px-3 py-3 lg:grid-cols-[240px_170px_minmax(120px,1fr)_130px_92px] ${i.outside ? 'bg-gradient-to-r from-warn-100 to-transparent' : ''}`}>
+      <div className="order-1 text-[15px] font-semibold text-ink">{i.label}</div>
+      <div className="order-2 justify-self-end lg:order-5">
+        {known && (i.outside
+          ? <Badge tone="amber">Outside</Badge>
+          : <Badge tone="green">Within</Badge>)}
+      </div>
+      <div className="order-3 lg:order-2">
+        <span className="font-mono text-[16px] tabular-nums text-ink">{fmt(i.value, d)}</span>
+        {i.unit && <span className={`${i.unit === '°' ? '' : 'ml-1'} text-[12.5px] text-muted`}>{i.unit}</span>}
+      </div>
+      <div className="order-4 text-right font-mono text-[14px] tabular-nums text-muted">
+        {known ? `${fmt(i.low, d)} – ${fmt(i.high, d)}` : '-'}
+      </div>
+      <div className="order-5 col-span-2 lg:order-3 lg:col-span-1">
+        <FeatureTrack i={i} />
+      </div>
+    </div>
+  )
+}
+
 function FeatureAnalysis({ r }) {
   const fa = r.analysis?.features
   if (!fa) return <p className="text-[14.5px] text-muted">No feature analysis for this record.</p>
+  const items = fa.items || []
+  const outside = items.filter((i) => i.outside)
+  const within = items.filter((i) => i.low !== null && !i.outside)
+  // The backend writes one sentence per outside feature, in row order; any
+  // sentence after those is a general note (the dynamic "slow signing" hint).
+  const callouts = outside.length
+    ? fa.summary.map((s, n) => ({ title: outside[n]?.label || 'Signing pattern', text: s }))
+    : []
+  const groups = [
+    ...FEATURE_GROUPS.map(([title, names]) => [title, items.filter((i) => names.includes(i.name))]),
+    ['Other', items.filter((i) => !FEATURE_GROUPS.some(([, names]) => names.includes(i.name)))],
+  ].filter(([, rows]) => rows.length)
   return (
     <div>
-      <h3 className="text-[17px] font-semibold text-ink">Handwriting features</h3>
-      <p className="mb-3.5 mt-1 text-[14px] text-muted">
-        How this signature differs from the client’s references; the result itself comes from the scores.
-      </p>
-      <ul className="mb-5 space-y-2">
-        {fa.summary.map((s, i) => (
-          <li key={i} className="flex gap-2.5 text-[14.5px] text-ink">
-            <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${fa.flagged ? 'bg-warn-600' : 'bg-ok-600'}`} />
-            {s}
-          </li>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="text-[17px] font-semibold text-ink">Handwriting features</h4>
+          <p className="mt-1 text-[13px] text-muted">How this signature differs from the client’s references; the result itself comes from the scores.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="green"><Check className="h-3.5 w-3.5" aria-hidden="true" /> {within.length} within range</Badge>
+          <Badge tone="amber"><TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" /> {outside.length} outside</Badge>
+        </div>
+      </div>
+
+      {callouts.length > 0 ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {callouts.map((c, n) => (
+            <div key={n} className="flex gap-3 rounded-[12px] border border-warn-100 bg-warn-50 px-4 py-3">
+              <TriangleAlert className="mt-0.5 h-[18px] w-[18px] shrink-0 text-warn-600" aria-hidden="true" />
+              <div className="min-w-0">
+                <div className="text-[15px] font-semibold text-ink">{c.title}</div>
+                <p className="mt-0.5 text-[14px] text-warn-700">{c.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        fa.summary.length > 0 && <p className="mt-3 flex items-center gap-2 text-[14px] text-ok-700"><Check className="h-4 w-4 shrink-0" aria-hidden="true" />{fa.summary.join(' ')}</p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-muted" aria-hidden="true">
+        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-6 rounded-full" style={{ background: FEATURE_COLORS.band }} /> Client’s usual range</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(16_31_77/0.15)]" style={{ background: FEATURE_COLORS.within }} /> This signature (within)</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(16_31_77/0.15)]" style={{ background: FEATURE_COLORS.outside }} /> This signature (outside)</span>
+      </div>
+
+      <div className="mt-2">
+        {groups.map(([title, rows]) => (
+          <section key={title} className="mt-4">
+            <h5 className="mb-1 px-3 text-[12.5px] font-bold uppercase tracking-[0.08em] text-muted">{title}</h5>
+            <div className="divide-y divide-track">
+              {rows.map((i) => <FeatureRow key={i.name} i={i} />)}
+            </div>
+          </section>
         ))}
-      </ul>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[14.5px]">
-          <thead>
-            <tr className="border-b border-track text-left text-[12px] uppercase tracking-[0.08em] text-muted">
-              <th className="py-2.5 font-semibold">Feature</th>
-              <th className="py-2.5 text-right font-semibold">This signature</th>
-              <th className="py-2.5 text-right font-semibold">Usual range</th>
-              <th className="py-2.5 text-right font-semibold" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-track">
-            {fa.items.map((i) => (
-              <tr key={i.name}>
-                <td className="py-3 font-semibold text-ink">{i.label}</td>
-                <td className="py-3 text-right font-mono tabular-nums text-ink">
-                  {fmt(i.value, digits(i))} <span className="text-muted">{i.unit}</span>
-                </td>
-                <td className="py-3 text-right font-mono tabular-nums text-muted">
-                  {i.low === null ? '-' : `${fmt(i.low, digits(i))} – ${fmt(i.high, digits(i))}`}
-                </td>
-                <td className="py-3 text-right">{i.low !== null && (i.outside ? <Badge tone="amber">Outside</Badge> : <Badge tone="green">Within</Badge>)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
