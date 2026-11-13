@@ -17,7 +17,7 @@ function ClientResult({ r }) {
   return (
     <div className="space-y-5">
       <PenDataNote r={r} />
-      <div className="grid items-stretch gap-5 lg:grid-cols-[1.35fr_1fr]">
+      <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
       <ResultHeader r={r} whose="your" client />
       <KeyFacts facts={[
         ['Client', r.client_name || r.client_code || '-'],

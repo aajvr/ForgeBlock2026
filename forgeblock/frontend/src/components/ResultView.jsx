@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Link2, ShieldAlert, ShieldCheck, X, ZoomIn } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Layers, Link2, ListChecks, Scale, ShieldAlert, ShieldCheck, SlidersHorizontal, X, ZoomIn } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -89,24 +89,16 @@ function HowPopover({ r, children, className = '', label = 'How is this calculat
   )
 }
 
-// A ring gauge in the result colour with the confidence score inside.
-function ConfidenceRing({ score, color, size = 92 }) {
-  const pct = Math.max(0, Math.min(100, score))
-  const R = 42
-  const C = 2 * Math.PI * R
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`Confidence score ${pct.toFixed(0)}%`}>
-      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-        <circle cx="50" cy="50" r={R} fill="none" stroke="#e3e9f1" strokeWidth="10" />
-        <circle cx="50" cy="50" r={R} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(C * pct) / 100} ${C}`} />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
-        <b className="text-[28px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink">{pct.toFixed(0)}</b>
-        <small className="mt-2 text-[13px] text-muted">%</small>
-      </div>
-    </div>
-  )
+// The result card's own colours: main colour, light tint, text colour.
+// Consistent is green here (the result card only; badges elsewhere keep RESULT's colours).
+const RESULT_THEME = {
+  consistent: { main: '#118A4B', tint: '#E3F5EA', text: '#0E7A43' },
+  inconclusive: { main: '#E8950C', tint: '#FFF1DB', text: '#B25E00' },
+  inconsistent: { main: '#D13438', tint: '#FDE7EB', text: '#A4262C' },
 }
+// Pass / not passed colours for the measure tracks.
+const PASS = { main: '#118A4B', tint: '#E3F5EA' }
+const FAIL = { main: '#D13438', tint: '#FDE7EB' }
 
 // One short sentence; the number itself is shown large next to it.
 function shortCaption(r, whose) {
@@ -116,49 +108,73 @@ function shortCaption(r, whose) {
   return 'Too close to call; an examiner should review it.'
 }
 
-// The result card (v3): a white card with a 5px top edge in the result colour.
-// Left: the result pill, the short caption and why. Right: the confidence score
-// panel with a ring. Footer: the receipt and, as children, the next action.
-// `how` (staff only) adds "How is this calculated?"; `client` uses the
-// client's plain-language line instead.
+// The result card (v3.1), tinted by the result: a diagonal gradient from the
+// result's light tint to white. Left: the white result pill, the caption and
+// why. Right: the confidence score. Then a full-width bar, the "measured
+// against" line, and a footer with the receipt and, as children, the next action.
+// `how` (staff only) adds the info button and "How is this calculated?";
+// `client` shows the client's plain-language line instead.
 export function ResultHeader({ r, label = 'Screening result', whose = 'the client’s', how = false, client = false, children }) {
   const res = RESULT[r.screening_result]
-  const score = r.confidence_score
+  const theme = RESULT_THEME[r.screening_result] || RESULT_THEME.inconclusive
+  const score = Math.max(0, Math.min(100, Number(r.confidence_score) || 0))
   const first = r.client_name ? r.client_name.trim().split(/\s+/)[0] : null
   const against = r.mode === 'compare' ? 'the other signature' : first ? `${first}’s own signature variation` : 'the client’s own signature variation'
+  const next = children || (client ? null : <span className="text-[13.5px] text-muted">The examiner makes the final decision.</span>)
   return (
-    <section className={`min-w-0 rounded-[16px] border border-t-[5px] border-edge ${res.edge} bg-white px-5 pb-5 pt-6 shadow-card sm:px-[26px]`} aria-label="Result">
-      <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:justify-between">
+    <section
+      className="min-w-0 rounded-[16px] border px-5 pb-5 pt-5 shadow-card sm:px-[26px]"
+      style={{ background: `linear-gradient(135deg, ${theme.tint} 0%, #ffffff 62%)`, borderColor: theme.tint }}
+      aria-label="Result"
+    >
+      <div className="text-[13.5px] font-bold uppercase tracking-[0.1em]" style={{ color: theme.text }}>{label}</div>
+      <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">{label}</div>
-          <div className={`mt-2.5 inline-flex items-center gap-2.5 rounded-[12px] px-4 py-2 text-[26px] font-bold leading-tight ${res.pill}`}>
-            <res.Icon className="h-[26px] w-[26px]" aria-hidden="true" />
+          <div className="inline-flex items-center gap-2.5 rounded-[14px] bg-white px-4 py-2 text-[28px] font-bold leading-tight shadow-[0_1px_3px_rgb(16_31_77/0.08)]" style={{ color: theme.text }}>
+            <res.Icon className="h-7 w-7 shrink-0" style={{ color: theme.main }} aria-hidden="true" />
             {res.label}
           </div>
-          <p className="mt-3 text-[16px] font-medium text-ink">{shortCaption(r, whose)}</p>
-          {r.explain?.why && <p className="mt-1 max-w-[430px] text-[14px] leading-normal text-muted">{r.explain.why}</p>}
+          <p className="mt-3 text-[17px] font-semibold text-ink">{shortCaption(r, whose)}</p>
+          {r.explain?.why && <p className="mt-1 max-w-[560px] text-[14.5px] leading-normal text-muted">{r.explain.why}</p>}
         </div>
-        <div className="flex w-full flex-col rounded-[14px] border border-[#e8edf4] bg-[#f6f8fc] px-4 py-3.5 md:w-[300px] md:shrink-0">
-          {/* One way in to the explanation: the "How is this calculated?" link under the ring. */}
-          <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">Confidence score</div>
-          <div className="mt-2 flex items-center gap-3">
-            <ConfidenceRing score={score} color={res.hex} />
-            <p className="m-0 text-[12.5px] leading-[1.45] text-[#4b5a6e]">
-              {client
-                ? 'How sure the screening is about this result. Your examiner makes the final decision.'
-                : <>How sure ForgeBlock is about <b className="font-semibold text-ink">this result</b>, measured against {against}. Never above 99%.</>}
-            </p>
+        <div className="shrink-0 sm:text-right">
+          <div className="flex items-center gap-1 text-[13.5px] font-bold uppercase tracking-[0.1em] text-[#3b4a5e] sm:justify-end">
+            Confidence score
+            {how && (
+              <HowPopover r={r} className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-white hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-600">
+                <Info className="h-4 w-4" />
+              </HowPopover>
+            )}
           </div>
-          {how && (
-            <HowPopover r={r} className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline">
-              How is this calculated? <ArrowRight className="h-3.5 w-3.5" />
-            </HowPopover>
-          )}
+          <div className="mt-1 leading-none text-ink">
+            <span className="text-[52px] font-bold tracking-[-0.03em] tabular-nums">{score.toFixed(0)}</span>
+            <span className="ml-0.5 text-[24px] font-bold text-muted">%</span>
+          </div>
+          <p className="mt-2 text-[13px] text-muted">How sure ForgeBlock is about this result</p>
         </div>
       </div>
-      <div className="mt-[18px] flex flex-wrap items-center justify-between gap-3 border-t border-track pt-4 text-[13.5px]">
+      <div
+        className="mt-5 h-[10px] overflow-hidden rounded-full border bg-white"
+        style={{ borderColor: theme.tint }}
+        role="meter"
+        aria-label="Confidence score"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(score)}
+      >
+        <div className="h-full rounded-full" style={{ width: `${score}%`, background: theme.main }} />
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        <p className="m-0 text-[12.5px] text-muted">{client ? 'Your examiner makes the final decision.' : `Measured against ${against}. Never above 99%.`}</p>
+        {how && (
+          <HowPopover r={r} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline">
+            How is this calculated? <ArrowRight className="h-3.5 w-3.5" />
+          </HowPopover>
+        )}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[rgb(15_40_90/0.08)] pt-4 text-[13.5px]">
         <span className="flex items-center gap-2 text-muted">Receipt <span className="text-[13px] font-medium text-ink"><ReceiptValue r={r} /></span></span>
-        {children}
+        {next}
       </div>
     </section>
   )
@@ -173,16 +189,16 @@ export function ReceiptValue({ r }) {
   )
 }
 
-// Key facts (v3): a card of rows, label left and value right, thin dividers.
+// Key facts (v3.1): stacked rows (small uppercase label over the value), thin dividers.
 export function KeyFacts({ facts, children, title = 'Key facts' }) {
   return (
-    <section className="min-w-0 rounded-[16px] border border-edge bg-white px-5 py-5 shadow-card sm:px-[22px]" aria-label={title}>
+    <section className="min-w-0 rounded-[16px] border border-edge bg-white px-5 py-5 shadow-card" aria-label={title}>
       <h2 className="text-[17px] font-semibold text-ink">{title}</h2>
-      <dl className="mt-3.5">
+      <dl className="mt-2">
         {facts.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between gap-4 border-t border-track px-0.5 py-3">
-            <dt className="shrink-0 text-[13.5px] text-muted">{k}</dt>
-            <dd className="m-0 min-w-0 text-right text-[14.5px] font-semibold text-ink">{v}</dd>
+          <div key={k} className="border-t border-track py-3 first:border-t-0">
+            <dt className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">{k}</dt>
+            <dd className="m-0 mt-1 min-w-0 break-words text-[15px] font-semibold text-ink">{v}</dd>
           </div>
         ))}
       </dl>
@@ -226,7 +242,7 @@ export function DetailsToggle({ tabs, children }) {
                   role="tab"
                   aria-selected={tab === t.value}
                   onClick={() => setTab(t.value)}
-                  className={`whitespace-nowrap rounded-[9px] px-3.5 py-1.5 text-[14px] transition ${
+                  className={`whitespace-nowrap rounded-[9px] px-[18px] py-2 text-[14.5px] transition ${
                     tab === t.value ? 'bg-white font-semibold text-brand-600 shadow-[0_1px_3px_rgb(0_0_0/0.1)]' : 'font-medium text-[#4b5a6e] hover:text-ink'
                   }`}
                 >
@@ -360,41 +376,42 @@ function SideBySide({ r }) {
 
 function FeatureAnalysis({ r }) {
   const fa = r.analysis?.features
-  if (!fa) return <p className="text-sm text-slate-500">No feature analysis for this record.</p>
+  if (!fa) return <p className="text-[14.5px] text-muted">No feature analysis for this record.</p>
   return (
     <div>
-      <p className="mb-3 text-xs text-slate-500">
+      <h3 className="text-[17px] font-semibold text-ink">Handwriting features</h3>
+      <p className="mb-3.5 mt-1 text-[14px] text-muted">
         How this signature differs from the client’s references; the result itself comes from the scores.
       </p>
-      <ul className="mb-4 space-y-1.5">
+      <ul className="mb-5 space-y-2">
         {fa.summary.map((s, i) => (
-          <li key={i} className="flex gap-2 text-sm text-slate-800">
-            <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${fa.flagged ? 'bg-warn-600' : 'bg-ok-600'}`} />
+          <li key={i} className="flex gap-2.5 text-[14.5px] text-ink">
+            <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${fa.flagged ? 'bg-warn-600' : 'bg-ok-600'}`} />
             {s}
           </li>
         ))}
       </ul>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-[14.5px]">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-              <th className="py-2 font-medium">Feature</th>
-              <th className="py-2 text-right font-medium">This signature</th>
-              <th className="py-2 text-right font-medium">Usual range</th>
-              <th className="py-2 text-right font-medium" />
+            <tr className="border-b border-track text-left text-[12px] uppercase tracking-[0.08em] text-muted">
+              <th className="py-2.5 font-semibold">Feature</th>
+              <th className="py-2.5 text-right font-semibold">This signature</th>
+              <th className="py-2.5 text-right font-semibold">Usual range</th>
+              <th className="py-2.5 text-right font-semibold" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-track">
             {fa.items.map((i) => (
               <tr key={i.name}>
-                <td className="py-2">{i.label}</td>
-                <td className="py-2 text-right font-mono tabular-nums">
-                  {fmt(i.value, digits(i))} <span className="text-slate-400">{i.unit}</span>
+                <td className="py-3 font-semibold text-ink">{i.label}</td>
+                <td className="py-3 text-right font-mono tabular-nums text-ink">
+                  {fmt(i.value, digits(i))} <span className="text-muted">{i.unit}</span>
                 </td>
-                <td className="py-2 text-right font-mono tabular-nums text-slate-500">
+                <td className="py-3 text-right font-mono tabular-nums text-muted">
                   {i.low === null ? '-' : `${fmt(i.low, digits(i))} – ${fmt(i.high, digits(i))}`}
                 </td>
-                <td className="py-2 text-right">{i.low !== null && (i.outside ? <Badge tone="amber">Outside</Badge> : <Badge tone="green">Within</Badge>)}</td>
+                <td className="py-3 text-right">{i.low !== null && (i.outside ? <Badge tone="amber">Outside</Badge> : <Badge tone="green">Within</Badge>)}</td>
               </tr>
             ))}
           </tbody>
@@ -526,78 +543,164 @@ function Overlay({ r }) {
   )
 }
 
+// A summary tile at the top of the Scores tab.
+function ScoreTile({ icon: Icon, label, children }) {
+  return (
+    <div className="flex min-w-0 items-start gap-3 rounded-[14px] border border-edge bg-[#f8fafd] px-4 py-3.5">
+      {Icon && (
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[var(--role-soft,#cfe4fa)] text-[var(--role-ink,#0f6cbd)]">
+          <Icon className="h-[18px] w-[18px]" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</div>
+        <div className="mt-1 text-[15px] font-semibold leading-snug text-ink">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// The track's range, zoomed around the threshold so the signature's dot and the
+// threshold tick are always far enough apart to read. Cosine stays within -1..1,
+// distances stay at or above 0.
+function trackRange(value, threshold, higherIsBetter) {
+  const d = Math.max(Math.abs(value - threshold) * 1.8, Math.abs(threshold) * 0.25, 0.05)
+  let lo = threshold - d
+  let hi = threshold + d
+  if (higherIsBetter) {
+    hi = Math.min(hi, 1)
+    lo = Math.max(lo, -1)
+  } else {
+    lo = Math.max(lo, 0)
+  }
+  return [lo, hi]
+}
+
+// One measure: name, value against its threshold, a track with the threshold
+// tick, the passing side shaded, a dot for this signature, and Passed / Not passed.
+function MeasureRow({ name, value, threshold, higherIsBetter, passed, personal }) {
+  const drawable = Number.isFinite(value) && Number.isFinite(threshold)
+  const [lo, hi] = drawable ? trackRange(value, threshold, higherIsBetter) : [0, 1]
+  const at = (x) => Math.max(0, Math.min(100, ((x - lo) / (hi - lo)) * 100))
+  const t = at(threshold)
+  const v = at(value)
+  const c = passed ? PASS : FAIL
+  return (
+    <div className="border-t border-track py-4 first:border-t-0">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <div className="min-w-0">
+          <div className="text-[15.5px] font-semibold text-ink">{name}</div>
+          <div className="text-[13px] text-muted">{higherIsBetter ? 'Higher is more similar' : 'Lower is more similar'}</div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="font-mono text-[20px] leading-tight tabular-nums text-ink">{fmt(value)}</div>
+            <div className="text-[12.5px] text-muted">
+              <span className="font-mono">{higherIsBetter ? '≥' : '≤'} {fmt(threshold)}</span> {personal ? 'personal' : 'standard'} threshold
+            </div>
+          </div>
+          {passed
+            ? <Badge tone="green"><Check className="h-3.5 w-3.5" aria-hidden="true" /> Passed</Badge>
+            : <Badge tone="red"><X className="h-3.5 w-3.5" aria-hidden="true" /> Not passed</Badge>}
+        </div>
+      </div>
+      {drawable && <>
+      <div className="relative mt-3.5 h-3" aria-hidden="true">
+        <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-track">
+          <div className="absolute inset-y-0" style={{ background: c.tint, left: higherIsBetter ? `${t}%` : 0, right: higherIsBetter ? 0 : `${100 - t}%` }} />
+        </div>
+        <div className="absolute -bottom-1 -top-1 w-[2px] -translate-x-1/2 rounded-full bg-ink/70" style={{ left: `${t}%` }} />
+        <div className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] bg-white shadow-[0_1px_3px_rgb(16_31_77/0.25)]" style={{ left: `${v}%`, borderColor: c.main }} />
+      </div>
+      <div className="mt-1.5 flex justify-between font-mono text-[11px] tabular-nums text-muted" aria-hidden="true">
+        <span>{fmt(lo, 2)}</span>
+        <span>{fmt(hi, 2)}</span>
+      </div>
+      </>}
+    </div>
+  )
+}
+
 function Scores({ r, quality = true }) {
   const per = r.analysis?.per_reference || []
+  const votes = Object.entries(r.votes || {})
+  const passedCount = votes.filter(([, v]) => v).length
+  const personal = r.threshold_source === 'adaptive'
+  const cosT = r.thresholds?.cosine
+  const hasCosT = typeof cosT === 'number'
   return (
-    <div className="space-y-5">
-      <div>
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 text-[15px]">
-          <div>
-            <dt className="text-sm text-slate-500">Compared with</dt>
-            <dd className="font-medium">{r.reference_count} {r.modality} reference{r.reference_count === 1 ? '' : 's'}</dd>
-          </div>
-          <div>
-            <dt className="text-sm text-slate-500">Thresholds</dt>
-            <dd className="font-medium">{r.threshold_source === 'adaptive' ? 'Personal' : 'Standard'}{r.strength && <span className="ml-2"><StrengthBadge strength={r.strength} /></span>}</dd>
-          </div>
-        </dl>
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ScoreTile icon={Layers} label="Compared with">
+          {r.reference_count} {r.modality} reference{r.reference_count === 1 ? '' : 's'}
+        </ScoreTile>
+        <ScoreTile icon={SlidersHorizontal} label="Thresholds">
+          <span className="inline-flex flex-wrap items-center gap-2">{personal ? 'Personal' : 'Standard'}{r.strength && <StrengthBadge strength={r.strength} />}</span>
+        </ScoreTile>
+        <ScoreTile icon={Scale} label="Decision rule">{r.decision_rule}</ScoreTile>
+        <ScoreTile icon={ListChecks} label="Measures passed">
+          {passedCount} of {votes.length}
+          <span className="block text-[12.5px] font-normal text-muted">{r.modality === 'static' ? '2 of 3 needed' : 'both needed'}</span>
+        </ScoreTile>
       </div>
-      <div className="overflow-x-auto">
-      <table className="w-full text-[14px]">
-        <thead>
-          <tr className="border-b border-track text-left text-[12.5px] text-muted">
-            <th className="px-3 py-2 font-semibold">Measure</th>
-            <th className="px-3 py-2 font-semibold">Score</th>
-            <th className="px-3 py-2 font-semibold">{r.threshold_source === 'adaptive' ? 'Personal threshold' : 'Standard threshold'}</th>
-            <th className="px-3 py-2 font-semibold">Result</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#f3f5f9]">
-          {Object.entries(r.votes).map(([k, vote]) => (
-            <tr key={k}>
-              <td className="px-3 py-[13px] text-ink">{r.metric_labels[k] || k}</td>
-              <td className="px-3 py-[13px] font-mono text-[13px] tabular-nums text-ink">{fmt(r.metrics[k])}</td>
-              <td className="px-3 py-[13px] font-mono text-[13px] tabular-nums text-ink">
-                {k === 'cosine' ? '≥ ' : '≤ '}
-                {fmt(r.thresholds[k])}
-              </td>
-              <td className="px-3 py-[13px]">
-                {vote
-                  ? <Badge tone="green"><Check className="h-3.5 w-3.5" aria-hidden="true" /> Passed</Badge>
-                  : <Badge tone="red"><X className="h-3.5 w-3.5" aria-hidden="true" /> Not passed</Badge>}
-              </td>
-            </tr>
+
+      <section>
+        <h3 className="text-[17px] font-semibold text-ink">Measures</h3>
+        <p className="mt-1 text-[14px] text-muted">
+          {r.reference_count > 1 ? 'Values are averaged over all references. ' : ''}The dot shows this signature; the shaded part is the passing side of the threshold.
+        </p>
+        <div className="mt-2">
+          {votes.map(([k, vote]) => (
+            <MeasureRow
+              key={k}
+              name={r.metric_labels?.[k] || k}
+              value={r.metrics[k]}
+              threshold={r.thresholds[k]}
+              higherIsBetter={k === 'cosine'}
+              passed={!!vote}
+              personal={personal}
+            />
           ))}
-        </tbody>
-      </table>
-      </div>
-      <p className="text-xs text-slate-500">Decision rule: {r.decision_rule}. {r.reference_count > 1 && 'Values are averaged over all references.'}</p>
+        </div>
+      </section>
+
       {r.explain?.all_pass && r.screening_result !== 'consistent' && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="rounded-[10px] bg-warn-50 px-3.5 py-2.5 text-[14px] text-warn-700">
           All metrics pass, but the result also depends on how far past the thresholds the signature is, compared with this client’s own
           signatures. Here the margin was small, so the chance it is genuine is about {r.explain.p_genuine}%.
         </p>
       )}
+
       {per.length > 0 && (
-        <div>
-          <div className="mb-2 text-sm font-medium">Similarity to each reference</div>
-          <div className="space-y-1.5">
-            {per.map((p, i) => (
-              <div key={p.profile_id} className="flex items-center gap-3 text-xs">
-                <span className="w-24 text-slate-500">
-                  Reference {i + 1} {p.profile_id === r.best_match_profile_id && '★'}
-                </span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full bg-brand-500" style={{ width: `${Math.max(0, p.cosine) * 100}%` }} />
+        <section>
+          <h3 className="text-[17px] font-semibold text-ink">Similarity to each reference</h3>
+          <p className="mt-1 text-[14px] text-muted">
+            Cosine similarity to each reference on file.{hasCosT && <> The line marks the threshold (<span className="font-mono">≥ {fmt(cosT)}</span>); grey bars are below it.</>} ★ is the best match.
+          </p>
+          <div className="mt-3 grid gap-x-6 gap-y-1 md:grid-cols-2">
+            {per.map((p, i) => {
+              const best = p.profile_id === r.best_match_profile_id
+              const below = hasCosT && p.cosine < cosT
+              return (
+                <div key={p.profile_id} className={`flex items-center gap-3 rounded-[10px] px-2.5 py-2 text-[14px] ${best ? 'bg-brand-50' : ''}`}>
+                  <span className={`w-[104px] shrink-0 ${best ? 'font-semibold text-ink' : 'text-muted'}`}>
+                    Reference {i + 1}{best && <span className="ml-1 text-warn-500" aria-label="best match">★</span>}
+                  </span>
+                  <div className="relative h-2.5 flex-1">
+                    <div className="absolute inset-0 overflow-hidden rounded-full bg-track">
+                      <div className={`h-full rounded-full ${below ? 'bg-slate-300' : 'bg-[var(--role-ink,#0f6cbd)]'}`} style={{ width: `${Math.max(0, Math.min(1, p.cosine)) * 100}%` }} />
+                    </div>
+                    {hasCosT && <div className="absolute -bottom-1 -top-1 w-[2px] -translate-x-1/2 rounded-full bg-ink/70" style={{ left: `${Math.max(0, Math.min(1, cosT)) * 100}%` }} aria-hidden="true" />}
+                  </div>
+                  <span className={`w-14 shrink-0 text-right font-mono tabular-nums ${best ? 'font-semibold text-ink' : 'text-ink'}`}>{p.cosine.toFixed(3)}</span>
                 </div>
-                <span className="w-14 text-right font-mono tabular-nums">{p.cosine.toFixed(3)}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        </div>
+        </section>
       )}
       {quality && r.analysis?.quality && (
-        <p className="text-xs text-slate-500">
+        <p className="text-[13px] text-muted">
           Input quality {r.analysis.quality.score}/100{r.analysis.quality.issues.length ? `: ${r.analysis.quality.issues.join(' ')}` : '.'}
         </p>
       )}
@@ -606,7 +709,7 @@ function Scores({ r, quality = true }) {
 }
 
 function LedgerProof({ r }) {
-  if (!r.block) return <p className="text-sm text-slate-500">No ledger block.</p>
+  if (!r.block) return <p className="text-[14.5px] text-muted">No ledger block.</p>
   const rows = [
     ['Block', `#${r.block.block_index}`],
     ['Record hash', r.block.record_hash],
@@ -616,19 +719,20 @@ function LedgerProof({ r }) {
   ]
   return (
     <div>
-      <div className={`mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${r.integrity.valid ? 'bg-ok-50 text-ok-700' : 'bg-bad-50 text-bad-700'}`}>
-        {r.integrity.valid ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+      <h3 className="text-[17px] font-semibold text-ink">Ledger proof</h3>
+      <div className={`mb-4 mt-3 flex items-center gap-2 rounded-[10px] px-3.5 py-2.5 text-[14.5px] font-medium ${r.integrity.valid ? 'bg-ok-50 text-ok-700' : 'bg-bad-50 text-bad-700'}`}>
+        {r.integrity.valid ? <ShieldCheck className="h-[18px] w-[18px] shrink-0" /> : <ShieldAlert className="h-[18px] w-[18px] shrink-0" />}
         {r.integrity.valid ? 'The record matches its sealed hash and its block links to the chain.' : r.integrity.issues.join(' ')}
       </div>
-      <dl className="space-y-2 text-sm">
+      <dl>
         {rows.map(([k, v]) => (
-          <div key={k} className="grid gap-1 sm:grid-cols-[180px_1fr]">
-            <dt className="text-slate-500">{k}</dt>
-            <dd className="break-all font-mono text-xs leading-5 text-slate-800">{v}</dd>
+          <div key={k} className="grid gap-1 border-t border-track py-3 first:border-t-0 sm:grid-cols-[180px_1fr] sm:gap-4">
+            <dt className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted sm:pt-0.5">{k}</dt>
+            <dd className="m-0 break-all font-mono text-[13.5px] leading-6 text-ink">{v}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500">
+      <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted">
         <Link2 className="h-3.5 w-3.5 shrink-0" /> Anyone with the receipt code can check this record on the ForgeBlock home page.
       </p>
     </div>
@@ -659,7 +763,7 @@ export default function ResultView({ result: r }) {
         </Alert>
       )}
       <PenDataNote r={r} />
-      <div className="grid items-stretch gap-5 lg:grid-cols-[1.35fr_1fr]">
+      <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff}>
           {needsDecision && r.case.can_open && (
             <Link to={`/app/cases/${r.case.id}`} className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-[18px] py-2.5 text-[15px] font-semibold text-white shadow-[0_6px_16px_rgb(15_108_189/0.3)] transition hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
