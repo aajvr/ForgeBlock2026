@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Layers, Link2, ListChecks, Scale, ShieldAlert, ShieldCheck, SlidersHorizontal, X, ZoomIn } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ChevronUp, Grid3x3, Info, Layers, Link2, ShieldAlert, ShieldCheck, SlidersHorizontal, X, ZoomIn } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -624,23 +624,17 @@ function MeasureRow({ name, value, threshold, higherIsBetter, passed, personal }
 function Scores({ r, quality = true }) {
   const per = r.analysis?.per_reference || []
   const votes = Object.entries(r.votes || {})
-  const passedCount = votes.filter(([, v]) => v).length
   const personal = r.threshold_source === 'adaptive'
   const cosT = r.thresholds?.cosine
   const hasCosT = typeof cosT === 'number'
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <ScoreTile icon={Layers} label="Compared with">
           {r.reference_count} {r.modality} reference{r.reference_count === 1 ? '' : 's'}
         </ScoreTile>
         <ScoreTile icon={SlidersHorizontal} label="Thresholds">
           <span className="inline-flex flex-wrap items-center gap-2">{personal ? 'Personal' : 'Standard'}{r.strength && <StrengthBadge strength={r.strength} />}</span>
-        </ScoreTile>
-        <ScoreTile icon={Scale} label="Decision rule">{r.decision_rule}</ScoreTile>
-        <ScoreTile icon={ListChecks} label="Measures passed">
-          {passedCount} of {votes.length}
-          <span className="block text-[12.5px] font-normal text-muted">{r.modality === 'static' ? '2 of 3 needed' : 'both needed'}</span>
         </ScoreTile>
       </div>
 
@@ -677,8 +671,12 @@ function Scores({ r, quality = true }) {
           <p className="mt-1 text-[14px] text-muted">
             Cosine similarity to each reference on file.{hasCosT && <> The line marks the threshold (<span className="font-mono">≥ {fmt(cosT)}</span>); grey bars are below it.</>} ★ is the best match.
           </p>
-          <div className="mt-3 grid gap-x-6 gap-y-1 md:grid-cols-2">
-            {per.map((p, i) => {
+          {/* Numbered top to bottom: the first half down the left column, the rest down the right. */}
+          <div className="mt-3 grid gap-x-6 md:grid-cols-2">
+            {[per.slice(0, Math.ceil(per.length / 2)), per.slice(Math.ceil(per.length / 2))].map((half, h) => (
+            <div key={h} className="flex flex-col gap-y-1">
+            {half.map((p, j) => {
+              const i = h * Math.ceil(per.length / 2) + j
               const best = p.profile_id === r.best_match_profile_id
               const below = hasCosT && p.cosine < cosT
               return (
@@ -696,6 +694,8 @@ function Scores({ r, quality = true }) {
                 </div>
               )
             })}
+            </div>
+            ))}
           </div>
         </section>
       )}
