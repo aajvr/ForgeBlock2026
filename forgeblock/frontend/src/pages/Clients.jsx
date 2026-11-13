@@ -788,11 +788,12 @@ function DynamicEnroll({ client, onDone, onDirty }) {
         <input type="checkbox" checked={penOnly} onChange={(e) => setPenOnly(e.target.checked)} /> Pen-only mode (ignore finger and palm touches)
       </label>
       <DevPenNotice />
-      <SignaturePad ref={pad} penOnly={penOnly} />
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={add}>Keep this signature</Button>
-        <Button variant="ghost" onClick={() => pad.current.clear()}>Clear</Button>
-        <Button className="ml-auto" onClick={save} disabled={!samples.length} loading={busy}>
+      <SignaturePad ref={pad} penOnly={penOnly} onPenOnlyChange={setPenOnly} label={client.client_code} />
+      {/* Tap-sized (44px) buttons in one row under the pad. */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Button variant="secondary" className="min-h-11" onClick={add}>Keep this signature</Button>
+        <Button variant="secondary" className="min-h-11" onClick={() => pad.current.clear()}>Clear</Button>
+        <Button className="ml-auto min-h-11" onClick={save} disabled={!samples.length} loading={busy}>
           Save {samples.length} reference{samples.length === 1 ? '' : 's'}
         </Button>
       </div>
