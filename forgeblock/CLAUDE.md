@@ -31,7 +31,7 @@ python training/train_dynamic.py --svc <SVC2004/Task2>
 - All decisions go through `app/ml/decision.py`:
   - static: cosine ≥ τc, Euclidean ≤ τE, Manhattan ≤ τM, majority 2 of 3;
   - dynamic: mean cosine ≥ τc and mean Euclidean ≤ √(2(1 − τc));
-  - adaptive thresholds when a client has ≥ `MIN_ADAPTIVE_SAMPLES` (5) references.
+  - adaptive thresholds when a client has ≥ `MIN_ADAPTIVE_SAMPLES` (7) references.
 - There is no Compare page or heatmap any more (removed in v7).
 - Static references can also come from the printable 10-box enrollment sheet (`app/ml/enroll_sheet.py`: vector PDF with four corner squares, client code only; phone photo or scan is straightened and cropped; crops keep natural paper/ink, not whitened). `/static/sheet-preview` stores nothing; the chosen crops go through the normal `/static/enroll`.
 - Every screening must go through `services.record_verification`, which writes the `VerificationLog`, appends the ledger block, logs the activity and adds the case event. Findings are sealed with `ledger.finding_payload` in `routers/cases.py`. Do not write verification logs any other way, or the ledger will flag them.

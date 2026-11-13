@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { Combobox } from './Combobox'
 import { LIMITED_PEN_LABEL, penMissing, penWords } from './penData'
 import { Alert, Field, Select, StrengthBadge } from './ui'
 
@@ -90,29 +91,59 @@ export function StrokePreview({ strokes, className = 'h-16 w-40', color = '#0c3b
 
 // Picks a client on file; shows the threshold strength for the chosen module.
 export function ClientPicker({ value, onChange, modality }) {
-  const [clients, setClients] = useState([])
+  const [clients, setClients] = useState(null)
   useEffect(() => {
     api.get('/api/clients').then(setClients).catch(() => setClients([]))
   }, [])
-  const chosen = clients.find((c) => String(c.id) === String(value))
+  const chosen = clients?.find((c) => String(c.id) === String(value))
   const strength = chosen && (modality === 'dynamic' ? chosen.dynamic_strength : chosen.static_strength)
+  // Searchable list: name on top, code, group and reference count underneath.
+  // Groups show as tabs at the top of the list (All, then each group A-Z).
+  const options = useMemo(
+    () =>
+      [...(clients || [])]
+        .sort((x, y) => x.full_name.localeCompare(y.full_name))
+        .map((c) => {
+          const n = modality === 'dynamic' ? c.dynamic_count : c.static_count
+          return {
+            value: c.id,
+            label: c.full_name,
+            sub: [c.client_code, c.group_name || 'No group', `${n} ref${n === 1 ? '' : 's'}`].join(' · '),
+            keywords: `${c.client_code} ${c.group_name || ''}`,
+            group: c.group_id ? String(c.group_id) : 'none',
+          }
+        }),
+    [clients, modality],
+  )
+  const tabs = useMemo(() => {
+    const seen = new Map()
+    for (const c of clients || []) seen.set(c.group_id ? String(c.group_id) : 'none', c.group_name || 'No group')
+    if (seen.size < 2) return undefined // one group: tabs add nothing
+    return [...seen]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => (a.value === 'none') - (b.value === 'none') || a.label.localeCompare(b.label))
+  }, [clients])
   return (
-    <Field
-      label="Client on file"
-      hint={chosen ? strength.note : 'The questioned signature is screened against this client’s references.'}
-    >
+    // A div, not Field's <label>: a label would turn clicks inside the open list into toggles.
+    <div>
+      <span className="mb-1 block text-sm font-medium text-slate-800">Client on file</span>
       <div className="flex items-center gap-2">
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Choose a client…</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.full_name} ({c.client_code}) · {modality === 'dynamic' ? c.dynamic_count : c.static_count} refs
-            </option>
-          ))}
-        </Select>
+        <Combobox
+          field
+          label="Client on file"
+          anyLabel={clients === null ? 'Loading clients…' : 'Choose a client…'}
+          placeholder="Search by name or code…"
+          value={value}
+          onChange={onChange}
+          options={options}
+          tabs={tabs}
+          tabsLabel="by group"
+          className="min-w-0 flex-1"
+        />
         {strength && <StrengthBadge strength={strength} />}
       </div>
-    </Field>
+      <span className="mt-1 block text-xs text-slate-500">{chosen ? strength.note : 'The questioned signature is screened against this client’s references.'}</span>
+    </div>
   )
 }
 

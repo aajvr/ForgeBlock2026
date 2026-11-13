@@ -46,7 +46,10 @@ from . import pen_data
 from .common import (
     VIEW_ONLY_HEADERS,
     active_profiles,
+    capture_flags,
     client_out,
+    clients_out,
+    logs_out,
     consistency,
     log_out,
     model_cfg,
@@ -130,7 +133,8 @@ def list_clients(q: str | None = None, db: Session = Depends(get_db), user: User
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(or_(func.lower(Client.full_name).like(like), func.lower(Client.client_code).like(like)))
-    return [{**client_out(c, db), "shared": not can_edit_client(user, c)} for c in db.scalars(stmt)]
+    cs = list(db.scalars(stmt))
+    return [{**o, "shared": not can_edit_client(user, c)} for c, o in zip(cs, clients_out(cs, db))]
 
 
 @router.post("/clients")
@@ -178,14 +182,15 @@ def client_card(client_id: int, db: Session = Depends(get_db), user: User = Depe
     for modality in ("static", "dynamic"):
         profiles = active_profiles(db, c.id, modality)
         cons = consistency(profiles, modality)
-        out[f"{modality}_references"] = [profile_out(p, cons) for p in profiles]
+        caps = capture_flags(profiles) if modality == "static" else {}
+        out[f"{modality}_references"] = [profile_out(p, cons, caps.get(p.id)) for p in profiles]
     cases = db.scalars(own_cases(select(Case).where(Case.client_id == c.id), user).order_by(Case.id.desc())).all()
     nm = names(db)
     out["cases"] = [{"id": k.id, "case_code": k.case_code, "title": k.title, "status": k.status,
                      "examiner_name": nm.get(k.examiner_id), "created_at": k.created_at} for k in cases]
     logs = db.scalars(own_logs(select(VerificationLog).where(VerificationLog.client_id == c.id), user)
                       .order_by(VerificationLog.id.desc()).limit(50)).all()
-    out["checks"] = [log_out(l, db, nm) for l in logs]
+    out["checks"] = logs_out(logs, db, nm)
     if is_admin(user):
         access = db.scalars(select(ClientAccess).where(ClientAccess.client_id == c.id)).all()
         users = {u.id: u for u in db.scalars(select(User).where(User.id.in_([a.user_id for a in access])))}
@@ -428,6 +433,23 @@ def remove_reference(profile_id: int, db: Session = Depends(get_db), user: User 
     db.commit()
     c = db.get(Client, p.client_id)
     log_activity(db, user, "enrollment", f"Removed {p.modality} reference #{p.id} from {c.client_code}",
+                 modality=p.modality)
+    return {"ok": True}
+
+
+@router.patch("/clients/{client_id}/references/{profile_id}/capture-ack")
+def acknowledge_capture(client_id: int, profile_id: int, db: Session = Depends(get_db),
+                        user: User = Depends(require_staff)):
+    """v8.23: keep a reference flagged as captured differently (same permission as
+    removing it). Stored in features; the embedding and screening are unchanged."""
+    p = _profile(db, profile_id, user, edit=True)
+    if p.client_id != client_id or p.modality != "static":
+        raise HTTPException(404, "Reference not found.")
+    p.features = {**(p.features or {}), "_capture_ack": True}  # new dict so the JSON change is saved
+    db.commit()
+    c = db.get(Client, p.client_id)
+    log_activity(db, user, "enrollment",
+                 f"Kept static reference #{p.id} of {c.client_code} although it was captured differently",
                  modality=p.modality)
     return {"ok": True}
 

@@ -111,3 +111,28 @@ def match_size(img: np.ndarray, reference_widths: list[int]) -> tuple[np.ndarray
         return img, 1.0
     interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
     return cv2.resize(img, None, fx=scale, fy=scale, interpolation=interp), scale
+
+
+# ------------------------------------------------- v8.22 capture check ---
+# The static model compares best when the questioned signature was captured like
+# the references. A questioned signature more than CAPTURE_SIZE_LIMIT times wider
+# (or narrower) than the client's references was almost always captured another
+# way (e.g. a close-up phone photo against small sheet-box references). Tested
+# 2026-11-13 (v8.16): fired on all 7 of a client's real document photos, on 1.5%
+# of same-capture uploads in the own 55-person dataset and on 0% of UTSig. A
+# sharpness check was tried and dropped (fired on ~6% of same-capture uploads).
+CAPTURE_SIZE_LIMIT = 2.0
+
+
+def capture_check(questioned_width: int | None, reference_widths: list[int | None]) -> dict:
+    """How the questioned signature's size compares with the references'.
+    Display only: never changes the result."""
+    widths = [w for w in reference_widths if w]
+    if not questioned_width or not widths:
+        return {"checked": False, "flagged": False}
+    ref = float(np.median(widths))
+    ratio = questioned_width / ref
+    flagged = ratio > CAPTURE_SIZE_LIMIT or ratio < 1 / CAPTURE_SIZE_LIMIT
+    return {"checked": True, "flagged": bool(flagged), "size_ratio": round(ratio, 2),
+            "questioned_width": int(questioned_width), "reference_width": int(round(ref)),
+            "limit": CAPTURE_SIZE_LIMIT}

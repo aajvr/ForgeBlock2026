@@ -24,7 +24,7 @@ from ..models import (
 )
 from ..security import current_user, require_admin, require_roles, require_staff
 from ..services import log_activity, notify, staff_ids
-from .common import active_profiles, client_out, log_out, names, threshold_strength
+from .common import active_profiles, client_out, log_out, logs_out, names, threshold_strength
 
 router = APIRouter(prefix="/api", tags=["records"])
 require_client = require_roles("client")
@@ -80,7 +80,7 @@ def records(
                               VerificationLog.client_id.in_(client_ids), VerificationLog.case_id.in_(case_ids)))
     logs = db.scalars(stmt.order_by(VerificationLog.id.desc()).limit(limit)).all()
     nm = names(db)
-    rows = [log_out(l, db, nm) for l in logs]
+    rows = logs_out(logs, db, nm)
     if decision == "pending":
         rows = [r for r in rows if r["case_status"] == "open"]
     elif decision == "none":
@@ -107,14 +107,14 @@ def my_checks(limit: int = Query(200, le=1000), db: Session = Depends(get_db), u
     logs = db.scalars(select(VerificationLog).where(VerificationLog.performed_by == user.id)
                       .order_by(VerificationLog.id.desc()).limit(limit)).all()
     nm = names(db)
-    return [log_out(l, db, nm) for l in logs]
+    return logs_out(logs, db, nm)
 
 
 @router.get("/home/examiner")
 def examiner_home(db: Session = Depends(get_db), user: User = Depends(require_staff)):
     """The examiner's "My work" page: cases waiting for a decision, recent
     screenings and a few counts."""
-    from .cases import case_out
+    from .cases import cases_out
 
     nm = names(db)
     open_cases = db.scalars(own_cases(select(Case).where(Case.status == "open"), user)
@@ -127,8 +127,8 @@ def examiner_home(db: Session = Depends(get_db), user: User = Depends(require_st
     if visible is not None:
         cstmt = cstmt.where(Client.id.in_(visible))
     return {
-        "open_cases": [case_out(c, db, nm) for c in open_cases],
-        "recent": [log_out(l, db, nm) for l in recent],
+        "open_cases": cases_out(open_cases, db, nm),
+        "recent": logs_out(recent, db, nm),
         "counts": {
             "open_cases": db.scalar(own_cases(select(func.count()).select_from(Case)
                                               .where(Case.status == "open"), user)) or 0,

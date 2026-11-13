@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, LockKeyhole, Scale, ShieldHalf, Trash2 } from 'lucide-react'
+import { CalendarClock, CheckCircle2, LockKeyhole, Ruler, Scale, ShieldHalf, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
@@ -27,6 +27,8 @@ export default function Settings() {
           leans on a borderline result. The cut-off is set by the research team from the evaluation results and is not shown in the app.
         </p>
       </Card>
+
+      <SizeMatchSetting value={!!s.screening?.size_match} onSaved={load} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card icon={CalendarClock} title="Data retention" subtitle="New clients are kept this many days, then their signature data is deleted automatically (checked daily).">
@@ -109,6 +111,45 @@ function AccessControlCard({ a }) {
           </li>
         ))}
       </ul>
+    </Card>
+  )
+}
+
+// v8.22: one system-wide switch for static size matching (off by default).
+function SizeMatchSetting({ value, onSaved }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const toggle = async () => {
+    setBusy(true)
+    try {
+      await api.put('/api/admin/settings/screening', { size_match: !value })
+      setMsg(!value ? 'Size matching is on for new screenings.' : 'Size matching is off for new screenings.')
+      onSaved()
+    } finally { setBusy(false) }
+  }
+  return (
+    <Card icon={Ruler} title="Static screening: size matching" className="mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl text-sm text-slate-700">
+          <p>
+            When on, the questioned image is resized before screening so the signature is as wide as the client’s references.
+            It is <b>off by default</b>: with the current model it made forgeries look more like the references (thick, softened strokes)
+            and lowered accuracy on real document photos, while it made no difference on the research datasets.
+          </p>
+          <p className="mt-2 text-slate-600">
+            Either way, the examiner sees a notice when the questioned signature is far larger or smaller than the references, and every
+            result records whether size matching was used. The change applies to new screenings only and is written to the audit log.
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
+          <span>{value ? 'On' : 'Off'}</span>
+          <button type="button" role="switch" aria-checked={value} disabled={busy} onClick={toggle}
+            className={`relative h-6 w-11 rounded-full transition ${value ? 'bg-brand-600' : 'bg-slate-300'} disabled:opacity-60`}>
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${value ? 'left-[22px]' : 'left-0.5'}`} />
+          </button>
+        </label>
+      </div>
+      {msg && <Alert kind="success" className="mt-3">{msg}</Alert>}
     </Card>
   )
 }

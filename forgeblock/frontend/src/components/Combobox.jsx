@@ -6,7 +6,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 //   value '' means the "any" option (anyLabel).
 //   tabs: optional [{ value, label }] shown above the list; an option shows under
 //   a tab when its `group` matches. Options with `tabOnly` show only under their tab.
-export function Combobox({ label, value, onChange, options, anyLabel = 'Any', placeholder = 'Search…', className = '', extra, tabs }) {
+//   field: form-field look (no "Label:" prefix, no "any" row; anyLabel is the empty prompt).
+export function Combobox({ label, value, onChange, options, anyLabel = 'Any', placeholder = 'Search…', className = '', extra, tabs, tabsLabel = 'by role', field = false }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const [tab, setTab] = useState('')
@@ -14,14 +15,14 @@ export function Combobox({ label, value, onChange, options, anyLabel = 'Any', pl
   const ref = useRef(null)
   const listRef = useRef(null)
   const id = useId()
-  const all = useMemo(() => [{ value: '', label: anyLabel }, ...(extra || []), ...options], [anyLabel, extra, options])
+  const all = useMemo(() => [...(field ? [] : [{ value: '', label: anyLabel }]), ...(extra || []), ...options], [anyLabel, extra, options, field])
   const shown = useMemo(() => {
     const inTab = all.filter((o) => o.value === '' || (tab ? o.group === tab : !o.tabOnly))
     const t = q.trim().toLowerCase()
     if (!t) return inTab
     return inTab.filter((o) => o.value !== '' && `${o.label} ${o.sub || ''} ${o.keywords || ''}`.toLowerCase().includes(t))
   }, [all, q, tab])
-  const current = all.find((o) => String(o.value) === String(value)) || all[0]
+  const current = all.find((o) => String(o.value) === String(value)) || (field ? { value: '', label: anyLabel } : all[0])
 
   useEffect(() => {
     if (!open) return
@@ -59,16 +60,19 @@ export function Combobox({ label, value, onChange, options, anyLabel = 'Any', pl
         aria-expanded={open}
         aria-label={`${label}: ${current.label}`}
         onClick={() => setOpen((o) => !o)}
-        className={`flex w-full min-w-0 items-center gap-2 rounded-[10px] border bg-white px-3 py-2 text-left text-sm outline-none transition hover:border-slate-300 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-100 ${value ? 'border-brand-300 text-ink' : 'border-[#dde3ec] text-slate-600'}`}
+        className={`flex w-full min-w-0 items-center gap-2 rounded-[10px] border bg-white px-3 text-left text-sm outline-none transition hover:border-slate-300 focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-100 ${field ? 'py-2.5' : 'py-2'} ${value ? (field ? 'border-[#dde3ec] text-ink' : 'border-brand-300 text-ink') : 'border-[#dde3ec] text-slate-600'}`}
       >
-        <span className="shrink-0 text-slate-500">{label}:</span>
-        <span className="min-w-0 flex-1 truncate font-medium">{current.label}</span>
+        {!field && <span className="shrink-0 text-slate-500">{label}:</span>}
+        <span className={`min-w-0 flex-1 truncate ${field && !value ? 'text-slate-500' : 'font-medium'}`}>
+          {current.label}
+          {field && value && current.sub && <span className="ml-1.5 font-normal text-slate-500">{current.sub}</span>}
+        </span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute left-0 z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-[12px] border border-line bg-white p-1 shadow-xl">
+        <div className={`absolute left-0 z-40 mt-1 max-w-[calc(100vw-2rem)] rounded-[12px] ${field ? 'w-full min-w-[18rem]' : 'w-80'} border border-line bg-white p-1 shadow-xl`}>
           {tabs && (
-            <div role="tablist" aria-label={`${label} by role`} className="flex flex-wrap gap-1 p-1">
+            <div role="tablist" aria-label={`${label} ${tabsLabel}`} className="flex flex-wrap gap-1 p-1">
               {[{ value: '', label: 'All' }, ...tabs].map((t) => (
                 <button
                   key={t.value}

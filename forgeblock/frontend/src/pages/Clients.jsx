@@ -625,18 +625,28 @@ function StrengthMeter({ strength }) {
       </div>
       <p className="mt-1 text-xs text-slate-500">{strength.note}</p>
       {strength.sitting_tip && <p className="mt-1 text-xs text-amber-700">{strength.sitting_tip}</p>}
+      {strength.alike_tip && <p className="mt-1 text-xs text-amber-700">{strength.alike_tip}</p>}
     </div>
   )
 }
 
 // One reference thumbnail. In select mode the whole card toggles its checkbox.
-function RefTile({ p, modality, onRemove, selecting = false, selected = false, onToggle }) {
+// v8.23: "about 3.1× larger" for a reference captured at a very different size.
+const sizeWords = (ratio) => {
+  const larger = ratio > 1
+  const x = larger ? ratio : 1 / ratio
+  return `about ${x >= 10 ? Math.round(x) : Math.round(x * 10) / 10}× ${larger ? 'larger' : 'smaller'} than the other references`
+}
+
+function RefTile({ p, modality, onRemove, onKeep, onReplace, selecting = false, selected = false, onToggle }) {
+  const [keeping, setKeeping] = useState(false)
+  const captureOff = !!p.capture_flag?.flagged
   const [strokes, setStrokes] = useState(null)
   useEffect(() => {
     if (modality === 'dynamic') api.get(`/api/references/${p.id}/strokes`).then((d) => setStrokes(d.strokes)).catch(() => {})
   }, [p.id, modality])
   const border = selected ? 'border-brand-600 bg-brand-50/60 ring-2 ring-brand-600'
-    : p.flagged ? 'border-warn-600 bg-white' : 'border-line bg-white'
+    : captureOff ? 'border-warn-500 bg-warn-50/50' : p.flagged ? 'border-warn-600 bg-white' : 'border-line bg-white'
   const selectProps = selecting
     ? {
         role: 'checkbox',
@@ -667,6 +677,31 @@ function RefTile({ p, modality, onRemove, selecting = false, selected = false, o
         {p.consistency !== null && <span className={p.flagged ? 'font-medium text-warn-700' : ''}>Match {p.consistency.toFixed(2)}</span>}
       </div>
       {p.flagged && <div className="mt-1 text-[12.5px] font-medium text-warn-700">Looks different from the others</div>}
+      {captureOff && (
+        <div className="mt-1 text-[12.5px] leading-snug text-warn-700">
+          <div className="font-medium">Captured differently</div>
+          <div>{sizeWords(p.capture_flag.size_ratio)}</div>
+          {onKeep && onReplace && !selecting && (
+            <div className="mt-1.5 flex gap-1.5">
+              <button
+                type="button"
+                disabled={keeping}
+                onClick={async (e) => { e.stopPropagation(); setKeeping(true); try { await onKeep(p) } finally { setKeeping(false) } }}
+                className="flex-1 rounded-[8px] border border-line bg-white px-2 py-1 text-xs font-medium text-ink transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                {keeping ? 'Keeping…' : 'Keep'}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onReplace(p) }}
+                className="flex-1 rounded-[8px] border border-warn-500 bg-white px-2 py-1 text-xs font-medium text-warn-700 transition hover:bg-warn-50"
+              >
+                Replace
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {p.pen_label && <div className="mt-1"><LimitedPenBadge missing={p.pen_missing} /></div>}
       {onRemove && !selecting && (
         // Touch (and any device that cannot hover): always shown, a 40px round button with a 44px hit area.
@@ -831,6 +866,8 @@ export function ClientDetail() {
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [toRemove, setToRemove] = useState(null)
+  const [toReplace, setToReplace] = useState(null) // v8.23: a reference captured differently
+  const addRef = useRef(null)
   const [removeError, setRemoveError] = useState('')
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState(() => new Set())
@@ -866,6 +903,21 @@ export function ClientDetail() {
 
   // Take the reference out of the list right away, then delete it on the server.
   // On failure, put the card back as it was and show the error.
+  // v8.23: keep a reference flagged as captured differently.
+  const keepCapture = async (p) => {
+    setRemoveError('')
+    try {
+      await api.patch(`/api/clients/${c.id}/references/${p.id}/capture-ack`)
+      load()
+    } catch (err) {
+      setRemoveError(`Could not keep the reference: ${err.message}`)
+    }
+  }
+  // Replace = remove it, then go to the place to add a new one.
+  const replaceCapture = async (p) => {
+    await remove(p)
+    addRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const remove = async (p) => {
     const before = c
     const listKey = `${tab}_references`
@@ -987,10 +1039,16 @@ export function ClientDetail() {
                 )}
               </div>
             )}
+            {refs.some((p) => p.capture_flag?.flagged) && (
+              <Alert kind="warn">
+                Some references were captured differently from the others (much larger or smaller in the image). Screening works best when references and questioned documents are captured the same way, with the in-app camera at a similar distance. Replace the reference if it was a mistake; keep it if this client's documents will be captured this way too.
+              </Alert>
+            )}
             {refs.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {refs.map((p) => (
                   <RefTile key={p.id} p={p} modality={tab} onRemove={c.can_edit ? setToRemove : null}
+                    onKeep={c.can_edit ? keepCapture : null} onReplace={c.can_edit ? setToReplace : null}
                     selecting={selecting} selected={selected.has(p.id)} onToggle={toggle} />
                 ))}
               </div>
@@ -1009,7 +1067,7 @@ export function ClientDetail() {
             {refs.some((p) => p.flagged) && (
               <Alert kind="warn">A highlighted reference is much less similar to the others. If it is the client's own signature and a clean capture, keep it: natural variation makes screening more reliable. Remove it only if the capture is bad (smudged, cut off, blurry) or it is not the client's signature.</Alert>
             )}
-            <div className="border-t border-slate-100 pt-5" data-tour="enroll-add">
+            <div ref={addRef} className="scroll-mt-20 border-t border-slate-100 pt-5" data-tour="enroll-add">
               <h3 className="mb-3 font-semibold">Add {tab} references</h3>
               {!c.can_edit ? (
                 <Alert kind="info">
@@ -1084,6 +1142,17 @@ export function ClientDetail() {
             onClose={() => setToRemove(null)}
           >
             This reference signature will be removed from the signature card.
+          </ConfirmDialog>
+          <ConfirmDialog
+            open={!!toReplace}
+            title="Replace this reference?"
+            confirmLabel={<><Trash2 className="h-4 w-4" /> Remove and add new</>}
+            danger
+            icon={Trash2}
+            onConfirm={() => { replaceCapture(toReplace) }}
+            onClose={() => setToReplace(null)}
+          >
+            This reference will be removed from the signature card. Then add a new one below, captured the same way as the other references.
           </ConfirmDialog>
           {deleting && <DeleteClientModal client={c} onClose={() => setDeleting(false)} onDeleted={() => navigate('/app/clients')} />}
         </div>

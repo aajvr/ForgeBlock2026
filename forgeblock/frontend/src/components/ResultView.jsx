@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { AuthImage, LimitedPenBadge, StrokePreview } from './shared'
 import StrokeReplay, { ReplayControls } from './StrokeReplay'
+import { CaptureNote, SizeMatchLine } from './CaptureNote'
 import { Alert, Badge, FindingBadge, RESULT, StrengthBadge, fmtDate, fmtDay } from './ui'
 
 const fmt = (v, d = 4) => (typeof v === 'number' ? v.toFixed(d) : '-')
@@ -345,6 +346,7 @@ function Signatures({ r }) {
         )}
       </div>
       {isStatic ? <StaticViewer r={r} measures={false} tools={tools} /> : <SideBySide r={r} />}
+      <CaptureNote r={r} className="mt-3.5" />
       {q && <p className="mt-3.5 text-[13px] text-muted">Input quality {q.score}/100{q.issues.length ? `: ${q.issues.join(' ')}` : '.'}</p>}
     </section>
   )
@@ -920,6 +922,7 @@ function Scores({ r, quality = true }) {
           Input quality {r.analysis.quality.score}/100{r.analysis.quality.issues.length ? `: ${r.analysis.quality.issues.join(' ')}` : '.'}
         </p>
       )}
+      <SizeMatchLine r={r} />
     </div>
   )
 }
@@ -980,6 +983,7 @@ export default function ResultView({ result: r }) {
       )}
       <PenDataNote r={r} />
       <TextRemovalNote r={r} />
+      {!showSignatures && <CaptureNote r={r} />}
       <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff}>
           {needsDecision && r.case.can_open && (

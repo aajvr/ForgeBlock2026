@@ -39,7 +39,7 @@ from ..services import get_setting, load_strokes, log_activity, notify, set_sett
 from .auth import user_out
 from .clients import delete_client_data
 from . import pen_data
-from .common import client_out, get_client_or_404, log_out, names
+from .common import client_out, clients_out, get_client_or_404, log_out, logs_out, names
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -345,7 +345,7 @@ def all_records(modality: str | None = None, result: str | None = None, limit: i
     if result:
         stmt = stmt.where(VerificationLog.screening_result == result)
     nm = names(db)
-    return [log_out(l, db, nm) for l in db.scalars(stmt.limit(limit))]
+    return logs_out(db.scalars(stmt.limit(limit)), db, nm)
 
 
 # --------------------------------------------------- settings / retention ---
@@ -354,10 +354,15 @@ class RetentionIn(BaseModel):
     days: int = Field(ge=0, le=3650)
 
 
+class ScreeningSettingsIn(BaseModel):
+    size_match: bool
+
+
 @router.get("/settings")
 def settings(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     return {
         "retention": get_setting(db, "retention"),
+        "screening": get_setting(db, "screening"),
         "security": {"max_failed_logins": MAX_FAILED_LOGINS, "lockout_minutes": LOCKOUT_MINUTES,
                      "idle_timeout_minutes": IDLE_TIMEOUT_MINUTES},
     }
@@ -367,6 +372,15 @@ def settings(db: Session = Depends(get_db), admin: User = Depends(require_admin)
 def set_retention(body: RetentionIn, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     value = set_setting(db, "retention", {"days": body.days})
     log_activity(db, admin, "settings", f"Set data retention to {body.days or 'unlimited'} day(s) for new clients")
+    return value
+
+
+@router.put("/settings/screening")
+def set_screening(body: ScreeningSettingsIn, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """v8.22: system-wide switch for static size matching (default off). One switch
+    for everyone, so screenings stay comparable; every result records how it was made."""
+    value = set_setting(db, "screening", {**get_setting(db, "screening"), "size_match": body.size_match})
+    log_activity(db, admin, "settings", f"Turned static size matching {'on' if body.size_match else 'off'}")
     return value
 
 
@@ -380,9 +394,9 @@ def retention_overview(db: Session = Depends(get_db), admin: User = Depends(requ
     deleted = _count(db, Client, Client.status == "deleted")
     return {
         "settings": get_setting(db, "retention"),
-        "due": [client_out(c, db) for c in due],
-        "due_soon": [client_out(c, db) for c in soon],
-        "requested": [client_out(c, db) for c in requested],
+        "due": clients_out(due, db),
+        "due_soon": clients_out(soon, db),
+        "requested": clients_out(requested, db),
         "deleted_count": deleted,
     }
 

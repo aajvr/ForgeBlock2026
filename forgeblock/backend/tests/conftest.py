@@ -15,6 +15,8 @@ os.environ["CLERK_PUBLISHABLE_KEY"] = "pk_test_Y2xlcmsuZXhhbXBsZS50ZXN0JA"
 os.environ["CLERK_SECRET_KEY"] = "sk_test_example"
 os.environ["CORS_ORIGINS"] = "http://localhost:5173"
 os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123"
+# Pin the reference minimum (Chapter 3: 7) so a local .env cannot change test results.
+os.environ["MIN_ADAPTIVE_SAMPLES"] = "7"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

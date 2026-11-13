@@ -38,7 +38,7 @@ from ..services import (
     staff_ids,
 )
 from . import pen_data
-from .common import active_profiles, examiner_ref, group_examiner, log_out, names
+from .common import active_profiles, examiner_ref, group_examiner, latest_findings, log_out, logs_out, names, prefetch
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -84,22 +84,56 @@ def finding_out(f: Finding, db: Session, nm: dict) -> dict:
     }
 
 
-def _handler(db: Session, c: Case, client: Client | None, latest: Finding | None) -> dict | None:
+def _handler(db: Session, c: Case, client: Client | None, latest: Finding | None,
+             pre: dict | None = None) -> dict | None:
     """The examiner who handles the case: who decided it, else the client's
     group examiner, else who opened it."""
+    users = pre["users"] if pre else None
+    get_user = (lambda i: users.get(i)) if users is not None else (lambda i: db.get(User, i) if i else None)
     if latest is not None:
-        u = db.get(User, latest.examiner_id)
+        u = get_user(latest.examiner_id)
     else:
-        u = group_examiner(db, client.group_id) if client is not None else None
-        u = u or db.get(User, c.examiner_id)
+        if client is None:
+            u = None
+        elif pre is not None:
+            u = pre["examiners"].get(client.group_id)
+        else:
+            u = group_examiner(db, client.group_id)
+        u = u or get_user(c.examiner_id)
     return examiner_ref(u)
 
 
-def case_out(c: Case, db: Session, nm: dict, detail: bool = False) -> dict:
-    client = db.get(Client, c.client_id)
-    logs = db.scalars(select(VerificationLog).where(VerificationLog.case_id == c.id)
-                      .order_by(VerificationLog.id)).all()
-    latest = db.scalar(select(Finding).where(Finding.case_id == c.id).order_by(Finding.id.desc()))
+def cases_out(cases, db: Session, nm: dict) -> list[dict]:
+    """case_out for a list of cases with a fixed number of queries."""
+    cases = list(cases)
+    ids = [c.id for c in cases]
+    clients = prefetch(db, Client, (c.client_id for c in cases))
+    logs: dict[int, list[VerificationLog]] = {}
+    if ids:
+        for l in db.scalars(select(VerificationLog).where(VerificationLog.case_id.in_(ids)).order_by(VerificationLog.id)):
+            logs.setdefault(l.case_id, []).append(l)
+    findings = latest_findings(db, ids)
+    examiners: dict[int, User] = {}
+    gids = {cl.group_id for cl in clients.values() if cl.group_id}
+    if gids:
+        for u in db.scalars(select(User).where(User.group_id.in_(gids), User.role == "examiner",
+                                               User.status == "active").order_by(User.id)):
+            examiners.setdefault(u.group_id, u)
+    users = prefetch(db, User, [c.examiner_id for c in cases] + [f.examiner_id for f in findings.values()])
+    pre = {"clients": clients, "logs": logs, "findings": findings, "examiners": examiners, "users": users}
+    return [case_out(c, db, nm, pre=pre) for c in cases]
+
+
+def case_out(c: Case, db: Session, nm: dict, detail: bool = False, pre: dict | None = None) -> dict:
+    if pre is None:
+        client = db.get(Client, c.client_id)
+        logs = db.scalars(select(VerificationLog).where(VerificationLog.case_id == c.id)
+                          .order_by(VerificationLog.id)).all()
+        latest = db.scalar(select(Finding).where(Finding.case_id == c.id).order_by(Finding.id.desc()))
+    else:
+        client = pre["clients"].get(c.client_id)
+        logs = pre["logs"].get(c.id, [])
+        latest = pre["findings"].get(c.id)
     out = {
         "id": c.id,
         "case_code": c.case_code,
@@ -110,7 +144,7 @@ def case_out(c: Case, db: Session, nm: dict, detail: bool = False) -> dict:
         "client_name": client.full_name if client else None,
         "examiner_id": c.examiner_id,
         "examiner_name": nm.get(c.examiner_id),
-        "handled_by": _handler(db, c, client, latest),
+        "handled_by": _handler(db, c, client, latest, pre),
         "status": c.status,
         "status_label": STATUS_LABELS.get(c.status, c.status),
         "screening_count": len(logs),
@@ -126,7 +160,7 @@ def case_out(c: Case, db: Session, nm: dict, detail: bool = False) -> dict:
         findings = db.scalars(select(Finding).where(Finding.case_id == c.id).order_by(Finding.id)).all()
         out.update({
             "notes": c.notes,
-            "screenings": [log_out(l, db, nm) for l in logs],
+            "screenings": logs_out(logs, db, nm),
             "findings": [finding_out(f, db, nm) for f in findings],
             "timeline": [{"id": e.id, "kind": e.kind, "text": e.text, "user_name": nm.get(e.user_id),
                           "verification_log_id": e.verification_log_id, "created_at": e.created_at}
@@ -183,7 +217,7 @@ def list_cases(
         stmt = stmt.where(or_(Case.title.ilike(like), Case.case_code.ilike(like), Case.document_ref.ilike(like),
                               Case.client_id.in_(client_ids)))
     nm = names(db)
-    return [case_out(c, db, nm) for c in db.scalars(stmt.limit(300))]
+    return cases_out(db.scalars(stmt.limit(300)), db, nm)
 
 
 @router.post("")

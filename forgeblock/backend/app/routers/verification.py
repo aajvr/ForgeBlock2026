@@ -36,6 +36,7 @@ from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
 from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
 from ..security import current_user, require_staff
 from ..services import (
+    get_setting,
     load_image,
     load_strokes,
     prior_decision,
@@ -45,7 +46,8 @@ from ..services import (
     storage_path,
 )
 from . import pen_data
-from .common import VIEW_ONLY_HEADERS, active_profiles, model_view_png, client_safe, log_out, read_upload, threshold_strength
+from .common import (VIEW_ONLY_HEADERS, active_profiles, client_safe, log_out, model_view_png, read_upload,
+                     reference_width, threshold_strength)
 
 router = APIRouter(tags=["screening"])
 
@@ -232,16 +234,7 @@ async def _questioned_upload(file: UploadFile, remove_text: bool, keep: dict | N
     return img
 
 
-_REF_WIDTHS: dict[str, int | None] = {}
-
-
-def _reference_width(profile) -> int | None:
-    """Signature width of a stored static reference (cached; the image never changes)."""
-    key = profile.sample_path
-    if key not in _REF_WIDTHS:
-        ref = load_image(key)
-        _REF_WIDTHS[key] = capture.signature_width(ref) if ref is not None else None
-    return _REF_WIDTHS[key]
+_reference_width = reference_width  # shared cache in common.py (v8.23)
 
 
 def _background(db: Session, client_id: int, model_version: str, dim: int) -> tuple[np.ndarray | None, int]:
@@ -296,8 +289,14 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     profiles = active_profiles(db, client.id, "static")
     if not profiles:
         raise HTTPException(409, f"{client.client_code} has no static references on file yet.")
-    # Same signature size as this client's references (capture.match_size).
-    img, size_scale = capture.match_size(img, [_reference_width(p) for p in profiles])
+    # v8.22: compare the questioned signature's size with the references' (display
+    # only), then match the size only if an admin switched it on (default off).
+    ref_widths = [_reference_width(p) for p in profiles]
+    capture_info = capture.capture_check(capture.signature_width(img), ref_widths)
+    size_match_on = bool(get_setting(db, "screening").get("size_match"))
+    size_scale = 1.0
+    if size_match_on:
+        img, size_scale = capture.match_size(img, ref_widths)
     q = static_quality(img)
     if not q["usable"]:
         raise HTTPException(422, " ".join(q["issues"]))
@@ -309,6 +308,8 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     analysis = {
         "quality": q,
         "size_scale": round(size_scale, 3),
+        "size_match": {"enabled": size_match_on, "scale": round(size_scale, 3)},
+        "capture": capture_info,
         "client_classifier": classifier,
         "text_removal": _text_removal_record(text_removal_info, original, client.id),
         "exact_match": _exact_match(test, refs, profiles),

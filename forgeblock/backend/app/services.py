@@ -65,6 +65,9 @@ def delete_file(rel: str) -> None:
 
 DEFAULT_SETTINGS = {
     "retention": {"days": DEFAULT_RETENTION_DAYS},
+    # v8.22: size matching of static questioned images is OFF by default (it raised
+    # forgery scores on real photos with the v8.16 model); admins can switch it on.
+    "screening": {"size_match": False},
 }
 
 
