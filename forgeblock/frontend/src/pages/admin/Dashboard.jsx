@@ -1,4 +1,4 @@
-import { ArrowUpRight, Briefcase, CheckCircle2, CircleHelp, Image, Link2, PenLine, ScanSearch, ShieldAlert, ShieldCheck, TriangleAlert, Users, XCircle } from 'lucide-react'
+import { ArrowUpRight, Briefcase, ChartColumn, ChartPie, CheckCircle2, CircleHelp, Image, Link2, PenLine, ScanSearch, ShieldAlert, ShieldCheck, TriangleAlert, Users, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
@@ -26,6 +26,8 @@ export default function Dashboard() {
   const t = d.totals
   const since = new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10)
   const groupOf = (uid) => groups.find((g) => g.examiner?.id === uid)?.name
+  // Share of ALL screenings in the period (the workload list is only the top 8 examiners).
+  const workloadTotal = d.by_modality.static + d.by_modality.dynamic
   return (
     <>
       <PageHeader eyebrow="Administrator" title="Dashboard" description="Screening activity, workload and system health at a glance.">
@@ -47,10 +49,10 @@ export default function Dashboard() {
       </div>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="Screenings per day" subtitle={`Last ${days} days, by screening result`} data-tour="dash-activity">
+        <Card icon={ChartColumn} title="Screenings per day" subtitle={`Last ${days} days, by screening result`} data-tour="dash-activity">
           <StackedDays series={d.series} />
         </Card>
-        <Card title="Screening results" subtitle={`Last ${days} days`}>
+        <Card icon={ChartPie} title="Screening results" subtitle={`Last ${days} days`}>
           <HBars rows={RESULT_ROWS.map(({ key, icon, tint }) => ({
             label: key[0].toUpperCase() + key.slice(1), value: d.results[key], color: RESULT_COLORS[key], icon, tint,
             to: `/app/records?result=${key}&date_from=${since}`,
@@ -64,25 +66,35 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card title="Examiner workload" subtitle={`Screenings in the last ${days} days`} data-tour="dash-workload">
+        <Card icon={Users} title="Examiner workload" subtitle={`Screenings in the last ${days} days`} data-tour="dash-workload">
           {d.workload.length ? (
-            <ul className="grid gap-x-6 sm:grid-cols-2">
+            <ul className="flex flex-col">
               {d.workload.map((w) => {
+                const share = workloadTotal ? Math.round((w.count / workloadTotal) * 100) : 0
+                const group = groupOf(w.user_id) || 'Without a group'
                 const body = (
                   <>
                     <Avatar name={w.name} size="h-9 w-9 text-[12px]" />
                     <span className="min-w-0 flex-1">
-                      <span className={`block truncate text-[14px] font-semibold text-ink ${w.user_id ? 'group-hover:text-brand-700 group-hover:underline' : ''}`}>{w.name}</span>
-                      <span className="block truncate text-[12.5px] text-muted">{groupOf(w.user_id) || 'Without a group'}</span>
+                      <span className="flex items-baseline gap-3">
+                        <span className="min-w-0 flex-1 truncate text-[14px]">
+                          <span className={`font-semibold text-ink ${w.user_id ? 'group-hover:text-brand-700 group-hover:underline' : ''}`}>{w.name}</span>
+                          <span className="text-muted"> · {group}</span>
+                        </span>
+                        <span className="shrink-0 text-[22px] font-bold leading-none tabular-nums text-ink">{w.count}</span>
+                      </span>
+                      <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-track" aria-hidden="true">
+                        <span className="block h-full rounded-full bg-[var(--role-ink,#0f6cbd)]" style={{ width: `${share}%` }} />
+                      </span>
+                      <span className="mt-1 block text-[12px] text-muted">{share}% of screenings in this period</span>
                     </span>
-                    <span className="text-[22px] font-bold tabular-nums text-ink">{w.count}</span>
                   </>
                 )
-                const row = 'flex items-center gap-3 border-t border-track py-2.5'
+                const row = 'flex items-center gap-3 py-3'
                 return (
-                  <li key={w.user_id ?? w.name}>
+                  <li key={w.user_id ?? w.name} className="border-t border-track first:border-t-0">
                     {w.user_id ? (
-                      <Link to={`/app/records?examiner=${w.user_id}&date_from=${since}`} className={`group -mx-2 rounded-[10px] px-2 transition-colors hover:bg-[#f5f8fc] focus-visible:outline-2 focus-visible:outline-brand-600 ${row}`} title={`${w.name}: ${w.count}. Open these records`}>{body}</Link>
+                      <Link to={`/app/records?examiner=${w.user_id}&date_from=${since}`} className={`group -mx-2 rounded-[10px] px-2 transition-colors hover:bg-[#f5f8fc] focus-visible:outline-2 focus-visible:outline-brand-600 ${row}`} title={`${w.name}: ${w.count} (${share}%). Open these records`}>{body}</Link>
                     ) : (
                       <div className={row}>{body}</div>
                     )}

@@ -1,4 +1,4 @@
-import { CheckCircle2, Trash2 } from 'lucide-react'
+import { CalendarClock, CheckCircle2, LockKeyhole, Scale, ShieldHalf, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
@@ -21,7 +21,7 @@ export default function Settings() {
   return (
     <>
       <PageHeader title="Policy and retention" description="How borderline results are handled, and how long client signature data is kept." />
-      <Card title="Screening policy" className="mb-6" data-tour="policy-settings">
+      <Card icon={Scale} title="Screening policy" className="mb-6" data-tour="policy-settings">
         <p className="text-sm text-slate-700">
           Results that land close to the decision thresholds are shown as <b>Inconclusive</b> and open a case for the examiner, so the model never
           leans on a borderline result. The cut-off is set by the research team from the evaluation results and is not shown in the app.
@@ -29,7 +29,7 @@ export default function Settings() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Data retention" subtitle="New clients are kept this many days, then their signature data is deleted automatically (checked daily).">
+        <Card icon={CalendarClock} title="Data retention" subtitle="New clients are kept this many days, then their signature data is deleted automatically (checked daily).">
           <div className="flex items-end gap-3">
             <Field label="Days (0 = keep until deleted)"><Input type="number" min="0" value={days} onChange={(e) => setDays(e.target.value)} /></Field>
             <Button variant="secondary" onClick={async () => { await api.put('/api/admin/settings/retention', { days: Number(days) }); setMsg('Saved.'); load() }}>Save</Button>
@@ -41,7 +41,7 @@ export default function Settings() {
             <span className="text-xs text-slate-500">{ret.deleted_count} client(s) deleted so far</span>
           </div>
         </Card>
-        <Card title="Deletion requests and due dates">
+        <Card icon={Trash2} title="Deletion requests and due dates">
           {[['Requested by the client', ret.requested, 'red'], ['Past retention date', ret.due, 'red'], ['Due in the next 30 days', ret.due_soon, 'amber']].map(([title, list, tone]) => (
             <div key={title} className="mb-4">
               <div className="mb-1 text-sm font-medium">{title} <Badge tone={list.length ? tone : 'gray'}>{list.length}</Badge></div>
@@ -60,7 +60,7 @@ export default function Settings() {
           ))}
         </Card>
         {access?.study_mode && <AccessControlCard a={access} />}
-        <Card title="Sign-in security">
+        <Card icon={LockKeyhole} title="Sign-in security">
           <ul className="space-y-1 text-sm text-slate-700">
             <li>Accounts lock after {s.security.max_failed_logins} wrong passwords, for {s.security.lockout_minutes} minutes.</li>
             <li>Users are signed out after {s.security.idle_timeout_minutes} minutes without activity.</li>
@@ -97,7 +97,7 @@ function AccessControlCard({ a }) {
       a.accounts_without_research_terms ? `${a.accounts_without_research_terms} active account(s) have not accepted the research-use terms yet.` : 'Every active account accepted the research-use terms.'],
   ]
   return (
-    <Card title="Access control and ethical use" subtitle="Chapter 3, Section 3.8, as ForgeBlock applies it.">
+    <Card icon={ShieldHalf} title="Access control and ethical use" subtitle="Chapter 3, Section 3.8, as ForgeBlock applies it.">
       <ul className="space-y-2 text-sm">
         {rows.map(([label, ok, note]) => (
           <li key={label} className="flex items-start gap-2">

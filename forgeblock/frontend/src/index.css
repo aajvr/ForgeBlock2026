@@ -43,11 +43,13 @@
   --color-bad-700: #a4243b;
 
   /* v3 surfaces and text */
-  --color-page: #f4f7fb;
+  --color-page: #eaeff6;
   --color-ink: #0b1b2e;
   --color-muted: #5b6b80;
   --color-line: #e3e9f1;
   --color-track: #eef2f7;
+  /* Card edge (v3.1): a very faint navy line instead of the grey border. */
+  --color-edge: rgb(15 40 90 / 0.06);
 
   /* Larger type (v7): every size is a little bigger and easier to read. */
   --text-xs: 0.8125rem;
@@ -63,6 +65,8 @@
   /* Depth. soft: ordinary cards. raised: cards that overlap the coloured band. */
   --shadow-soft: 0 2px 8px rgb(12 59 94 / 0.05);
   --shadow-raised: 0 8px 24px rgb(12 59 94 / 0.1);
+  /* card: every card and stat card (v3.1). */
+  --shadow-card: 0 1px 2px rgb(16 31 77 / 0.06), 0 8px 24px rgb(16 31 77 / 0.07);
   --shadow-lift: 0 2px 6px rgb(16 24 40 / 0.06), 0 24px 44px -18px rgb(12 59 94 / 0.34);
 }
 
@@ -82,28 +86,36 @@ body {
    --role-top    the band's top colour (rings around badges on the band)
    --role-active active rail tile, selected segment text on the band
    --role-chip   main stat icon chip
-   --role-soft   light tint for avatars and icon bubbles */
+   --role-soft   light tint for avatars and icon bubbles
+   --role-ink    the role's main colour (icons in card-title bubbles)
+   --role-rail   the floating sidebar's dark gradient */
 .app-shell,
 [data-role="examiner"] {
-  --role-band: linear-gradient(180deg, #0e559c 0%, #1a65b2 44%, #5a92cb 64%, #bcd3ec 85%, #f4f7fb 100%);
+  --role-band: linear-gradient(180deg, #0e559c 0%, #1a65b2 44%, #5a92cb 64%, #bcd3ec 85%, #eaeff6 100%);
   --role-top: #0e559c;
   --role-active: #0c3b5e;
   --role-chip: linear-gradient(135deg, #2886de, #0f548c);
   --role-soft: #cfe4fa;
+  --role-ink: #0f6cbd;
+  --role-rail: linear-gradient(180deg, #0f6cbd 0%, #0c4f8c 55%, #0c3b5e 100%);
 }
 [data-role="admin"] {
-  --role-band: linear-gradient(180deg, #1b2f7e 0%, #2b42a3 44%, #6877c6 64%, #c4caec 85%, #f4f7fb 100%);
+  --role-band: linear-gradient(180deg, #1b2f7e 0%, #2b42a3 44%, #6877c6 64%, #c4caec 85%, #eaeff6 100%);
   --role-top: #1b2f7e;
   --role-active: #172f73;
   --role-chip: linear-gradient(135deg, #4f67d0, #1f3a93);
   --role-soft: #d5dbf4;
+  --role-ink: #1f3a93;
+  --role-rail: linear-gradient(180deg, #1f3a93 0%, #172f73 55%, #101f4d 100%);
 }
 [data-role="client"] {
-  --role-band: linear-gradient(180deg, #0a5c76 0%, #147597 44%, #57a1bc 64%, #bedde8 85%, #f4f7fb 100%);
+  --role-band: linear-gradient(180deg, #0a5c76 0%, #147597 44%, #57a1bc 64%, #bedde8 85%, #eaeff6 100%);
   --role-top: #0a5c76;
   --role-active: #083f52;
   --role-chip: linear-gradient(135deg, #1c9cc2, #0a5e7a);
   --role-soft: #cde9f1;
+  --role-ink: #0b7a9c;
+  --role-rail: linear-gradient(180deg, #0b7a9c 0%, #0a5e7a 55%, #083f52 100%);
 }
 .app-band {
   background: var(--role-band);
@@ -148,13 +160,14 @@ body {
   transition-duration: 220ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-/* v3 sidebar: one floating white pill. */
+/* v3.1 sidebar: one floating rail in the role's dark gradient. */
 .pill-rail {
-  box-shadow: 0 10px 30px rgb(12 59 94 / 0.14);
+  background: var(--role-rail);
+  box-shadow: 0 18px 40px rgb(16 31 77 / 0.35);
 }
-/* Opened over the page (peek, or the phone drawer): a deeper shadow. */
+/* Opened over the page (peek, or the phone drawer): a little deeper. */
 .pill-rail.is-lifted {
-  box-shadow: 0 18px 48px rgb(12 59 94 / 0.24);
+  box-shadow: 0 24px 56px rgb(16 31 77 / 0.45);
 }
 /* Short screens (laptops around 768px tall): slightly smaller tiles so the
    admin's nine links still fit without scrolling the menu. */

@@ -1,4 +1,4 @@
-import { ArrowUpRight, Briefcase, CheckCircle2, ClipboardList, ScanSearch, UserPlus, Users } from 'lucide-react'
+import { ArrowUpRight, Briefcase, CheckCircle2, ClipboardCheck, ClipboardList, ScanSearch, UserPlus, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -11,7 +11,7 @@ import { DecisionCell } from './Records'
 function Action({ to, icon, title, text }) {
   const Icon = icon
   return (
-    <Link to={to} className="group flex items-start gap-3 rounded-[16px] border border-line bg-white px-[18px] py-4 shadow-soft transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+    <Link to={to} className="group flex items-start gap-3 rounded-[16px] border border-edge bg-white px-[18px] py-4 shadow-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-brand-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--role-soft)] text-[var(--role-active)]"><Icon className="h-5 w-5" /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-semibold text-ink">{title}</span>
@@ -54,11 +54,11 @@ export default function ExaminerHome() {
         <Action to="/app/records" icon={ClipboardList} title="See all records" text="Every screening you made, with receipt codes." />
       </div>
       <div className="grid items-start gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <Card title="Needs your decision" subtitle="Screenings that were not clearly Consistent" bodyClass="p-0" data-tour="home-decisions"
+        <Card icon={ClipboardCheck} title="Needs your decision" subtitle="Screenings that were not clearly Consistent" bodyClass="p-0" data-tour="home-decisions"
           actions={<Link to="/app/cases" className={headerLink}>All cases</Link>}>
           {d.open_cases.length === 0 ? <Empty icon={CheckCircle2}>Nothing is waiting for you.</Empty> : <CasesTable cases={d.open_cases} compact />}
         </Card>
-        <Card title="Latest screenings" bodyClass="p-0"
+        <Card icon={ScanSearch} title="Latest screenings" bodyClass="p-0"
           actions={<Link to="/app/records" className={headerLink}>Records</Link>}>
           {d.recent.length === 0 ? (
             <Empty icon={ScanSearch}>No screenings yet.</Empty>

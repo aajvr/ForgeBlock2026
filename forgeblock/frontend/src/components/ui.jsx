@@ -2,17 +2,26 @@ import { ArrowUpRight, CheckCircle2, CircleAlert, CircleHelp, Info, Loader2, X, 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-// A white card (v3): 16px radius, thin border, soft shadow. `raised` gives the
-// stronger shadow for cards that overlap the coloured band.
-export function Card({ title, subtitle, actions, children, className = '', bodyClass, raised = false, ...rest }) {
+// A white card (v3.1): 16px radius, a faint navy edge and the card shadow.
+// `icon` (a lucide icon) sits in a role-tinted bubble left of the title.
+// `raised` is kept for callers; every card now uses the same shadow.
+export function Card({ title, subtitle, actions, icon: Icon, children, className = '', bodyClass, ...props }) {
+  const { raised: _raised, ...rest } = props // `raised` no longer changes the look; keep it off the DOM
   const head = title || actions
   return (
-    <section className={`min-w-0 rounded-[16px] border border-line bg-white ${raised ? 'shadow-raised' : 'shadow-soft'} ${className}`} {...rest}>
+    <section className={`min-w-0 rounded-[16px] border border-edge bg-white shadow-card ${className}`} {...rest}>
       {head && (
         <header className="flex flex-wrap items-start justify-between gap-3 px-[22px] pb-3.5 pt-5">
-          <div className="min-w-0">
-            <h2 className="text-[17px] font-semibold leading-snug text-ink">{title}</h2>
-            {subtitle && <p className="mt-[3px] text-[12.5px] leading-snug text-muted">{subtitle}</p>}
+          <div className="flex min-w-0 items-start gap-3">
+            {Icon && (
+              <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[var(--role-soft,#cfe4fa)] text-[var(--role-ink,#0f6cbd)]">
+                <Icon className="h-[18px] w-[18px]" />
+              </span>
+            )}
+            <div className={`min-w-0 ${Icon ? (subtitle ? '' : 'self-center') : ''}`}>
+              <h2 className="text-[17px] font-semibold leading-snug text-ink">{title}</h2>
+              {subtitle && <p className="mt-[3px] text-[12.5px] leading-snug text-muted">{subtitle}</p>}
+            </div>
           </div>
           {actions}
         </header>
@@ -177,7 +186,20 @@ const STAT_CHIPS = {
   navy: 'linear-gradient(135deg, #1f3a93, #101f4d)',
 }
 
-// A stat card (v3): icon chip, big number, label, hint. With `to` the whole
+// Stat accent line colours, one per tone (the chip's main colour).
+const STAT_ACCENTS = {
+  brand: 'var(--role-ink, #0f6cbd)',
+  amber: '#e8950c',
+  green: '#2fa063',
+  violet: '#8b6cf0',
+  teal: '#1c9cc2',
+  indigo: '#4f67d0',
+  sky: '#479ef5',
+  navy: '#1f3a93',
+}
+
+// A stat card (v3.1): icon chip, big number, label, hint, a 3px accent line in
+// the tone's colour along the bottom and a faint gradient towards it. With `to` the whole
 // card is a router link to the matching page, with a small arrow tile.
 export function Stat({ label, value, hint, icon: Icon, tone = 'brand', to, ariaLabel }) {
   const body = (
@@ -199,9 +221,10 @@ export function Stat({ label, value, hint, icon: Icon, tone = 'brand', to, ariaL
       <div className="text-[36px] font-bold leading-none tracking-[-0.02em] tabular-nums text-ink">{value}</div>
       <div className="mt-1.5 text-[14px] font-semibold leading-snug text-ink">{label}</div>
       {hint && <div className="mt-[3px] text-[12.5px] leading-snug text-muted">{hint}</div>}
+      <span aria-hidden="true" className="absolute inset-x-[18px] bottom-0 h-[3px] rounded-full" style={{ background: STAT_ACCENTS[tone] || STAT_ACCENTS.brand }} />
     </>
   )
-  const base = 'rounded-[16px] border border-line bg-white px-[18px] pb-[18px] pt-4 shadow-raised'
+  const base = 'relative rounded-[16px] border border-edge bg-white bg-gradient-to-b from-white from-55% to-[#f3f5fc] px-[18px] pb-[18px] pt-4 shadow-card'
   if (!to) return <div className={base}>{body}</div>
   return (
     <Link

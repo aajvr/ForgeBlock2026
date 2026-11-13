@@ -330,12 +330,12 @@ export default function Layout() {
 
   // Labels stay rendered and fade with a small slide; icons keep their place as the pill widens.
   const fade = `transition-[opacity,translate] motion-fb ${expanded ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0'}`
-  // 44px rounded-12 tiles. Active: solid role colour, white icon, soft shadow.
+  // 44px rounded-12 tiles on the dark rail. Active: a white tile with role-dark text.
   const link = ({ isActive }) =>
-    `rail-tile group relative flex h-[44px] shrink-0 items-center rounded-[12px] transition-colors motion-fb focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+    `rail-tile group relative flex h-[44px] shrink-0 items-center rounded-[12px] transition-colors motion-fb focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
       isActive
-        ? 'bg-[var(--role-active)] font-semibold text-white shadow-[0_6px_14px_rgb(12_40_70/0.3)]'
-        : 'text-muted hover:bg-[#eef4fb] hover:text-ink'
+        ? 'bg-white font-semibold text-[var(--role-active)] shadow-[0_6px_14px_rgb(8_16_40/0.25)]'
+        : 'text-white/75 hover:bg-white/8 hover:text-white'
     }`
   const icon = (glyph) => {
     const Icon = glyph
@@ -375,15 +375,15 @@ export default function Layout() {
         style={desktop ? { width: pillW } : undefined}
         className={`pill-rail ${(!desktop && open) || (floating && expanded) ? 'is-lifted' : ''} ${
           open ? 'translate-x-0' : '-translate-x-[calc(100%+2rem)] max-lg:invisible'
-        } fixed bottom-3 left-3 top-3 z-30 flex w-[272px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-[40px] border border-line bg-white px-[17px] py-4 transition-[translate,width,visibility,box-shadow] motion-fb lg:bottom-4 lg:left-4 lg:top-4 lg:max-w-none lg:translate-x-0`}
+        } fixed bottom-3 left-3 top-3 z-30 flex w-[272px] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-[28px] border border-white/10 px-[17px] py-4 transition-[translate,width,visibility,box-shadow] motion-fb lg:bottom-4 lg:left-4 lg:top-4 lg:max-w-none lg:translate-x-0`}
       >
         {/* Logo mark at the top */}
         <div className="mb-2 flex h-[44px] shrink-0 items-center">
           <span className="flex w-[44px] shrink-0 justify-center">
-            <Logo variant="blue" showText={false} size={38} />
+            <Logo variant="white" showText={false} size={38} />
           </span>
-          <span className={`whitespace-nowrap pl-2 text-xl font-bold tracking-tight text-brand-800 ${fade}`} aria-hidden="true">ForgeBlock</span>
-          <button className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-track lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
+          <span className={`whitespace-nowrap pl-2 text-xl font-bold tracking-tight text-white ${fade}`} aria-hidden="true">ForgeBlock</span>
+          <button className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-white/75 hover:bg-white/8 hover:text-white lg:hidden" onClick={() => setOpen(false)} aria-label="Close menu">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -393,7 +393,7 @@ export default function Layout() {
             n.section ? (
               // Section names show only when the pill is open; in the rail they are a small gap.
               <div key={`s${i}`} className={`flex shrink-0 items-end ${i === 0 ? 'h-[14px]' : 'h-[22px]'}`} aria-hidden={rail}>
-                <span className={`whitespace-nowrap pl-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 ${fade}`}>{n.section}</span>
+                <span className={`whitespace-nowrap pl-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/45 ${fade}`}>{n.section}</span>
               </div>
             ) : (
               navLink(n)
@@ -402,13 +402,13 @@ export default function Layout() {
         </nav>
 
         {/* Thin divider, then Help, Profile and the menu control */}
-        <div className="rail-stack flex shrink-0 flex-col gap-[6px] border-t border-line pt-3" onClick={(e) => e.target.closest('a') && setOpen(false)}>
+        <div className="rail-stack flex shrink-0 flex-col gap-[6px] border-t border-white/12 pt-3" onClick={(e) => e.target.closest('a') && setOpen(false)}>
           {COMMON.map(navLink)}
           <button
             onClick={control.onClick}
             aria-label={control.label}
             aria-pressed={rail ? undefined : pinned}
-            className="rail-tile group hidden h-[44px] shrink-0 items-center rounded-[12px] text-sm font-medium text-muted transition-colors motion-fb hover:bg-[#eef4fb] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:flex"
+            className="rail-tile group hidden h-[44px] shrink-0 items-center rounded-[12px] text-sm font-medium text-white/75 transition-colors motion-fb hover:bg-white/8 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white lg:flex"
             {...tipProps(control.label)}
           >
             {icon(control.Icon)}

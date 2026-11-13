@@ -127,7 +127,7 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
   const first = r.client_name ? r.client_name.trim().split(/\s+/)[0] : null
   const against = r.mode === 'compare' ? 'the other signature' : first ? `${first}’s own signature variation` : 'the client’s own signature variation'
   return (
-    <section className={`min-w-0 rounded-[16px] border border-t-[5px] border-line ${res.edge} bg-white px-5 pb-5 pt-6 shadow-raised sm:px-[26px]`} aria-label="Result">
+    <section className={`min-w-0 rounded-[16px] border border-t-[5px] border-edge ${res.edge} bg-white px-5 pb-5 pt-6 shadow-card sm:px-[26px]`} aria-label="Result">
       <div className="flex flex-col gap-5 md:flex-row md:items-stretch md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">{label}</div>
@@ -176,7 +176,7 @@ export function ReceiptValue({ r }) {
 // Key facts (v3): a card of rows, label left and value right, thin dividers.
 export function KeyFacts({ facts, children, title = 'Key facts' }) {
   return (
-    <section className="min-w-0 rounded-[16px] border border-line bg-white px-5 py-5 shadow-raised sm:px-[22px]" aria-label={title}>
+    <section className="min-w-0 rounded-[16px] border border-edge bg-white px-5 py-5 shadow-card sm:px-[22px]" aria-label={title}>
       <h2 className="text-[17px] font-semibold text-ink">{title}</h2>
       <dl className="mt-3.5">
         {facts.map(([k, v]) => (
@@ -217,7 +217,7 @@ export function DetailsToggle({ tabs, children }) {
         <span className="hidden font-normal text-muted sm:inline">{tabs.map((t) => t.label.toLowerCase()).join(', ')}</span>
       </button>
       {open && (
-        <section className="mt-3 rounded-[16px] border border-line bg-white px-5 py-5 shadow-soft sm:px-[22px]" aria-label="Details">
+        <section className="mt-3 rounded-[16px] border border-edge bg-white px-5 py-5 shadow-card sm:px-[22px]" aria-label="Details">
           {tabs.length > 1 && (
             <div role="tablist" aria-label="Details" className="mb-[18px] inline-flex max-w-full flex-wrap gap-0.5 rounded-[12px] bg-track p-1">
               {tabs.map((t) => (
@@ -309,7 +309,7 @@ function Signatures({ r }) {
   const isStatic = r.modality === 'static'
   const q = r.analysis?.quality
   return (
-    <section className="rounded-[16px] border border-line bg-white px-5 py-5 shadow-soft sm:px-[22px]" aria-label="Signatures">
+    <section className="rounded-[16px] border border-edge bg-white px-5 py-5 shadow-card sm:px-[22px]" aria-label="Signatures">
       <div className="mb-3.5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[17px] font-semibold text-ink">Questioned signature and closest reference</h2>

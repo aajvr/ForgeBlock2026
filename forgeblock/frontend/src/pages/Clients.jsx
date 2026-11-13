@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, Check, CheckSquare, PlayCircle, FolderInput, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { ArrowLeft, Briefcase, Check, CheckSquare, Database, FolderInput, FolderOpen, FolderPlus, History, Lock, MoreHorizontal, Pencil, PlayCircle, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
@@ -354,7 +354,7 @@ const folderStyle = (group) => {
 // The bar at the top of a folder: group name and its assigned examiner.
 function FolderHeader({ group, isAdmin, onEdit, onDelete, mine }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-4 rounded-[16px] border border-line bg-white px-5 py-4 shadow-raised" style={folderStyle(group)}>
+    <div className="mb-5 flex flex-wrap items-center gap-4 rounded-[16px] border border-edge bg-white px-5 py-4 shadow-card" style={folderStyle(group)}>
       <span className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-[linear-gradient(150deg,var(--folder),var(--folder-deep))] text-white shadow-sm"><FolderOpen className="h-6 w-6" /></span>
       <div className="min-w-0">
         <div className="text-xl font-semibold tracking-tight">{group ? group.name : 'Clients without a group'}</div>
@@ -1027,7 +1027,7 @@ export function ClientDetail() {
 
         <div className="space-y-6">
           <GroupAccountCard client={c} onDone={load} />
-          <Card title="Cases">
+          <Card icon={Briefcase} title="Cases">
             {c.cases.length === 0 ? (
               <p className="text-sm text-slate-500">No cases for this client.</p>
             ) : (
@@ -1041,7 +1041,7 @@ export function ClientDetail() {
               </ul>
             )}
           </Card>
-          <Card title="Screening history">
+          <Card icon={History} title="Screening history">
             {c.checks.length === 0 ? (
               <p className="text-sm text-slate-500">No screenings yet.</p>
             ) : (
@@ -1058,7 +1058,7 @@ export function ClientDetail() {
             )}
           </Card>
           {user.role === 'admin' && user.study_mode && <AccessCard client={c} onDone={load} />}
-          <Card title="Data">
+          <Card icon={Database} title="Data">
             <p className="text-sm text-slate-600">
               Registered {fmtDay(c.created_at)}. {c.retention_until ? `Kept until ${fmtDay(c.retention_until)}, then deleted automatically.` : 'No retention limit.'}
             </p>
@@ -1112,7 +1112,7 @@ function GroupAccountCard({ client, onDone }) {
   }
   const ex = client.assigned_examiner
   return (
-    <Card title="Group and account">
+    <Card icon={FolderOpen} title="Group and account">
       <dl className="space-y-3 text-sm">
         <div>
           <dt className="text-slate-500">Group</dt>
@@ -1153,7 +1153,7 @@ function AccessCard({ client, onDone }) {
   }
   const access = client.access || []
   return (
-    <Card title="Shared with" subtitle="Examiners see only the clients they registered and clients shared with them here (read-only).">
+    <Card icon={Share2} title="Shared with" subtitle="Examiners see only the clients they registered and clients shared with them here (read-only).">
       {access.length === 0 ? (
         <p className="text-sm text-slate-500">Not shared. Only the account that registered it and admins can see it.</p>
       ) : (

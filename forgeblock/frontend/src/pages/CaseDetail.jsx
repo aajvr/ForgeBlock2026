@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Gavel, MessageSquare, PlusCircle, ScanSearch, ShieldCheck, Stamp, XCircle } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, CheckCircle2, Gavel, History, MessageSquare, PenLine, PlusCircle, RotateCcw, ScanSearch, ShieldCheck, Stamp, User, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
@@ -146,7 +146,7 @@ export default function CaseDetail() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
-          <Card title="Questioned signatures" subtitle={`Screened against ${c.client_name} (${c.client_code})`}>
+          <Card icon={PenLine} title="Questioned signatures" subtitle={`Screened against ${c.client_name} (${c.client_code})`}>
             {c.screenings.length === 0 ? (
               <Empty icon={ScanSearch}>No screenings yet. Screen the questioned signature against the client's references.</Empty>
             ) : (
@@ -186,7 +186,7 @@ export default function CaseDetail() {
           </Card>
 
           {c.status === 'open' && (
-            <Card title="Your decision" subtitle="The screening result is decision support. You decide whether the signature is genuine or forged.">
+            <Card icon={Gavel} title="Your decision" subtitle="The screening result is decision support. You decide whether the signature is genuine or forged.">
               {c.screenings.length === 0 ? (
                 <p className="text-sm text-slate-500">Screen the questioned signature first.</p>
               ) : (
@@ -195,7 +195,7 @@ export default function CaseDetail() {
             </Card>
           )}
           {c.findings.length > 0 && (
-            <Card title="Decision">
+            <Card icon={BadgeCheck} title="Decision">
               <ul className="space-y-4">
                 {c.findings.map((f) => (
                   <li key={f.id} className="rounded-[12px] border border-line p-4">
@@ -219,7 +219,7 @@ export default function CaseDetail() {
             </Card>
           )}
           {c.status === 'closed' && (
-            <Card title="Reopen case">
+            <Card icon={RotateCcw} title="Reopen case">
               <div className="flex gap-2">
                 <input value={reopen} onChange={(e) => setReopen(e.target.value)} placeholder="Reason for reopening" className={`${fieldClass} min-w-0 flex-1`} />
                 <Button variant="secondary" disabled={reopen.length < 1} onClick={async () => setC(await api.post(`/api/cases/${c.id}/reopen`, { text: reopen }))}>Reopen</Button>
@@ -229,13 +229,13 @@ export default function CaseDetail() {
         </div>
 
         <div className="space-y-6">
-          <Card title="Client">
+          <Card icon={User} title="Client">
             <Link to={`/app/clients/${c.client_id}`} className="font-medium text-brand-700 hover:underline">{c.client_name}</Link>
             <div className="text-sm text-slate-500">{c.client_code}</div>
             <div className="mt-3 text-sm text-slate-600">Examiner: {c.examiner_name}</div>
             {c.notes && <p className="mt-3 rounded-[10px] bg-[#f6f8fc] p-3 text-sm text-slate-700">{c.notes}</p>}
           </Card>
-          <Card title="Timeline">
+          <Card icon={History} title="Timeline">
             <form onSubmit={addNote} className="mb-4 flex gap-2">
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" aria-label="Add a note" className={`${fieldClass} min-w-0 flex-1 py-1.5`} />
               <Button size="sm" disabled={!note.trim()}>Add</Button>

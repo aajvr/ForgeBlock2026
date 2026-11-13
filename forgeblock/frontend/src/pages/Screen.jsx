@@ -1,4 +1,4 @@
-import { Eye, PenLine, PlayCircle, ScanSearch, Upload } from 'lucide-react'
+import { Eye, PenLine, PlayCircle, ScanSearch, Upload, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
@@ -136,7 +136,7 @@ export default function Screen() {
         </Card>
 
         <div className="space-y-6">
-          <Card title="Screen against" data-tour="screen-client">
+          <Card icon={Users} title="Screen against" data-tour="screen-client">
             <div className="space-y-4">
               <ClientPicker value={clientId} onChange={(v) => { setClientId(v); setCaseId('') }} modality={modality} />
               <CasePicker clientId={clientId} value={caseId} onChange={setCaseId} />

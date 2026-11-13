@@ -31,7 +31,7 @@ function ClientResult({ r }) {
         <p className="border-t border-track pt-3.5 text-[12.5px] text-muted">The screening result supports the examiner. The examiner’s decision is final.</p>
       </KeyFacts>
       </div>
-      <section className="flex items-start gap-3.5 rounded-[16px] border border-line bg-white px-5 py-5 shadow-soft sm:px-[22px]" aria-label="Ledger proof">
+      <section className="flex items-start gap-3.5 rounded-[16px] border border-edge bg-white px-5 py-5 shadow-card sm:px-[22px]" aria-label="Ledger proof">
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] ${r.integrity?.valid ? 'bg-ok-100 text-ok-600' : 'bg-bad-100 text-bad-600'}`}>
           {r.integrity?.valid ? <ShieldCheck className="h-5 w-5" /> : <ShieldAlert className="h-5 w-5" />}
         </span>

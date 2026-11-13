@@ -85,7 +85,7 @@ export default function Help() {
       <div className="space-y-6">
         {topics.length === 0 && <p className="text-sm text-slate-500">No articles match “{q}”.</p>}
         {topics.map((t) => (
-          <Card key={t.topic} title={<span className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-brand-600" />{t.topic}</span>} bodyClass="p-0">
+          <Card key={t.topic} icon={BookOpen} title={t.topic} bodyClass="p-0">
             <ul className="divide-y divide-slate-100">
               {t.items.map(([question, answer]) => {
                 const isOpen = open === question || !!term

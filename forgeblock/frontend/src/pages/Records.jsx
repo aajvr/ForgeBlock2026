@@ -72,7 +72,7 @@ function Summary({ s }) {
   return (
     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
       {items.map(([label, value, cls]) => (
-        <div key={label} className="rounded-[16px] border border-line bg-white px-4 py-3.5 shadow-raised">
+        <div key={label} className="rounded-[16px] border border-edge bg-white px-4 py-3.5 shadow-card">
           <div className="text-[13px] font-medium leading-snug text-muted">{label}</div>
           <div className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.01em] tabular-nums ${cls}`}>{value}</div>
         </div>

@@ -1,4 +1,4 @@
-import { Compass, KeyRound, LogIn } from 'lucide-react'
+import { Compass, KeyRound, LogIn, Signature, User } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -23,7 +23,7 @@ export default function Profile() {
     <>
       <PageHeader title="Profile" description="Your account details, how you sign in, and your password." />
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Account" data-tour="profile-account">
+        <Card icon={User} title="Account" data-tour="profile-account">
           <div className="mb-5 flex items-center gap-4">
             <Avatar name={user.full_name} role={user.role} size="h-14 w-14 text-lg" />
             <div>
@@ -42,7 +42,7 @@ export default function Profile() {
           <p className="mt-4 text-sm text-slate-500">To change your name, email or role, ask your administrator.</p>
         </Card>
         <div className="space-y-6">
-          <Card title="How you sign in">
+          <Card icon={LogIn} title="How you sign in">
             <div className="flex items-start gap-3 text-[15px]">
               <LogIn className="mt-0.5 h-5 w-5 text-brand-600" />
               <div>
@@ -54,19 +54,19 @@ export default function Profile() {
               </div>
             </div>
           </Card>
-          <Card title="Guided tour">
+          <Card icon={Compass} title="Guided tour">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-slate-600">See the short tour of your workspace again.</p>
               <Button variant="secondary" onClick={() => setTourOpen('full')}><Compass className="h-4 w-4" /> Replay the tour</Button>
             </div>
           </Card>
         </div>
-        <Card title="Change password" actions={<KeyRound className="h-4 w-4 text-slate-400" />}>
+        <Card icon={KeyRound} title="Change password">
           {done && <Alert kind="success" className="mb-4">{done}</Alert>}
           <PasswordForm onDone={() => setDone('Your password was changed.')} />
         </Card>
         {user.role === 'client' && (
-          <Card title="Your signature data" subtitle="You can ask for your signatures on file to be deleted." data-tour="profile-data">
+          <Card icon={Signature} title="Your signature data" subtitle="You can ask for your signatures on file to be deleted." data-tour="profile-data">
             <p className="text-sm text-slate-600">
               Deleting removes your reference signatures and stored images. Screening records keep only their hashes in the ledger so the chain stays
               valid; they contain no images.

@@ -37,7 +37,7 @@ function LedgerIntro({ data, check }) {
     { icon: Timer, title: 'Last checked automatically', text: auto ? `${fmtDate(auto.checked_at)}: ${auto.valid ? 'intact' : 'FAILED'}.` : 'The daily auto-check has not run yet.' },
   ]
   return (
-    <section className="mb-6 rounded-[16px] border border-line bg-white p-6 shadow-raised" data-tour="ledger-check">
+    <section className="mb-6 rounded-[16px] border border-edge bg-white p-6 shadow-card" data-tour="ledger-check">
       <div className="grid gap-6 md:grid-cols-3">
         {items.map((it) => (
           <div key={it.title} className="flex gap-3">
@@ -135,7 +135,7 @@ export default function Ledger() {
             </Card>
           )}
           {data.demo_mode && (
-            <Card title={<span className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-brand-600" /> Tamper demo</span>}>
+            <Card icon={FlaskConical} title="Tamper demo">
               <p className="text-sm text-slate-600">Edits a sealed screening directly in the database, bypassing ForgeBlock, so you can show the check catching it. Restore it afterwards.</p>
               <Alert className="mt-3">{error}</Alert>
               <div className="mt-3 flex gap-2">
@@ -158,7 +158,7 @@ export default function Ledger() {
           const { title, code, codeLabel } = splitSummary(b)
           return (
             <div key={b.block_index}>
-              <div className={`rounded-[16px] border bg-white p-4 shadow-soft transition hover:shadow-lift sm:p-5 ${isBad ? 'border-bad-600 ring-2 ring-bad-100' : after ? 'border-warn-600' : 'border-line'}`}>
+              <div className={`rounded-[16px] border bg-white p-4 shadow-card transition hover:shadow-lift sm:p-5 ${isBad ? 'border-bad-600 ring-2 ring-bad-100' : after ? 'border-warn-600' : 'border-edge'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-3">
                     <span className={`flex h-10 min-w-10 items-center justify-center rounded-[12px] px-1.5 text-sm font-semibold ${isBad ? 'bg-bad-600 text-white' : 'bg-[var(--role-soft)] text-[var(--role-active)]'}`}>#{b.block_index}</span>

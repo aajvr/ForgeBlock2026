@@ -32,7 +32,7 @@ export default function ClientHome() {
         <Stat label="Dynamic signatures on file" value={c.dynamic_count} hint={<StrengthBadge strength={c.dynamic_strength} />} icon={FileSignature} tone="violet" />
         <Stat label="Screenings on your documents" value={c.checks.length} icon={ScanSearch} tone="green" />
       </div>
-      <Card data-tour="client-screenings" title="Screenings on your documents" subtitle="Click a screening to see its details. The screening result supports the examiner; the examiner’s decision is final." bodyClass="p-0">
+      <Card icon={ScanSearch} data-tour="client-screenings" title="Screenings on your documents" subtitle="Click a screening to see its details. The screening result supports the examiner; the examiner’s decision is final." bodyClass="p-0">
         {c.checks.length === 0 ? (
           <Empty>No documents in your name have been screened.</Empty>
         ) : (
