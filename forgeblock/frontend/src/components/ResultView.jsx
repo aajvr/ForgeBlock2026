@@ -602,16 +602,159 @@ function DynamicViewer({ r }) {
   )
 }
 
+// ------------------------------------------------------------ overlay ---
+// Static screenings only. A visual aid for the examiner: the handwriting
+// features drawn on the questioned signature and its closest reference.
+// Nothing here changes the result.
+
+// Feature layers, their colours and how they are drawn.
+const MARK_LAYERS = [
+  { key: 'slant', label: 'Slant', color: '#7c3aed' },
+  { key: 'baseline', label: 'Baseline', color: '#0f6cbd' },
+  { key: 'box', label: 'Size box', color: '#5b6b80' },
+  { key: 'loops', label: 'Loops', color: '#118A4B' },
+  { key: 'endpoints', label: 'Stroke endings', color: '#E8950C' },
+]
+
+// Watches an element's size, for scaling image coordinates to the display.
+function useSize(ref) {
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return size
+}
+
+// One image with its feature marks drawn over it. The image is shown with
+// object-contain, so the marks use the same fit: scale k and centring offset.
+function MarkedImage({ src, marks, show, tag, tone, outsideLabels = [] }) {
+  const box = useRef(null)
+  const { w: bw, h: bh } = useSize(box)
+  const k = marks && bw ? Math.min(bw / marks.width, bh / marks.height) : 0
+  const ox = (bw - (marks?.width || 0) * k) / 2
+  const oy = (bh - (marks?.height || 0) * k) / 2
+  const P = ([x, y]) => [ox + x * k, oy + y * k]
+  const label = (x, y, text, color) => (
+    <text x={x} y={y} fill={color} fontSize="12" fontWeight="700" paintOrder="stroke" stroke="#fff" strokeWidth="3" strokeLinejoin="round">{text}</text>
+  )
+  let svg = null
+  if (marks && k) {
+    const [bx, by, bwid, bhei] = marks.bbox
+    const [x1, y1] = P([bx, by])
+    const s1 = P(marks.slant.line[0])
+    const s2 = P(marks.slant.line[1])
+    const b1 = P(marks.baseline.line[0])
+    const b2 = P(marks.baseline.line[1])
+    svg = (
+      <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" width={bw} height={bh} aria-hidden="true">
+        {show.box && <>
+          <rect x={x1} y={y1} width={bwid * k} height={bhei * k} fill="none" stroke="#5b6b80" strokeWidth="1.5" strokeDasharray="6 4" rx="3" />
+          {label(x1 + 2, Math.max(12, y1 - 5), `W/H ${marks.width_height_ratio.toFixed(2)}`, '#3b4a5e')}
+        </>}
+        {show.baseline && <line x1={b1[0]} y1={b1[1]} x2={b2[0]} y2={b2[1]} stroke="#0f6cbd" strokeWidth="2.5" strokeDasharray="1 5" strokeLinecap="round" />}
+        {show.slant && <>
+          <line x1={s1[0]} y1={s1[1]} x2={s2[0]} y2={s2[1]} stroke="#7c3aed" strokeWidth="2" strokeDasharray="7 5" strokeLinecap="round" />
+          {label(s2[0] + 6, s2[1] + 4, `slant ${Math.round(marks.slant.angle_deg)}°`, '#7c3aed')}
+        </>}
+        {show.loops && marks.loops.map((l, i) => {
+          const [cx, cy] = P([l.cx, l.cy])
+          return <circle key={i} cx={cx} cy={cy} r={Math.max(4, l.r * k)} fill="none" stroke="#118A4B" strokeWidth="2" />
+        })}
+        {show.endpoints && marks.endpoints.map((p, i) => {
+          const [cx, cy] = P(p)
+          return <circle key={i} cx={cx} cy={cy} r="3.5" fill="#E8950C" stroke="#fff" strokeWidth="1" />
+        })}
+      </svg>
+    )
+  }
+  return (
+    <figure className="relative m-0">
+      <TileTag tone={tone}>{tag}</TileTag>
+      <div className="relative h-64 rounded-[12px] border border-line bg-white sm:h-72" style={RULED}>
+        <div ref={box} className="absolute inset-x-4 bottom-4 top-12">
+          <AuthImage src={src} className="absolute inset-0 h-full w-full object-contain mix-blend-multiply" />
+          {svg}
+        </div>
+      </div>
+      {/* Under the tile, not over it, so it never covers the signature. */}
+      {outsideLabels.length > 0 && (
+        <figcaption className="mt-2 inline-flex max-w-full items-start gap-1.5 rounded-[8px] bg-warn-100 px-2.5 py-1 text-[12.5px] font-semibold text-warn-700">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>Outside usual range: {outsideLabels.join(', ')}</span>
+        </figcaption>
+      )}
+    </figure>
+  )
+}
+
+function FeatureMarksView({ r }) {
+  const [state, setState] = useState({ data: null, error: '' })
+  const [show, setShow] = useState({ slant: true, baseline: true, box: true, loops: true, endpoints: true })
+  useEffect(() => {
+    let live = true
+    api.get(`/api/verifications/${r.id}/feature-marks`)
+      .then((d) => live && setState({ data: d, error: '' }))
+      .catch((e) => live && setState({ data: null, error: e.message || 'Feature marks are not available.' }))
+    return () => { live = false }
+  }, [r.id])
+  const { data, error } = state
+  if (error) return <p className="text-[14.5px] text-muted">{error}</p>
+  const outside = data?.outside || []
+  const n = refNumber(r, r.best_match_profile_id)
+  return (
+    <div className="space-y-3.5">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Feature layers">
+        {MARK_LAYERS.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            aria-pressed={show[m.key]}
+            onClick={() => setShow((s) => ({ ...s, [m.key]: !s[m.key] }))}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-brand-600 ${
+              show[m.key] ? 'border-line bg-white text-ink shadow-[0_1px_2px_rgb(16_31_77/0.06)]' : 'border-transparent bg-track text-muted line-through decoration-1'
+            }`}
+          >
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: show[m.key] ? m.color : '#c3ccd8' }} />
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {outside.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {outside.map((o) => (
+            <span key={o.name} className="inline-flex items-center gap-1.5 rounded-full bg-warn-100 px-3 py-1 text-[13px] font-semibold text-warn-700">
+              <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" /> {o.label}: outside
+            </span>
+          ))}
+        </div>
+      )}
+      {data ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <MarkedImage src={`/api/verifications/${r.id}/image`} marks={data.questioned} show={show} tag="Questioned" tone="blue" outsideLabels={outside.map((o) => o.label)} />
+          <MarkedImage src={`/api/references/${r.best_match_profile_id}/image`} marks={data.reference} show={show} tag={`Closest reference${n ? ` · #${n}` : ''}`} />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="h-64 animate-pulse rounded-[12px] bg-slate-50 sm:h-72" />
+          <div className="h-64 animate-pulse rounded-[12px] bg-slate-50 sm:h-72" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// The feature marks tab (static only), with its visual-aid note.
 function Overlay({ r }) {
   return (
-    <div className="grid gap-5 md:grid-cols-[minmax(0,320px)_1fr]">
-      <AuthImage src={`/api/verifications/${r.id}/overlay`} className="aspect-square w-full rounded-lg border border-slate-200" />
-      <div className="space-y-2 text-sm text-slate-700">
-        <p>The questioned signature laid over its closest reference.</p>
-        <p className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-bad-600" /> Only in the questioned signature</p>
-        <p className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-brand-500" /> Only in the reference</p>
-        <p className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-slate-800" /> In both</p>
-      </div>
+    <div className="space-y-4">
+      <FeatureMarksView r={r} />
+      <p className="border-t border-track pt-3 text-[13px] text-muted">
+        A visual aid for the examiner. The result comes from the model’s comparison, not from this picture.
+      </p>
     </div>
   )
 }
@@ -823,7 +966,7 @@ export default function ResultView({ result: r }) {
     { value: 'scores', label: 'Scores' },
     staff && { value: 'features', label: 'Handwriting features' },
     staff && stored && !isStatic && { value: 'viewer', label: 'Stroke replay' },
-    staff && stored && isStatic && r.best_match_profile_id && { value: 'overlay', label: 'Overlay' },
+    staff && stored && isStatic && r.best_match_profile_id && { value: 'overlay', label: 'Feature marks' },
     { value: 'ledger', label: 'Ledger proof' },
   ].filter(Boolean)
 

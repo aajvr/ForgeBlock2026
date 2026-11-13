@@ -18,7 +18,7 @@ import math
 import cv2
 import numpy as np
 
-from .preprocessing import ink_mask
+from .preprocessing import _enhance_and_mask, ink_mask
 
 # name -> (label, unit, kind). kind decides how a difference is worded:
 #   pct   - relative difference ("24% longer")
@@ -103,11 +103,10 @@ def _slant(mask: np.ndarray) -> float:
     return float(ang[order][np.searchsorted(cum, cum[-1] / 2)])
 
 
-def static_features(img: np.ndarray) -> dict:
-    """Measures the handwriting features of a scanned signature image."""
-    mask = ink_mask(img)
-    if mask.size == 0 or not mask.any():
-        return {}
+def _static_measure(mask: np.ndarray) -> tuple[dict, dict]:
+    """Measures a cropped ink mask (ink = 255). Returns (values, geometry):
+    the values are what static_features reports; the geometry is what the
+    feature-marks view needs to draw them (positions at the working scale)."""
     h, w = mask.shape
     # Work at a fixed height so measurements do not depend on scan resolution.
     scale = 150.0 / max(h, 1)
@@ -121,7 +120,8 @@ def static_features(img: np.ndarray) -> dict:
 
     # Endpoints: skeleton pixels with exactly one neighbour.
     nb = cv2.filter2D(skel.astype(np.float32), -1, np.ones((3, 3), np.float32), borderType=cv2.BORDER_CONSTANT)
-    endpoints = int(np.count_nonzero((skel == 1) & (nb == 2)))
+    ends = (skel == 1) & (nb == 2)
+    endpoints = int(np.count_nonzero(ends))
 
     slant = _slant(m)
     # Baseline tilt: line through the lowest ink point of each column
@@ -129,23 +129,25 @@ def static_features(img: np.ndarray) -> dict:
     cols = np.nonzero(m.any(axis=0))[0]
     bottoms = np.array([np.nonzero(m[:, c])[0].max() for c in cols], dtype=np.float64)
     baseline = 0.0
+    baseline_fit = None
     if len(cols) > 10:
         lo = bottoms >= np.percentile(bottoms, 60)  # keep the low points (the baseline, not the loops above it)
         if lo.sum() > 5:
-            k = np.polyfit(cols[lo], bottoms[lo], 1)[0]
+            k, b = np.polyfit(cols[lo], bottoms[lo], 1)
             baseline = -math.degrees(math.atan(k))
+            baseline_fit = (float(k), float(b))
 
     n_pieces, _, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
     pieces = int(np.sum(stats[1:, cv2.CC_STAT_AREA] >= 0.002 * H * W)) if n_pieces > 1 else 0
 
     contours, hierarchy = cv2.findContours(m, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-    loops = 0
+    loop_contours = []
     if hierarchy is not None:
         for c, hinfo in zip(contours, hierarchy[0]):
             if hinfo[3] != -1 and cv2.contourArea(c) >= 12:  # a hole inside an ink piece
-                loops += 1
+                loop_contours.append(c)
 
-    return {
+    values = {
         "stroke_length": round(skel_px / H, 3),
         "thickness": round(100.0 * ink / max(skel_px, 1) / H, 3),
         "slant": round(slant, 2),
@@ -153,8 +155,96 @@ def static_features(img: np.ndarray) -> dict:
         "aspect_ratio": round(W / H, 3),
         "ink_density": round(100.0 * ink / (H * W), 3),
         "pieces": pieces,
+        "loops": len(loop_contours),
+        "endpoints": endpoints,
+    }
+    geometry = {
+        "m": m, "sx": W / max(w, 1), "sy": H / max(h, 1), "slant": slant, "ends": ends,
+        "cols": cols, "baseline_fit": baseline_fit, "loop_contours": loop_contours,
+    }
+    return values, geometry
+
+
+def static_features(img: np.ndarray) -> dict:
+    """Measures the handwriting features of a scanned signature image."""
+    mask = ink_mask(img)
+    if mask.size == 0 or not mask.any():
+        return {}
+    return _static_measure(mask)[0]
+
+
+# ------------------------------------------------------- feature marks ---
+# Positions for drawing the features on the image (a visual aid in the
+# result page's Overlay tab). Values come from the same _static_measure as
+# static_features, so the marks always match the numbers.
+
+def _ink_offset(img: np.ndarray) -> tuple[int, int]:
+    """Top-left corner of ink_mask's crop in the original image. Repeats
+    ink_mask's speck rule on the uncropped mask (tests check it matches)."""
+    _, mask, _ = _enhance_and_mask(img)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    min_area = max(4, int(0.00005 * mask.size))
+    keep = np.zeros(n, bool)
+    keep[1:] = stats[1:, cv2.CC_STAT_AREA] >= min_area
+    ys, xs = np.nonzero(keep[labels])
+    if len(xs) == 0:
+        return 0, 0
+    return int(xs.min()), int(ys.min())
+
+
+def static_feature_marks(img: np.ndarray) -> dict | None:
+    """Where the static features are, in the image's own pixel coordinates:
+    the ink box, slant and baseline lines, loops and stroke endings."""
+    mask = ink_mask(img)
+    if mask.size == 0 or not mask.any():
+        return None
+    vals, g = _static_measure(mask)
+    x0, y0 = _ink_offset(img)
+    h, w = mask.shape
+    sx, sy = g["sx"], g["sy"]
+
+    def back(x: float, y: float) -> list[float]:
+        return [round(x / sx + x0, 1), round(y / sy + y0, 1)]
+
+    m = g["m"]
+    H = m.shape[0]
+    ys, xs = np.nonzero(m)
+    cx, cy = float(xs.mean()), float(ys.mean())
+    half = 0.45 * H
+    lean = math.tan(math.radians(g["slant"]))  # positive leans right: the top is further right
+    slant_line = [back(cx - half * lean, cy + half), back(cx + half * lean, cy - half)]
+
+    cols = g["cols"]
+    if g["baseline_fit"] is not None:
+        k, b = g["baseline_fit"]
+        c1, c2 = float(cols[0]), float(cols[-1])
+        base_line = [back(c1, k * c1 + b), back(c2, k * c2 + b)]
+    else:
+        bottom = float(np.nonzero(m.any(axis=1))[0].max())
+        base_line = [back(0.0, bottom), back(float(m.shape[1] - 1), bottom)]
+
+    loops = []
+    for c in g["loop_contours"]:
+        (lx, ly), r = cv2.minEnclosingCircle(c)
+        px, py = back(lx, ly)
+        loops.append({"cx": px, "cy": py, "r": round(float(r) / ((sx + sy) / 2), 1)})
+
+    ey, ex = np.nonzero(g["ends"])
+    endpoints = [back(float(x), float(y)) for x, y in zip(ex, ey)]
+
+    ih, iw = img.shape[:2]
+    return {
+        "width": int(iw),
+        "height": int(ih),
+        "bbox": [x0, y0, int(w), int(h)],
+        "width_height_ratio": vals["aspect_ratio"],
+        "slant": {"angle_deg": vals["slant"], "line": slant_line},
+        "baseline": {"line": base_line, "tilt_deg": vals["baseline"]},
         "loops": loops,
         "endpoints": endpoints,
+        "pieces": vals["pieces"],
+        "stroke_thickness": vals["thickness"],
+        "ink_density": vals["ink_density"],
     }
 
 

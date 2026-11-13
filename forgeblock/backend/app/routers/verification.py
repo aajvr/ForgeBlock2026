@@ -13,7 +13,7 @@ import json
 import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ from ..ml import decision as dec
 from ..ml.dynamic_features import points_from_payload
 from ..ml.engine import get_engine
 from ..ml.explain import overlay_png
-from ..ml.features import compare_features, dynamic_features, static_features
+from ..ml.features import compare_features, dynamic_features, static_feature_marks, static_features
 from ..ml.preprocessing import preprocessed_preview
 from ..ml.quality import dynamic_quality, static_quality
 from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
@@ -422,12 +422,39 @@ def questioned_strokes(log_id: int, db: Session = Depends(get_db), user: User = 
     return {"strokes": strokes}
 
 
-@router.get("/api/verifications/{log_id}/overlay")
-def difference_overlay(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def _overlay_images(db: Session, log_id: int, user: User) -> tuple[VerificationLog, np.ndarray, np.ndarray]:
+    """The stored questioned image and its best-match reference (static only).
+    Staff and the same record access as the result page (app/access.py)."""
     log = _visible_log(db, log_id, user)
     test_img = load_image(log.test_sample_path) if log.modality == "static" else None
     best = db.get(SignatureProfile, log.best_match_profile_id) if log.best_match_profile_id else None
     ref_img = load_image(best.sample_path) if best else None
     if test_img is None or ref_img is None:
         raise HTTPException(404, "The overlay needs the stored questioned image and its best-match reference.")
-    return Response(content=overlay_png(test_img, ref_img), media_type="image/png", headers=VIEW_ONLY_HEADERS)
+    return log, test_img, ref_img
+
+
+# The overlay views below are view-only visual aids for the examiner: they
+# change nothing (result, ledger, stored data) and are never downloadable.
+@router.get("/api/verifications/{log_id}/overlay")
+def difference_overlay(log_id: int, aligned: int = Query(1, ge=0, le=1),
+                       db: Session = Depends(get_db), user: User = Depends(require_staff)):
+    _, test_img, ref_img = _overlay_images(db, log_id, user)
+    return Response(content=overlay_png(test_img, ref_img, aligned=bool(aligned)), media_type="image/png",
+                    headers=VIEW_ONLY_HEADERS)
+
+
+@router.get("/api/verifications/{log_id}/feature-marks")
+def feature_marks(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+    """Where the handwriting features are on the questioned image and on its
+    closest reference (each in its own pixels), plus which features were
+    outside the client's usual range in this screening's feature analysis."""
+    log, test_img, ref_img = _overlay_images(db, log_id, user)
+    q, ref = static_feature_marks(test_img), static_feature_marks(ref_img)
+    if q is None or ref is None:
+        raise HTTPException(404, "No ink was found to mark on these images.")
+    # The comparison made at screening time (compare_features), so this view
+    # agrees with the Handwriting features tab.
+    items = ((log.analysis or {}).get("features") or {}).get("items") or []
+    outside = [{"name": i["name"], "label": i["label"]} for i in items if i.get("outside")]
+    return JSONResponse({"questioned": q, "reference": ref, "outside": outside}, headers=VIEW_ONLY_HEADERS)
