@@ -90,6 +90,13 @@ async def lifespan(app: FastAPI):
     get_engine()  # load models at startup rather than on the first request
     from .ml import text_removal
     text_removal.available()  # v8.21: load the printed-text remover now too (first use was slow)
+    from . import remote_storage
+    if remote_storage.enabled():  # v8.24: shared sample storage
+        ok = remote_storage.ensure_bucket()
+        print(f"Shared storage (Supabase Storage, bucket '{remote_storage.SUPABASE_BUCKET}'): "
+              f"{'ON' if ok else 'NOT REACHABLE - check SUPABASE_URL / SUPABASE_SERVICE_KEY'}", flush=True)
+    else:
+        print("Shared storage: OFF (images stay on this computer). Set SUPABASE_URL and SUPABASE_SERVICE_KEY.", flush=True)
     stop = threading.Event()
     threading.Thread(target=daily_jobs, args=(stop,), daemon=True).start()
     yield

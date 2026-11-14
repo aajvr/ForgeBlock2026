@@ -92,8 +92,21 @@ def test_client_account_created_at_registration_and_limited_view(client, admin):
     assert me["assigned_examiner"]["full_name"] == "ccje" and me["checks"][0]["examiner_name"] == "ccje"
     detail = client.get(f"/api/verifications/{log_id}", headers=h).json()
     assert detail["screening_result"] and "confidence_score" in detail and detail["block"]
-    for hidden in ("metrics", "thresholds", "analysis", "votes", "similarity_score"):
-        assert hidden not in detail, hidden
+    # v8.24: full read-only result for the client by default ...
+    for shown in ("metrics", "thresholds", "analysis", "votes"):
+        assert shown in detail, shown
+    # ... and the old limited view when CLIENT_FULL_RESULTS=false.
+    import app.config as cfg
+    import app.routers.verification as ver
+    old = (cfg.CLIENT_FULL_RESULTS, ver.CLIENT_FULL_RESULTS)
+    cfg.CLIENT_FULL_RESULTS = ver.CLIENT_FULL_RESULTS = False
+    try:
+        detail = client.get(f"/api/verifications/{log_id}", headers=h).json()
+        for hidden in ("metrics", "thresholds", "analysis", "votes", "similarity_score"):
+            assert hidden not in detail, hidden
+        assert client.get(f"/api/verifications/{log_id}/image", headers=h).status_code == 403
+    finally:
+        cfg.CLIENT_FULL_RESULTS, ver.CLIENT_FULL_RESULTS = old
 
 
 def test_writer_dependent_confidence():

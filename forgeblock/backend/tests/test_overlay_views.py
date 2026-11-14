@@ -60,10 +60,10 @@ def test_overlay_views_need_staff_and_access(client, admin, examiner, examiner2,
         # An examiner outside the client's group does not see the record.
         assert client.get(p, headers=examiner2).status_code == 404
         assert client.get(p, headers=admin).status_code == 200
-    # A client account, even for their own screening: staff only.
+    # v8.24: a client account sees the views of their OWN screening (read-only).
     h = make_user(client, admin, "overlay-client@example.com", role="client", client_id=screening["cid"])
     for p in paths:
-        assert client.get(p, headers=h).status_code in (403, 404)
+        assert client.get(p, headers=h).status_code == 200
 
 
 def test_overlay_views_for_dynamic_are_404(client, examiner):

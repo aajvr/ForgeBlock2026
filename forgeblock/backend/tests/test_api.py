@@ -212,7 +212,18 @@ def test_client_account_sees_only_own_checks(client, admin, examiner):
     assert [c["id"] for c in card["checks"]] == [own["id"]]
     assert client.get(f"/api/verifications/{theirs['id']}", headers=h).status_code == 404
     assert client.get("/api/clients", headers=h).status_code == 403
-    assert client.get(f"/api/verifications/{own['id']}/image", headers=h).status_code == 403
+    # v8.24 (CLIENT_FULL_RESULTS on by default): the client sees the full read-only
+    # result of their own screening, images included, but not the examiner's notes.
+    full = client.get(f"/api/verifications/{own['id']}", headers=h).json()
+    assert "metrics" in full and "analysis" in full and "internal_decision" not in full
+    assert client.get(f"/api/verifications/{own['id']}/image", headers=h).status_code == 200
+    assert client.get(f"/api/verifications/{theirs['id']}/image", headers=h).status_code == 404
+    if full.get("best_match_profile_id"):
+        assert client.get(f"/api/references/{full['best_match_profile_id']}/image", headers=h).status_code == 200
+    other_refs = client.get(f"/api/clients/{other}", headers=examiner).json()
+    ref = next((p["id"] for p in other_refs.get("static_references", other_refs.get("references", []))), None)
+    if ref:
+        assert client.get(f"/api/references/{ref}/image", headers=h).status_code == 404
     assert client.post("/api/me/request-deletion", headers=h).status_code == 200
 
 

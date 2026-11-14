@@ -6,9 +6,9 @@ import { useAuth } from '../auth'
 import ResultView, { KeyFacts, LedgerBlockValue, PenDataNote, ResultHeader } from '../components/ResultView'
 import { Alert, Badge, FindingBadge, PageHeader, Spinner, fmtDate } from '../components/ui'
 
-// What a client sees of a screening on a document in their name: the result,
-// the examiner and their decision, and the ledger receipt. Not the model's
-// scores, thresholds or the signature images.
+// v8.24: clients now get the full read-only ResultView (CLIENT_FULL_RESULTS=true).
+// This limited view is kept for CLIENT_FULL_RESULTS=false: the result, the
+// examiner and their decision, and the ledger receipt only.
 function ClientResult({ r }) {
   const decided = r.finding?.finding
   const decision = decided ? <FindingBadge value={decided} />
@@ -73,7 +73,7 @@ export default function Record() {
         description={r.case_code ? undefined : r.document_ref || undefined}
       >
       </PageHeader>
-      {user.role === 'client' ? <ClientResult r={r} /> : <ResultView result={r} />}
+      {user.role === 'client' && !r.analysis ? <ClientResult r={r} /> : <ResultView result={r} client={user.role === 'client'} />}
     </>
   )
 }

@@ -104,3 +104,13 @@ def require_roles(*roles: str):
 
 require_admin = require_roles("admin")
 require_staff = require_roles("admin", "examiner")
+
+
+def require_result_viewer(user: User = Depends(current_user)) -> User:
+    """v8.24: staff, and clients when CLIENT_FULL_RESULTS is on. The record-level
+    check (app/access.py) still limits a client to their own screenings."""
+    from .config import CLIENT_FULL_RESULTS
+
+    if user.role in ("admin", "examiner") or (user.role == "client" and CLIENT_FULL_RESULTS):
+        return user
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "You do not have access to this page.")

@@ -958,7 +958,7 @@ function LedgerProof({ r }) {
   )
 }
 
-export default function ResultView({ result: r }) {
+export default function ResultView({ result: r, client = false }) {
   const staff = !!r.analysis
   const isStatic = r.modality === 'static'
   const stored = r.stored_sample
@@ -985,7 +985,7 @@ export default function ResultView({ result: r }) {
       <TextRemovalNote r={r} />
       {!showSignatures && <CaptureNote r={r} />}
       <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff}>
+        <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff} {...(client ? { whose: 'your', client: true } : {})}>
           {needsDecision && r.case.can_open && (
             <Link to={`/app/cases/${r.case.id}`} className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-[18px] py-2.5 text-[15px] font-semibold text-white shadow-[0_6px_16px_rgb(15_108_189/0.3)] transition hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
               Decide now: case {r.case.case_code} <ArrowRight className="h-4 w-4" />

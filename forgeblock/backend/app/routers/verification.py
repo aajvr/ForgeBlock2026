@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..access import can_view_case, can_view_log, visible_client_or_404
-from ..config import MIN_ADAPTIVE_SAMPLES
+from ..config import CLIENT_FULL_RESULTS, MIN_ADAPTIVE_SAMPLES
 from ..database import get_db
 from ..ledger import verify_block
 from ..ml import capture
@@ -34,7 +34,7 @@ from ..ml.preprocessing import preprocessed_preview
 from ..ml.quality import dynamic_quality, static_quality
 from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
 from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
-from ..security import current_user, require_staff
+from ..security import current_user, require_result_viewer, require_staff
 from ..services import (
     get_setting,
     load_image,
@@ -117,12 +117,14 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
         # v8.11: plain-language note when pen pressure/tilt was left out (all viewers)
         "pen_note": (l.analysis or {}).get("pen_data") if l.modality == "dynamic" else None,
     })
-    if viewer.role in ("admin", "examiner"):
+    full = viewer.role in ("admin", "examiner") or (viewer.role == "client" and CLIENT_FULL_RESULTS)
+    if full:
         out["analysis"] = l.analysis or {}
         out["best_match_profile_id"] = l.best_match_profile_id
         out["reference_profile_ids"] = list(l.reference_profile_ids or [])
         out["strength"] = threshold_strength(len(l.reference_profile_ids or [])) if l.mode == "verify" else None
-        out["internal_decision"] = l.classification  # for evaluation pages only
+        if viewer.role != "client":
+            out["internal_decision"] = l.classification  # for evaluation pages only
         out["explain"] = explain_result(l)
     out["case"] = None
     out["finding"] = None
@@ -144,15 +146,17 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
     else:
         out["prior_decision"] = None
     if viewer.role == "client":
-        out.pop("votes", None)
-        out.pop("metric_labels", None)
-        out.pop("decision_rule", None)
+        if not CLIENT_FULL_RESULTS:
+            out.pop("votes", None)
+            out.pop("metric_labels", None)
+            out.pop("decision_rule", None)
         if out.get("case"):
             out["case"]["can_open"] = False
         if out.get("finding"):
             out["finding"].pop("reason", None)  # the examiner's notes stay internal
         out["examiner_name"] = out.get("performed_by_name")
-        client_safe(out)
+        if not CLIENT_FULL_RESULTS:
+            client_safe(out)
     return out
 
 
@@ -442,7 +446,7 @@ def verification_detail(log_id: int, db: Session = Depends(get_db), user: User =
 
 @router.get("/api/verifications/{log_id}/image")
 def questioned_image(log_id: int, view: str = Query("original", pattern="^(original|model)$"),
-                     db: Session = Depends(get_db), user: User = Depends(require_staff)):
+                     db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     log = _visible_log(db, log_id, user)
     path = storage_path(log.test_sample_path) if log.modality == "static" else None
     if path is None:
@@ -456,7 +460,7 @@ def questioned_image(log_id: int, view: str = Query("original", pattern="^(origi
 
 
 @router.get("/api/verifications/{log_id}/original-image")
-def questioned_original(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def questioned_original(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     """v8.21: the photo as uploaded, before printed text was removed."""
     log = _visible_log(db, log_id, user)
     path = storage_path(((log.analysis or {}).get("text_removal") or {}).get("original_path"))
@@ -466,7 +470,7 @@ def questioned_original(log_id: int, db: Session = Depends(get_db), user: User =
 
 
 @router.get("/api/verifications/{log_id}/strokes")
-def questioned_strokes(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def questioned_strokes(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     log = _visible_log(db, log_id, user)
     strokes = load_strokes(log.test_sample_path) if log.modality == "dynamic" else None
     if strokes is None:
@@ -490,14 +494,14 @@ def _overlay_images(db: Session, log_id: int, user: User) -> tuple[VerificationL
 # change nothing (result, ledger, stored data) and are never downloadable.
 @router.get("/api/verifications/{log_id}/overlay")
 def difference_overlay(log_id: int, aligned: int = Query(1, ge=0, le=1),
-                       db: Session = Depends(get_db), user: User = Depends(require_staff)):
+                       db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     _, test_img, ref_img = _overlay_images(db, log_id, user)
     return Response(content=overlay_png(test_img, ref_img, aligned=bool(aligned)), media_type="image/png",
                     headers=VIEW_ONLY_HEADERS)
 
 
 @router.get("/api/verifications/{log_id}/feature-marks")
-def feature_marks(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def feature_marks(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     """Where the handwriting features are on the questioned image and on its
     closest reference (each in its own pixels), plus which features were
     outside the client's usual range in this screening's feature analysis."""

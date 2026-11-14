@@ -27,7 +27,7 @@ from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
 from ..ml.quality import dynamic_quality, static_quality
 from ..models import Case, Client, ClientAccess, ClientGroup, SignatureProfile, User, VerificationLog, utcnow
-from ..security import hash_password, require_admin, require_staff, temporary_password
+from ..security import hash_password, require_admin, require_result_viewer, require_staff, temporary_password
 from ..services import (
     assigned_examiner_id,
     delete_file,
@@ -484,7 +484,7 @@ def bulk_remove_references(client_id: int, body: BulkDeleteIn, db: Session = Dep
 
 @router.get("/references/{profile_id}/image")
 def reference_image(profile_id: int, view: str = Query("original", pattern="^(original|model)$"),
-                    db: Session = Depends(get_db), user: User = Depends(require_staff)):
+                    db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     """Shown inside the app's viewer only. There is no download or export
     function (Section 3.8); the response is marked inline and not cached.
     view=model returns the cleaned 224 x 224 picture the model sees (display only)."""
@@ -501,7 +501,7 @@ def reference_image(profile_id: int, view: str = Query("original", pattern="^(or
 
 
 @router.get("/references/{profile_id}/strokes")
-def reference_strokes(profile_id: int, db: Session = Depends(get_db), user: User = Depends(require_staff)):
+def reference_strokes(profile_id: int, db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     p = _profile(db, profile_id, user)
     strokes = load_strokes(p.sample_path) if p.modality == "dynamic" else None
     if strokes is None:

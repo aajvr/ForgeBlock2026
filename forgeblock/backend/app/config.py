@@ -39,6 +39,22 @@ RESEARCH_TEAM_EMAILS = {
 } | {ADMIN_EMAIL.lower()}
 
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR", BASE_DIR / "storage"))
+
+# v8.24: shared sample storage in Supabase Storage. When SUPABASE_URL and
+# SUPABASE_SERVICE_KEY are set, every signature image / stroke file is also
+# uploaded to the private bucket SUPABASE_BUCKET, and a file missing on this PC
+# is fetched from the bucket (then kept in STORAGE_DIR as a cache). So images
+# uploaded on one computer can be seen on every computer. Without the keys the
+# files stay local only (old behaviour). The service key stays in backend/.env.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "").strip()
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "forgeblock-samples").strip()
+
+# v8.24: clients see the full result page of their own screenings (scores,
+# handwriting features, their questioned signature and the closest reference,
+# overlay / stroke replay), read-only. The examiner's private notes stay hidden.
+# false = the old limited client view (result, confidence, decision, receipt).
+CLIENT_FULL_RESULTS = os.getenv("CLIENT_FULL_RESULTS", "true").lower() == "true"
 WEIGHTS_DIR = Path(os.getenv("WEIGHTS_DIR", BASE_DIR / "weights"))
 
 # Enables the ledger tamper-simulation endpoint used to demonstrate

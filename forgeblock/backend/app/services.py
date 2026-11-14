@@ -10,6 +10,7 @@ import numpy as np
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from . import remote_storage
 from .config import DEFAULT_RETENTION_DAYS, INCONCLUSIVE_BELOW, STORAGE_DIR
 from .ledger import append_block
 from .ml.decision import Decision
@@ -24,6 +25,7 @@ def save_image(img: np.ndarray, folder: str) -> str:
     path = STORAGE_DIR / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(path), img)
+    remote_storage.upload(rel.as_posix(), path)  # v8.24: shared copy (no-op if off)
     return rel.as_posix()
 
 
@@ -32,6 +34,7 @@ def save_strokes(strokes: list, folder: str) -> str:
     path = STORAGE_DIR / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(strokes))
+    remote_storage.upload(rel.as_posix(), path)  # v8.24: shared copy (no-op if off)
     return rel.as_posix()
 
 
@@ -40,8 +43,12 @@ def storage_path(rel: str) -> Path | None:
     if not rel or rel.startswith("sha256:"):
         return None
     path = (STORAGE_DIR / rel).resolve()
-    if not path.is_relative_to(STORAGE_DIR.resolve()) or not path.exists():
+    if not path.is_relative_to(STORAGE_DIR.resolve()):
         return None
+    if not path.exists():
+        # v8.24: uploaded on another computer? Fetch it from Supabase Storage.
+        if not remote_storage.download(Path(rel).as_posix(), path):
+            return None
     return path
 
 
@@ -56,9 +63,12 @@ def load_strokes(rel: str) -> list | None:
 
 
 def delete_file(rel: str) -> None:
-    path = storage_path(rel)
-    if path:
+    if not rel or rel.startswith("sha256:"):
+        return
+    path = (STORAGE_DIR / rel).resolve()
+    if path.is_relative_to(STORAGE_DIR.resolve()):
         path.unlink(missing_ok=True)
+        remote_storage.delete(Path(rel).as_posix())  # v8.24: and the shared copy
 
 
 # --------------------------------------------------------------- settings ---

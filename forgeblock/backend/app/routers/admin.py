@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..access import may_be_admin
+from .. import remote_storage
 from ..config import (
     DATABASE_URL,
     STUDY_MODE,
@@ -450,7 +451,8 @@ def system_status(db: Session = Depends(get_db), admin: User = Depends(require_a
     return {
         "models": get_engine().status(),
         "database": {"ok": db_ok, "kind": "PostgreSQL (Supabase)" if DATABASE_URL.startswith("postgres") else "SQLite"},
-        "storage": {"used_mb": round(_dir_size(STORAGE_DIR) / 1e6, 1), "free_gb": round(usage.free / 1e9, 1)},
+        "storage": {"used_mb": round(_dir_size(STORAGE_DIR) / 1e6, 1), "free_gb": round(usage.free / 1e9, 1),
+                    "shared": remote_storage.enabled()},  # v8.24: Supabase Storage on/off
         "ledger": {"chain_height": chain_height(db), "last_auto_check": last_auto_check()},
         "counts": {
             "users": _count(db, User), "clients": _count(db, Client, Client.status == "active"),
