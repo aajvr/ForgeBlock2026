@@ -1,5 +1,8 @@
 // Thin fetch wrapper around the FastAPI backend.
-const BASE = import.meta.env.VITE_API_URL || ''
+// Backend address for the online build (e.g. https://...azurewebsites.net). Tolerates a
+// value saved without https:// or with a trailing slash; empty = same origin (/api proxy).
+const RAW_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+const BASE = RAW_BASE && !/^https?:\/\//i.test(RAW_BASE) ? `https://${RAW_BASE}` : RAW_BASE
 const TOKEN_KEY = 'forgeblock_token'
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY)
