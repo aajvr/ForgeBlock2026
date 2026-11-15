@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+storage/
+*.db
+tests/
+weights/static_backup.*
+weights/*.bak-*
