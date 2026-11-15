@@ -1,0 +1,47 @@
+# Copies forgeblock/backend to the Hugging Face Space on every push to main.
+# Needs two GitHub repository settings (Settings > Secrets and variables > Actions):
+#   secret   HF_TOKEN  = a Hugging Face access token with WRITE permission
+#   variable HF_SPACE  = your Space id, e.g. aajvr/forgeblock-api
+name: Deploy backend to Hugging Face
+on:
+  push:
+    branches: [main]
+    paths: ["forgeblock/backend/**", ".github/workflows/deploy-backend-hf.yml"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Push backend to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          set -e
+          test -n "$HF_TOKEN" && test -n "$HF_SPACE" || { echo "Set HF_TOKEN (secret) and HF_SPACE (variable) first"; exit 1; }
+          mkdir /tmp/space
+          rsync -a --exclude='.env' --exclude='.env.*' --exclude='.venv/' --exclude='__pycache__/' \
+            --exclude='storage/' --exclude='*.db' --exclude='tests/' \
+            --exclude='weights/static_backup.*' --exclude='weights/*.bak-*' \
+            forgeblock/backend/ /tmp/space/
+          cp forgeblock/backend/.env.example /tmp/space/ 2>/dev/null || true
+          cat > /tmp/space/README.md <<'MD'
+          ---
+          title: ForgeBlock API
+          sdk: docker
+          app_port: 7860
+          pinned: false
+          ---
+          ForgeBlock backend (staging). Deployed automatically from GitHub; do not edit here.
+          MD
+          cd /tmp/space
+          git init -q -b main
+          git lfs install --local
+          git lfs track "*.keras" "*.pt" "*.h5"
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_SHA::7}"
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" main
