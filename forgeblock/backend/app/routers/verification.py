@@ -35,8 +35,10 @@ from ..ml.quality import dynamic_quality, static_quality
 from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
 from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
 from ..security import current_user, require_result_viewer, require_staff
+from ..ml.screening import screening_result
 from ..services import (
     get_setting,
+    inconclusive_band,
     load_image,
     load_strokes,
     prior_decision,
@@ -241,47 +243,46 @@ async def _questioned_upload(file: UploadFile, remove_text: bool, keep: dict | N
 _reference_width = reference_width  # shared cache in common.py (v8.23)
 
 
-def _background(db: Session, client_id: int, model_version: str, dim: int) -> tuple[np.ndarray | None, int]:
-    """Static reference embeddings of OTHER clients (same model), up to
-    REFS_PER_BACKGROUND_CLIENT each, for the per-client classifier. Used inside
-    the model only; nothing about these clients is shown."""
-    rows = db.execute(
-        select(SignatureProfile.client_id, SignatureProfile.embedding)
-        .join(Client, Client.id == SignatureProfile.client_id)
-        .where(Client.status == "active", SignatureProfile.modality == "static", SignatureProfile.status == "active",
-               SignatureProfile.client_id != client_id, SignatureProfile.model_version == model_version)
-        .order_by(SignatureProfile.client_id, SignatureProfile.id)
-    ).all()
-    per: dict[int, list] = {}
-    for cid, emb in rows:
-        if emb is not None and len(emb) == dim and len(per.setdefault(cid, [])) < cc.REFS_PER_BACKGROUND_CLIENT:
-            per[cid].append(emb)
-    usable = [cid for cid, e in per.items() if len(e) >= MIN_ADAPTIVE_SAMPLES]
-    if len(usable) > cc.MAX_BACKGROUND_CLIENTS:  # a fixed, even spread over the clients
-        idx = np.linspace(0, len(usable) - 1, cc.MAX_BACKGROUND_CLIENTS).round().astype(int)
-        usable = [usable[i] for i in idx]
-    if len(usable) < cc.MIN_BACKGROUND_CLIENTS:
-        return None, len(usable)
-    return np.array([e for cid in usable for e in per[cid]], np.float64), len(usable)
-
-
-def _client_classifier(db: Session, client_id: int, test: np.ndarray, refs: list[np.ndarray],
-                       decision, cfg: dict) -> dict:
-    """v8.10: replaces the result's probability with the per-client
-    classifier's when there is a calibration and enough other clients."""
+def _client_classifier(db: Session, test: np.ndarray, refs: list[np.ndarray], decision, cfg: dict) -> dict:
+    """v8.10 per-client check, v8.25 fixed background: replaces the result's
+    probability with the per-client classifier's when there is a calibration and
+    a background set for the loaded static model. The background is a fixed set
+    of dataset participants (client_classifier.background_from_setting), never
+    the live clients, so results do not drift as clients are enrolled and a
+    person enrolled twice is never compared against themself."""
     cal = cfg.get("client_classifier")
-    info = {"used": False, "background_clients": 0, "min_background_clients": cc.MIN_BACKGROUND_CLIENTS}
+    info = {"used": False, "source": "fixed", "background_clients": 0,
+            "min_background_clients": cc.MIN_BACKGROUND_CLIENTS}
     if not cal or len(refs) < MIN_ADAPTIVE_SAMPLES:
         return info
-    neg, k = _background(db, client_id, cfg["model_version"], len(test))
-    info["background_clients"] = k
+    neg, bg = cc.background_from_setting(get_setting(db, cc.BACKGROUND_SETTING), get_engine().static_fingerprint,
+                                         len(test))
+    info.update(bg)
     if neg is None:
         return info
     s = float(cc.fit(np.array(refs), neg)(test)[0])
     p = cc.probability(s, cal)
     info.update(used=True, score=round(s, 4), p_distance_only=decision.p_genuine)
+    info.pop("reason", None)
     dec.with_probability(decision, p, cal)
     return info
+
+
+SIZE_MODES = ("adaptive", "always", "off")
+
+
+def size_mode(db: Session) -> str:
+    """v8.25: how static questioned images are sized. "adaptive" (default) resizes
+    only when the capture check flags the upload (more than 2x larger or smaller
+    than the references); "always" is the v8.8 behaviour; "off" never resizes.
+    The v8.22 on/off switch ("size_match") is no longer read."""
+    mode = get_setting(db, "screening").get("size_mode")
+    return mode if mode in SIZE_MODES else "adaptive"
+
+
+def _static_decision(db: Session, test: np.ndarray, refs: list[np.ndarray], cfg: dict):
+    decision = dec.screen_static_embedding(test, refs, cfg, MIN_ADAPTIVE_SAMPLES)
+    return decision, _client_classifier(db, test, refs, decision, cfg)
 
 
 def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: Case | None = None,
@@ -293,26 +294,39 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     profiles = active_profiles(db, client.id, "static")
     if not profiles:
         raise HTTPException(409, f"{client.client_code} has no static references on file yet.")
-    # v8.22: compare the questioned signature's size with the references' (display
-    # only), then match the size only if an admin switched it on (default off).
+    # v8.22: compare the questioned signature's size with the references'.
+    # v8.25: resize adaptively (only when that check flags the upload) unless an
+    # admin chose "always" or "off"; when it was resized, the original size is
+    # screened too and shown in the details (the resized result stays official).
     ref_widths = [_reference_width(p) for p in profiles]
     capture_info = capture.capture_check(capture.signature_width(img), ref_widths)
-    size_match_on = bool(get_setting(db, "screening").get("size_match"))
+    mode = size_mode(db)
     size_scale = 1.0
-    if size_match_on:
+    unresized = img
+    if mode == "always" or (mode == "adaptive" and capture_info.get("flagged")):
         img, size_scale = capture.match_size(img, ref_widths)
     q = static_quality(img)
     if not q["usable"]:
         raise HTTPException(422, " ".join(q["issues"]))
     test = engine.static_embedding(img)
     refs = [np.array(p.embedding) for p in profiles]
-    decision = dec.screen_static_embedding(test, refs, engine.static_cfg, MIN_ADAPTIVE_SAMPLES)
-    classifier = _client_classifier(db, client.id, test, refs, decision, engine.static_cfg)
+    decision, classifier = _static_decision(db, test, refs, engine.static_cfg)
+    without_resizing = None
+    if size_scale != 1.0:
+        alt, alt_cc = _static_decision(db, engine.static_embedding(unresized), refs, engine.static_cfg)
+        without_resizing = {
+            "screening_result": screening_result(alt, inconclusive_band(db)),
+            "confidence": round(alt.confidence, 2),
+            "p_genuine": None if alt.p_genuine is None else round(alt.p_genuine, 4),
+            "similarity": round(alt.similarity, 4),
+            "client_classifier_used": alt_cc["used"],
+        }
     per_ref, best = _per_ref(test, profiles)
     analysis = {
         "quality": q,
         "size_scale": round(size_scale, 3),
-        "size_match": {"enabled": size_match_on, "scale": round(size_scale, 3)},
+        "size_match": {"enabled": size_scale != 1.0, "mode": mode, "scale": round(size_scale, 3)},
+        "without_resizing": without_resizing,
         "capture": capture_info,
         "client_classifier": classifier,
         "text_removal": _text_removal_record(text_removal_info, original, client.id),

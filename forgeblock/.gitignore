@@ -25,6 +25,8 @@ backend/*.db
 forgeblock-dataset-*.zip
 **/scans/
 training/results/
+# v8.25 static background set (signature embeddings of dataset participants)
+**/static_background*.json
 
 # --- Python --------------------------------------------------------------
 __pycache__/

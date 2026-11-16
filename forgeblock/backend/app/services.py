@@ -75,9 +75,10 @@ def delete_file(rel: str) -> None:
 
 DEFAULT_SETTINGS = {
     "retention": {"days": DEFAULT_RETENTION_DAYS},
-    # v8.22: size matching of static questioned images is OFF by default (it raised
-    # forgery scores on real photos with the v8.16 model); admins can switch it on.
-    "screening": {"size_match": False},
+    # v8.25: static questioned images are resized ADAPTIVELY by default: only when the
+    # upload is more than 2x larger or smaller than the references (the capture notice).
+    # Admins can choose "always" (v8.8 behaviour) or "off". Replaces the v8.22 switch.
+    "screening": {"size_mode": "adaptive"},
 }
 
 

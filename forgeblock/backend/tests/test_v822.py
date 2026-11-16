@@ -1,4 +1,4 @@
-"""v8.22: size matching is an admin switch (default off); capture-size notice; references-alike tip."""
+"""v8.22/v8.25: size matching mode (default adaptive); capture-size notice; references-alike tip."""
 import io
 
 import cv2
@@ -25,30 +25,43 @@ def test_capture_check_flags_only_large_size_differences():
     assert not capture.capture_check(110, [200])["flagged"]
 
 
-def test_size_matching_switch_and_capture_notice(client, examiner, admin):
+def test_size_matching_modes_and_capture_notice(client, examiner, admin):
+    """v8.25: adaptive by default (resize only flagged uploads, and also screen the
+    original size); "always" and "off" for admins; the v8.22 switch is retired."""
     cid = _client_with_refs(client, examiner, name="Size Switch", n=7)
-    # Default: off, recorded on the result, and the 3x larger photo is flagged.
-    assert client.get("/api/admin/settings", headers=admin).json()["screening"] == {"size_match": False}
-    r = client.post("/api/screen/static", headers=examiner, data={"client_id": cid},
-                    files={"file": ("q.png", _bigger(signature_png(1, jitter=0.7)), "image/png")})
+    shot = lambda img: client.post("/api/screen/static", headers=examiner, data={"client_id": cid},
+                                   files={"file": ("q.png", img, "image/png")})
+    assert client.get("/api/admin/settings", headers=admin).json()["screening"]["size_mode"] == "adaptive"
+
+    # Adaptive: the 3x larger photo is flagged, resized, and also screened unresized.
+    r = shot(_bigger(signature_png(1, jitter=0.7)))
     assert r.status_code == 200, r.text
     a = r.json()["analysis"]
-    assert a["size_match"] == {"enabled": False, "scale": 1.0} and a["size_scale"] == 1.0
     assert a["capture"]["flagged"] and a["capture"]["size_ratio"] > 2
+    assert a["size_match"]["mode"] == "adaptive" and a["size_match"]["enabled"] and a["size_match"]["scale"] < 0.5
+    w = a["without_resizing"]
+    assert w["screening_result"] in ("consistent", "inconclusive", "inconsistent") and 0 <= w["confidence"] <= 99
+    # ... a normal-size upload is left alone.
+    a = shot(signature_png(1, jitter=0.7)).json()["analysis"]
+    assert not a["capture"]["flagged"] and a["size_match"]["enabled"] is False and a["size_scale"] == 1.0
+    assert a["without_resizing"] is None
 
-    # Only admins can switch it; the change is audited and used by new screenings.
-    assert client.put("/api/admin/settings/screening", headers=examiner, json={"size_match": True}).status_code == 403
-    assert client.put("/api/admin/settings/screening", headers=admin, json={"size_match": True}).json() == {"size_match": True}
+    # Only admins can change it; the change is audited and used by new screenings.
+    put = lambda h, body: client.put("/api/admin/settings/screening", headers=h, json=body)
+    assert put(examiner, {"size_mode": "off"}).status_code == 403
+    assert put(admin, {"size_mode": "sometimes"}).status_code == 422
     try:
-        r = client.post("/api/screen/static", headers=examiner, data={"client_id": cid},
-                        files={"file": ("q.png", _bigger(signature_png(1, jitter=0.7)), "image/png")})
-        a = r.json()["analysis"]
-        assert a["size_match"]["enabled"] and a["size_match"]["scale"] < 0.5
+        assert put(admin, {"size_mode": "off"}).json()["size_mode"] == "off"
+        a = shot(_bigger(signature_png(1, jitter=0.7))).json()["analysis"]
+        assert a["size_match"] == {"enabled": False, "mode": "off", "scale": 1.0} and a["without_resizing"] is None
         assert a["capture"]["flagged"]          # the notice is about the upload, before any resize
+        assert put(admin, {"size_mode": "always"}).json() == {"size_mode": "always"}
+        a = shot(_bigger(signature_png(1, jitter=0.7))).json()["analysis"]
+        assert a["size_match"]["mode"] == "always" and a["size_match"]["scale"] < 0.5
         log = client.get("/api/admin/audit", headers=admin)
-        assert log.status_code == 200 and "size matching on" in log.text
+        assert log.status_code == 200 and "size matching to always" in log.text
     finally:
-        client.put("/api/admin/settings/screening", headers=admin, json={"size_match": False})
+        put(admin, {"size_mode": "adaptive"})
 
 
 def test_alike_tip_from_reference_spread():
