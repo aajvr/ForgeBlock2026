@@ -28,7 +28,7 @@ export default function Settings() {
         </p>
       </Card>
 
-      <SizeMatchSetting value={!!s.screening?.size_match} onSaved={load} />
+      <SizeMatchSetting value={s.screening?.size_mode || 'adaptive'} onSaved={load} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card icon={CalendarClock} title="Data retention" subtitle="New clients are kept this many days, then their signature data is deleted automatically (checked daily).">
@@ -115,39 +115,45 @@ function AccessControlCard({ a }) {
   )
 }
 
-// v8.22: one system-wide switch for static size matching (off by default).
+// v8.25: one system-wide setting for static size matching (adaptive by default).
+const SIZE_MODES = [
+  ['adaptive', 'Adaptive', 'Resize only when the questioned signature is more than 2× larger or smaller than the references (recommended).'],
+  ['always', 'Always', 'Always resize the questioned signature to the width of the references.'],
+  ['off', 'Off', 'Never resize.'],
+]
+
 function SizeMatchSetting({ value, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-  const toggle = async () => {
+  const choose = async (mode) => {
+    if (mode === value) return
     setBusy(true)
     try {
-      await api.put('/api/admin/settings/screening', { size_match: !value })
-      setMsg(!value ? 'Size matching is on for new screenings.' : 'Size matching is off for new screenings.')
+      await api.put('/api/admin/settings/screening', { size_mode: mode })
+      setMsg(`Size matching is set to ${mode} for new screenings.`)
       onSaved()
     } finally { setBusy(false) }
   }
   return (
     <Card icon={Ruler} title="Static screening: size matching" className="mb-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl text-sm text-slate-700">
-          <p>
-            When on, the questioned image is resized before screening so the signature is as wide as the client’s references.
-            It is <b>off by default</b>: with the current model it made forgeries look more like the references (thick, softened strokes)
-            and lowered accuracy on real document photos, while it made no difference on the research datasets.
-          </p>
-          <p className="mt-2 text-slate-600">
-            Either way, the examiner sees a notice when the questioned signature is far larger or smaller than the references, and every
-            result records whether size matching was used. The change applies to new screenings only and is written to the audit log.
-          </p>
-        </div>
-        <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
-          <span>{value ? 'On' : 'Off'}</span>
-          <button type="button" role="switch" aria-checked={value} disabled={busy} onClick={toggle}
-            className={`relative h-6 w-11 rounded-full transition ${value ? 'bg-brand-600' : 'bg-slate-300'} disabled:opacity-60`}>
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${value ? 'left-[22px]' : 'left-0.5'}`} />
+      <div className="max-w-3xl text-sm text-slate-700">
+        <p>
+          A questioned signature photographed much closer or farther than the client’s references can score lower than it should.
+          <b> Adaptive</b> resizes it only in that case, and the details also show the result without resizing, so the examiner can
+          compare both. Normal uploads are never resized.
+        </p>
+        <p className="mt-2 text-slate-600">
+          Every result records how it was sized. The change applies to new screenings only and is written to the audit log.
+        </p>
+      </div>
+      <div role="radiogroup" aria-label="Size matching" className="mt-4 grid gap-2 sm:grid-cols-3">
+        {SIZE_MODES.map(([mode, label, note]) => (
+          <button key={mode} type="button" role="radio" aria-checked={value === mode} disabled={busy} onClick={() => choose(mode)}
+            className={`rounded-[10px] border px-3 py-2 text-left text-sm transition disabled:opacity-60 ${value === mode ? 'border-brand-600 bg-brand-50 ring-1 ring-brand-600' : 'border-slate-200 hover:border-slate-300'}`}>
+            <span className="block font-medium">{label}</span>
+            <span className="block text-xs text-slate-500">{note}</span>
           </button>
-        </label>
+        ))}
       </div>
       {msg && <Alert kind="success" className="mt-3">{msg}</Alert>}
     </Card>

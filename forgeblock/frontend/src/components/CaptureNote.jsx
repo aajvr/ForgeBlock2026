@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { ChevronDown, Ruler } from 'lucide-react'
 
 // v8.22: the questioned signature was captured very differently from the client's
-// references (its size is far off). Display only: the result is not changed.
+// references (its size is far off). v8.25: with adaptive size matching it was
+// resized, and the result without resizing is shown next to it.
 const times = (x) => (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10)
 
 // A quiet one-line strip that sits under the signature pair; details on demand.
@@ -21,6 +22,7 @@ export function CaptureNote({ r, className = '' }) {
         <span className="min-w-0 flex-1">
           <span className="font-semibold">Captured at a different size:</span> about {factor}× {larger ? 'larger' : 'smaller'} than the references
           {resized ? `, resized to ${times(sm.scale)}× before screening.` : '.'}
+          {resized && <WithoutResizing w={r.analysis?.without_resizing} />}
         </span>
         <button
           type="button"
@@ -48,13 +50,29 @@ export function CaptureNote({ r, className = '' }) {
   )
 }
 
+const RESULT = { consistent: 'Consistent', inconclusive: 'Inconclusive', inconsistent: 'Inconsistent' }
+
+// v8.25: the same screening at the original size (shown only when it was resized).
+function WithoutResizing({ w }) {
+  if (!w) return null
+  return (
+    <span className="block">
+      Without resizing: <span className="font-semibold">{RESULT[w.screening_result] || w.screening_result}</span>
+      {w.p_genuine != null && `, chance genuine about ${Math.round(w.p_genuine * 100)}%`}. The result above is the resized one.
+    </span>
+  )
+}
+
 // One line in the details: how the questioned image was sized for this screening.
 export function SizeMatchLine({ r }) {
   const sm = r.analysis?.size_match
   if (r.modality !== 'static' || !sm) return null
+  const resized = sm.enabled && sm.scale !== 1
+  const mode = sm.mode ? `${sm.mode}, ` : ''
   return (
     <p className="text-[13px] text-muted">
-      Size matching: {sm.enabled ? (sm.scale !== 1 ? `on, resized to ${times(sm.scale)}× to match the references` : 'on, no resize needed') : 'off'}.
+      Size matching: {resized ? `${mode}resized to ${times(sm.scale)}× to match the references` : `${mode}not resized`}.
+      {resized && r.analysis?.without_resizing && <WithoutResizing w={r.analysis.without_resizing} />}
     </p>
   )
 }

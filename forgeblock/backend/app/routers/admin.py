@@ -3,6 +3,7 @@ data retention, system status and the model."""
 import shutil
 from collections import Counter
 from datetime import timedelta
+from typing import Literal
 
 import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -356,7 +357,7 @@ class RetentionIn(BaseModel):
 
 
 class ScreeningSettingsIn(BaseModel):
-    size_match: bool
+    size_mode: Literal["adaptive", "always", "off"]
 
 
 @router.get("/settings")
@@ -378,10 +379,11 @@ def set_retention(body: RetentionIn, db: Session = Depends(get_db), admin: User 
 
 @router.put("/settings/screening")
 def set_screening(body: ScreeningSettingsIn, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    """v8.22: system-wide switch for static size matching (default off). One switch
+    """v8.25: system-wide static size matching mode (default adaptive). One setting
     for everyone, so screenings stay comparable; every result records how it was made."""
-    value = set_setting(db, "screening", {**get_setting(db, "screening"), "size_match": body.size_match})
-    log_activity(db, admin, "settings", f"Turned static size matching {'on' if body.size_match else 'off'}")
+    current = {k: v for k, v in get_setting(db, "screening").items() if k != "size_match"}  # v8.22 key retired
+    value = set_setting(db, "screening", {**current, "size_mode": body.size_mode})
+    log_activity(db, admin, "settings", f"Set static size matching to {body.size_mode}")
     return value
 
 
