@@ -134,7 +134,7 @@ export default function Screen() {
           <div className="space-y-5 p-5">
             {modality === 'static' ? (
               <>
-                <ImagePicker crop label="Questioned signature" files={files} onChange={setFiles} />
+                <ImagePicker crop scan label="Questioned signature" files={files} onChange={setFiles} />
                 {canRemoveText && (
                   <label className="flex items-start gap-2 text-sm text-slate-600">
                     <input type="checkbox" className="mt-0.5" checked={removeText} onChange={(e) => setRemoveText(e.target.checked)} />

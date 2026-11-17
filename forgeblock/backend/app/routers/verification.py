@@ -606,6 +606,16 @@ def questioned_original(log_id: int, db: Session = Depends(get_db), user: User =
     return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
 
 
+@router.get("/api/verifications/{log_id}/before-stray-marks")
+def questioned_before_stray_marks(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
+    """v8.26: the questioned image before stray marks were removed."""
+    log = _visible_log(db, log_id, user)
+    path = storage_path(((log.analysis or {}).get("stray_marks") or {}).get("original_path"))
+    if path is None:
+        raise HTTPException(404, "No original image: no stray marks were removed for this record.")
+    return FileResponse(path, media_type="image/png", headers=VIEW_ONLY_HEADERS)
+
+
 @router.get("/api/verifications/{log_id}/strokes")
 def questioned_strokes(log_id: int, db: Session = Depends(get_db), user: User = Depends(require_result_viewer)):
     log = _visible_log(db, log_id, user)

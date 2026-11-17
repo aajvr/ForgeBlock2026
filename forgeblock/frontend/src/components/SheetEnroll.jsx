@@ -1,6 +1,7 @@
-import { Camera, Check, FileUp, Printer } from 'lucide-react'
+import { Camera, Check, FileUp, ImageUp, Printer } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
+import PageScanner from './PageScanner'
 import { Alert, Button } from './ui'
 
 // Static enrollment from the printable sheet: print it, let the client sign the
@@ -12,6 +13,8 @@ import { Alert, Button } from './ui'
 export default function SheetEnroll({ client, onDone, onDirty }) {
   const cameraRef = useRef(null)
   const fileRef = useRef(null)
+  const photoRef = useRef(null)
+  const [scanning, setScanning] = useState(null) // phone photo waiting for the built-in scanner (v8.26)
   const [boxes, setBoxes] = useState(null)
   const [picked, setPicked] = useState({})
   const [busy, setBusy] = useState('')
@@ -120,12 +123,27 @@ export default function SheetEnroll({ client, onDone, onDirty }) {
         <Button onClick={() => cameraRef.current.click()} loading={busy === 'read'}>
           <Camera className="h-4 w-4" /> Scan with phone
         </Button>
+        <Button variant="secondary" onClick={() => photoRef.current.click()} disabled={busy === 'read'}>
+          <ImageUp className="h-4 w-4" /> Scan a saved photo
+        </Button>
         <Button variant="secondary" onClick={() => fileRef.current.click()} disabled={busy === 'read'}>
           <FileUp className="h-4 w-4" /> Upload a scan
         </Button>
       </div>
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { readSheet(e.target.files[0]); e.target.value = '' }} />
+      {/* Phone photos go through the built-in scanner first (find page, fix corners,
+          straighten, clean). "Upload a scan" is for files that are already scanned. */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { setScanning(e.target.files[0] || null); e.target.value = '' }} />
+      <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { setScanning(e.target.files[0] || null); e.target.value = '' }} />
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { readSheet(e.target.files[0]); e.target.value = '' }} />
+      <PageScanner
+        file={scanning}
+        title="Scan the enrollment sheet"
+        onCancel={() => setScanning(null)}
+        onDone={(f) => {
+          setScanning(null)
+          readSheet(f)
+        }}
+      />
 
       <Alert>{error}</Alert>
       {res && (

@@ -1089,6 +1089,7 @@ export default function ResultView({ result: r, client = false }) {
       )}
       <PenDataNote r={r} />
       <TextRemovalNote r={r} />
+      <StrayMarkNote r={r} />
       {!showSignatures && <CaptureNote r={r} />}
       <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ResultHeader r={r} label={decided ? 'Model screening result' : 'Screening result'} how={staff} {...(client ? { whose: 'your', client: true } : {})}>
@@ -1141,6 +1142,27 @@ export function TextRemovalNote({ r }) {
         </button>
       </div>
       {show && <AuthImage src={`/api/verifications/${r.id}/original-image`} alt="Questioned photo as uploaded" className="mt-3 max-h-64 rounded-[10px] border border-line bg-white" />}
+    </Alert>
+  )
+}
+
+// v8.26: small stray marks (dots, specks) far from the signature were removed
+// automatically before screening. Clean images are never changed.
+export function StrayMarkNote({ r }) {
+  const [show, setShow] = useState(false)
+  const s = r.analysis?.stray_marks
+  if (!s) return null
+  const n = s.removed || s.boxes?.length || 1
+  return (
+    <Alert kind="info" icon={Info} raised>
+      <div>
+        Stray mark removed: {n === 1 ? '1 small mark' : `${n} small marks`} away from the signature {n === 1 ? 'was' : 'were'} erased before screening.
+        Check that nothing belonging to the signature was removed.
+        <button type="button" onClick={() => setShow(!show)} className="ml-2 font-medium text-brand-700 underline underline-offset-2">
+          {show ? 'Hide before' : 'View before'}
+        </button>
+      </div>
+      {show && <AuthImage src={`/api/verifications/${r.id}/before-stray-marks`} alt="Questioned image before stray marks were removed" className="mt-3 max-h-64 rounded-[10px] border border-line bg-white" />}
     </Alert>
   )
 }
