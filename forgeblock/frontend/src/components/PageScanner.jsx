@@ -1,6 +1,6 @@
-import { RotateCcw, ScanLine } from 'lucide-react'
+import { RotateCcw, ScanLine, SkipForward } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { detectPage, fileToCanvas, loadOpenCV, scanPage } from '../lib/pageScan'
+import { detectPage, fileToCanvas, loadOpenCV, preloadScanner, scanPage } from '../lib/pageScan'
 import { Alert, Button, Modal } from './ui'
 
 // Built-in scanner step (v8.26), used instead of a separate scanning app such as
@@ -8,7 +8,10 @@ import { Alert, Button, Modal } from './ui'
 // when it guesses wrong, then straightens and cleans the page (see lib/pageScan.js).
 // The scanned page goes on to the normal upload (sheet import or signature crop).
 // References and questioned signatures should both go through this same scanner.
-export default function PageScanner({ file, onDone, onCancel, title = 'Scan the page' }) {
+// onSkip (optional): use the photo as it is, for files that are already scanned
+// (for example with Notebloc). The skipped photo is not straightened or cleaned.
+export default function PageScanner({ file, onDone, onCancel, onSkip, title = 'Scan the page' }) {
+  useEffect(() => preloadScanner(), [])
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -153,6 +156,11 @@ export default function PageScanner({ file, onDone, onCancel, title = 'Scan the 
         )}
       </div>
       <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {onSkip && (
+          <Button variant="ghost" disabled={busy} onClick={() => onSkip(file)}>
+            <SkipForward className="h-4 w-4" /> Skip, already scanned
+          </Button>
+        )}
         <Button variant="ghost" disabled={!pts || busy} onClick={() => img && setPts(detectPage(cvRef.current, img).points)}>
           <RotateCcw className="h-4 w-4" /> Detect again
         </Button>
