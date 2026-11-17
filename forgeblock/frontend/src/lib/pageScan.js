@@ -20,28 +20,61 @@ const HI = 240
 
 let loading = null
 
+// The OpenCV.js build is an Emscripten module that is itself "thenable" (it has
+// a .then). Resolving a Promise with it makes the browser call .then again and
+// again, forever: the page freezes on "Loading the scanner..." until the browser
+// says it is not responding. So the module's .then is removed before it is
+// handed to any Promise.
+function settle(cv, resolve) {
+  if (cv && typeof cv.then === 'function') {
+    try {
+      delete cv.then
+    } catch {
+      cv.then = undefined
+    }
+  }
+  window.cv = cv
+  resolve(cv)
+}
+
 export function loadOpenCV() {
-  if (window.cv?.Mat) return Promise.resolve(window.cv)
+  if (window.cv?.Mat) {
+    const cv = window.cv
+    return new Promise((resolve) => settle(cv, resolve))
+  }
   if (loading) return loading
   loading = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      loading = null
+      reject(new Error('The scanner took too long to start. Check the internet connection and try again.'))
+    }, 60000)
+    const done = (cv) => {
+      clearTimeout(timer)
+      settle(cv, resolve)
+    }
     const ready = () => {
       const cv = window.cv
-      if (cv?.Mat) return resolve(cv)
+      if (cv?.Mat) return done(cv)
       if (cv && typeof cv.then === 'function') {
+        // The callback's argument is the module itself: take it without returning it.
         cv.then((m) => {
-          window.cv = m
-          resolve(m)
+          done(m)
         })
         return
       }
-      if (cv) cv.onRuntimeInitialized = () => resolve(window.cv)
-      else reject(new Error('OpenCV did not start.'))
+      if (cv) cv.onRuntimeInitialized = () => done(window.cv)
+      else {
+        clearTimeout(timer)
+        loading = null
+        reject(new Error('OpenCV did not start.'))
+      }
     }
     const s = document.createElement('script')
     s.src = OPENCV_URL
     s.async = true
     s.onload = ready
     s.onerror = () => {
+      clearTimeout(timer)
       loading = null
       reject(new Error('Could not load the scanner. Check the internet connection and try again.'))
     }
