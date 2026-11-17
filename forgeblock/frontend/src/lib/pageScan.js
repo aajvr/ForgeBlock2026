@@ -174,18 +174,40 @@ export function insetCorners(canvas) {
 }
 
 // Returns { points, found }. found is false when no page covering a quarter of the photo was seen.
+// Finding the page runs on a copy at most DETECT_SIDE px (much faster on phones);
+// the corners are scaled back up, and the scan itself still uses the full photo.
+const DETECT_SIDE = 1000
+
 export function detectPage(cv, canvas) {
+  const k = Math.min(1, DETECT_SIDE / Math.max(canvas.width, canvas.height))
+  let small = canvas
+  if (k < 1) {
+    small = document.createElement('canvas')
+    small.width = Math.round(canvas.width * k)
+    small.height = Math.round(canvas.height * k)
+    small.getContext('2d').drawImage(canvas, 0, 0, small.width, small.height)
+  }
   let best = null
   for (const useCanny of [false, true]) {
     try {
-      const p = detectOnce(cv, canvas, useCanny)
+      const p = detectOnce(cv, small, useCanny)
       if (p && (!best || area(p) > area(best))) best = p
     } catch {
       // try the other mode
     }
   }
-  if (best && area(best) > canvas.width * canvas.height * 0.25) return { points: best, found: true }
+  if (best && area(best) > small.width * small.height * 0.25) {
+    return { points: best.map((q) => ({ x: q.x / k, y: q.y / k })), found: true }
+  }
   return { points: insetCorners(canvas), found: false }
+}
+
+// Start downloading OpenCV in the background (call when a page with a scanner
+// opens), so it is usually ready by the time a photo is picked.
+export function preloadScanner() {
+  const go = () => loadOpenCV().catch(() => {})
+  if ('requestIdleCallback' in window) window.requestIdleCallback(go, { timeout: 3000 })
+  else setTimeout(go, 1000)
 }
 
 // Straighten + clean. Returns a grayscale JPEG File.
@@ -212,7 +234,21 @@ export async function scanPage(cv, canvas, pts, name = 'scan') {
     cv.cvtColor(flat, gray, cv.COLOR_RGBA2GRAY)
     cv.dilate(gray, bg, kernel)
     cv.medianBlur(bg, bg2, 21)
-    cv.divide(gray, bg2, norm, 255)
+    // The dilate leaves round plateaus on grainy paper that show up as grey spots
+    // after the divide; a wide blur of the background removes them. Tested
+    // 2026-11-18 (flash photo of sheet B vs Notebloc sheet A refs): 5C/5?/0X
+    // before, 7C/3?/0X after. Do NOT force light paper to pure white instead:
+    // that made the same boxes 0C/0?/10X.
+    // (blurred at quarter size and scaled back up: same result, ~25x faster)
+    const small = new cv.Mat()
+    try {
+      cv.resize(bg2, small, new cv.Size(Math.max(1, Math.round(w / 4)), Math.max(1, Math.round(h / 4))), 0, 0, cv.INTER_AREA)
+      cv.GaussianBlur(small, small, new cv.Size(0, 0), k / 4, k / 4, cv.BORDER_REPLICATE)
+      cv.resize(small, bg, new cv.Size(w, h), 0, 0, cv.INTER_LINEAR)
+    } finally {
+      small.delete()
+    }
+    cv.divide(gray, bg, norm, 255)
     const a = 255 / (HI - LO)
     norm.convertTo(out, -1, a, -LO * a)
     const c = document.createElement('canvas')

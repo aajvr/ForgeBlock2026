@@ -143,6 +143,10 @@ export default function SheetEnroll({ client, onDone, onDirty }) {
           setScanning(null)
           readSheet(f)
         }}
+        onSkip={(f) => {
+          setScanning(null)
+          readSheet(f)
+        }}
       />
 
       <Alert>{error}</Alert>

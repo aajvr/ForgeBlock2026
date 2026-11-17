@@ -106,6 +106,13 @@ export default function ImagePicker({ label, files, onChange, multiple = false, 
               setCropping(f)
             } else onChange([f])
           }}
+          onSkip={(f) => {
+            setScanning(null)
+            if (crop) {
+              setOriginal(f)
+              setCropping(f)
+            } else onChange([f])
+          }}
         />
       )}
       {crop && (
