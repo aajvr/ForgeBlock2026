@@ -61,6 +61,21 @@ def screening_result(decision: Decision, inconclusive_below: float) -> str:
     return "consistent" if decision.classification == "genuine" else "inconsistent"
 
 
+# v8.26 feature gate (static). A Consistent result also needs the handwriting
+# features (features.compare_features) to agree: if more than FEATURE_GATE_MAX
+# features fall outside the client's usual range, the result becomes Inconclusive
+# so an examiner looks at it. It never makes a result Consistent or Inconsistent.
+# Tested 2026-11-17 (3 real clients, leave-one-out, size matching always): skilled
+# forgeries passing as Consistent 4 -> 0 of 26; genuine 51C/15?/4X -> 46C/20?/4X.
+FEATURE_GATE_MAX = 1
+
+
+def feature_gate(result: str, features_outside: int) -> str:
+    if result == "consistent" and features_outside > FEATURE_GATE_MAX:
+        return "inconclusive"
+    return result
+
+
 def caption(result: str, confidence: float, mode: str = "verify") -> str:
     """Plain-language sentence shown under the screening result."""
     n = round(confidence)

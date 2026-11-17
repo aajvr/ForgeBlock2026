@@ -20,6 +20,7 @@ from ..ledger import append_block
 from ..config import MAX_REFERENCES
 from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
+from ..ml.stray_marks import near_positions
 from ..ml.quality import dynamic_quality, static_quality
 from ..models import BlockchainLedger, Case, CaseEvent, Client, Finding, SignatureProfile, User, VerificationLog, utcnow
 from ..security import require_staff
@@ -317,7 +318,8 @@ def add_as_reference(case_id: int, body: AddReferenceIn, db: Session = Depends(g
                              sample_path=save_image(img, f"profiles/static/{client.id}"),
                              embedding=engine.static_embedding(img).tolist(),
                              model_version=engine.static_cfg["model_version"],
-                             features=static_features(img), quality=q["score"], enrolled_by=user.id)
+                             features={**static_features(img), "_marks": near_positions(img)},
+                             quality=q["score"], enrolled_by=user.id)
     else:
         from ..ml.dynamic_features import points_from_payload
 

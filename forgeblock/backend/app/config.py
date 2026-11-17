@@ -55,6 +55,9 @@ SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "forgeblock-samples").strip()
 # overlay / stroke replay), read-only. The examiner's private notes stay hidden.
 # false = the old limited client view (result, confidence, decision, receipt).
 CLIENT_FULL_RESULTS = os.getenv("CLIENT_FULL_RESULTS", "true").lower() == "true"
+# v8.26: remove small stray marks (dots, dashes, splashes) away from the signature on
+# every static reference and questioned image; images without one are left unchanged.
+STRAY_MARK_REMOVAL = os.getenv("STRAY_MARK_REMOVAL", "true").lower() == "true"
 WEIGHTS_DIR = Path(os.getenv("WEIGHTS_DIR", BASE_DIR / "weights"))
 
 # Enables the ledger tamper-simulation endpoint used to demonstrate

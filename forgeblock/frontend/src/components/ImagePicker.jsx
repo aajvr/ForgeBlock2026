@@ -1,17 +1,21 @@
 import { Camera, Crop, ImagePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import PageScanner from './PageScanner'
 import SignatureCrop from './SignatureCrop'
 
 // Image upload box with preview. "Take photo" (camera, on by default) opens the camera on phones and tablets.
 // With `crop` (single image only), every picked photo first opens the crop step
 // so the examiner frames just the signature (see SignatureCrop).
-export default function ImagePicker({ label, files, onChange, multiple = false, hint, crop = false, camera = true }) {
+// With `scan` (v8.26, single image only), the photo goes through the built-in page
+// scanner first (straighten + clean, like the references), then the crop step.
+export default function ImagePicker({ label, files, onChange, multiple = false, hint, crop = false, camera = true, scan = false }) {
   const inputRef = useRef(null)
   const cameraRef = useRef(null)
   const [previews, setPreviews] = useState([])
   const [drag, setDrag] = useState(false)
   const [original, setOriginal] = useState(null) // the photo as taken, kept for "Crop again"
   const [cropping, setCropping] = useState(null)
+  const [scanning, setScanning] = useState(null)
 
   useEffect(() => {
     const urls = (files || []).map((f) => URL.createObjectURL(f))
@@ -22,6 +26,10 @@ export default function ImagePicker({ label, files, onChange, multiple = false, 
   const take = (list) => {
     const imgs = [...list].filter((f) => f.type.startsWith('image/'))
     if (!imgs.length) return
+    if (scan && !multiple) {
+      setScanning(imgs[0])
+      return
+    }
     if (crop && !multiple) {
       setOriginal(imgs[0])
       setCropping(imgs[0])
@@ -86,6 +94,20 @@ export default function ImagePicker({ label, files, onChange, multiple = false, 
         )}
       </div>}
       <input ref={inputRef} type="file" accept="image/*" multiple={multiple} className="hidden" onChange={(e) => { take(e.target.files); e.target.value = '' }} />
+      {scan && !multiple && (
+        <PageScanner
+          file={scanning}
+          title="Scan the document"
+          onCancel={() => setScanning(null)}
+          onDone={(f) => {
+            setScanning(null)
+            if (crop) {
+              setOriginal(f)
+              setCropping(f)
+            } else onChange([f])
+          }}
+        />
+      )}
       {crop && (
         <SignatureCrop
           file={cropping}

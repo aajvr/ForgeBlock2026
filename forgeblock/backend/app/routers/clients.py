@@ -18,10 +18,10 @@ from ..access import (
     visible_client_ids,
     visible_client_or_404,
 )
-from ..config import MAX_REFERENCES
+from ..config import MAX_REFERENCES, STRAY_MARK_REMOVAL
 from ..database import get_db
 from ..ml.dynamic_features import points_from_payload
-from ..ml import enroll_sheet
+from ..ml import enroll_sheet, stray_marks
 from ..ml.capture import standardize
 from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
@@ -283,27 +283,47 @@ async def enroll_static(client_id: int, files: list[UploadFile] = File(...), db:
     _room(db, c.id, "static", len(files))
     engine = get_engine()
     accepted, rejected = [], []
-    for f in files:
-        _, img = await read_upload(f)
+    uploads = [(f, (await read_upload(f))[1]) for f in files]
+    # v8.26: stray marks are judged against the client's other signatures (the
+    # references on file and the rest of this batch, e.g. the other sheet boxes).
+    marks = [stray_marks.near_positions(img) for _, img in uploads] if STRAY_MARK_REMOVAL else []
+    on_file = [(p.features or {}).get("_marks") for p in active_profiles(db, c.id, "static")] \
+        if STRAY_MARK_REMOVAL else []
+    removed = 0
+    for k, (f, img) in enumerate(uploads):
+        stray = None
+        if STRAY_MARK_REMOVAL:
+            cleaned, info = stray_marks.clean(img, on_file + marks[:k] + marks[k + 1:])
+            if info["removed"]:
+                stray = {**info, "original_path": save_image(img, f"profiles/static/{c.id}")}
+                img = cleaned
+                removed += 1
         q = static_quality(img)
         if not q["usable"]:
             rejected.append({"file": f.filename, "issues": q["issues"]})
             continue
+        features = static_features(img)
+        if STRAY_MARK_REMOVAL:
+            features["_marks"] = stray_marks.near_positions(img)
+        if stray:
+            features["_stray_marks"] = stray
         p = SignatureProfile(
             client_id=c.id,
             modality="static",
             sample_path=save_image(img, f"profiles/static/{c.id}"),
             embedding=engine.static_embedding(img).tolist(),
             model_version=engine.static_cfg["model_version"],
-            features=static_features(img),
+            features=features,
             quality=q["score"],
             enrolled_by=user.id,
         )
         db.add(p)
         db.commit()
-        accepted.append({"file": f.filename, "id": p.id, "quality": q["score"], "issues": q["issues"]})
+        accepted.append({"file": f.filename, "id": p.id, "quality": q["score"], "issues": q["issues"],
+                         "stray_marks_removed": stray["removed"] if stray else 0})
     if accepted:
-        log_activity(db, user, "enrollment", f"Added {len(accepted)} static reference(s) to {c.client_code}",
+        note = f"; stray marks removed from {removed}" if removed else ""
+        log_activity(db, user, "enrollment", f"Added {len(accepted)} static reference(s) to {c.client_code}{note}",
                      modality="static")
         _notify_references(db, user, c, len(accepted), "static")
     return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db)}
