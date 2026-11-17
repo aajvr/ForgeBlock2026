@@ -19,13 +19,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..access import can_view_case, can_view_log, visible_client_or_404
-from ..config import CLIENT_FULL_RESULTS, MIN_ADAPTIVE_SAMPLES
+from ..config import CLIENT_FULL_RESULTS, MIN_ADAPTIVE_SAMPLES, STRAY_MARK_REMOVAL
 from ..database import get_db
 from ..ledger import verify_block
 from ..ml import capture
 from ..ml import client_classifier as cc
 from ..ml import decision as dec
-from ..ml import text_removal
+from ..ml import stray_marks, text_removal
 from ..ml.dynamic_features import points_from_payload
 from ..ml.engine import get_engine
 from ..ml.explain import overlay_png
@@ -395,6 +395,14 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     profiles = active_profiles(db, client.id, "static")
     if not profiles:
         raise HTTPException(409, f"{client.client_code} has no static references on file yet.")
+    # v8.26: remove stray marks (only when found), judged against the references'
+    # habits; the upload as received is stored too so the examiner can compare.
+    stray = None
+    if STRAY_MARK_REMOVAL:
+        cleaned, info = stray_marks.clean(img, [(p.features or {}).get("_marks") for p in profiles])
+        if info["removed"]:
+            stray = {**info, "original_path": save_image(img, f"questioned/static/{client.id}")}
+            img = cleaned
     # v8.22: compare the questioned signature's size with the references'.
     # v8.25: resize adaptively (only when that check flags the upload) unless an
     # admin chose "always" or "off"; when it was resized, the original size is
@@ -431,6 +439,7 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
         "capture": capture_info,
         "client_classifier": classifier,
         "text_removal": _text_removal_record(text_removal_info, original, client.id),
+        "stray_marks": stray,
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
         "features": compare_features(static_features(img), [p.features for p in profiles], "static"),

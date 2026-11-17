@@ -547,14 +547,43 @@ def reembed_profiles(db: Session = Depends(get_db), admin: User = Depends(requir
     from ..ml.engine import get_engine
     from ..services import load_image
 
+    from ..config import STRAY_MARK_REMOVAL
+    from ..ml import stray_marks
+    from ..ml.features import static_features
+    from ..services import save_image
+
     engine = get_engine()
-    updated, failed = 0, []
-    for p in db.scalars(select(SignatureProfile).where(SignatureProfile.status == "active")):
+    updated, failed, cleaned_refs = 0, [], 0
+    profiles = list(db.scalars(select(SignatureProfile).where(SignatureProfile.status == "active")))
+    # v8.26: references enrolled before stray-mark removal are checked here too,
+    # each against the same client's other references.
+    marks: dict[int, list] = {}
+    if STRAY_MARK_REMOVAL:
+        for p in profiles:
+            if p.modality == "static" and "_marks" not in (p.features or {}):
+                img = load_image(p.sample_path)
+                if img is not None:
+                    p.features = {**(p.features or {}), "_marks": stray_marks.near_positions(img)}
+    for p in profiles:
+        if p.modality == "static":
+            marks.setdefault(p.client_id, []).append((p.id, (p.features or {}).get("_marks")))
+    for p in profiles:
         try:
             if p.modality == "static":
                 img = load_image(p.sample_path)
                 if img is None:
                     raise ValueError("image missing")
+                if STRAY_MARK_REMOVAL and "_stray_marks" not in (p.features or {}):
+                    others = [m for pid, m in marks.get(p.client_id, []) if pid != p.id]
+                    out, info = stray_marks.clean(img, others)
+                    if info["removed"]:
+                        info["original_path"] = p.sample_path
+                        p.sample_path = save_image(out, f"profiles/static/{p.client_id}")
+                        img = out
+                        p.features = {**static_features(img), "_marks": stray_marks.near_positions(img),
+                                      "_stray_marks": info,
+                                      **{k: v for k, v in (p.features or {}).items() if k == "_capture_ack"}}
+                        cleaned_refs += 1
                 p.embedding = engine.static_embedding(img).tolist()
                 p.model_version = engine.static_cfg["model_version"]
             else:
@@ -571,5 +600,6 @@ def reembed_profiles(db: Session = Depends(get_db), admin: User = Depends(requir
         except Exception as e:  # keep going; report which profiles could not be updated
             failed.append({"profile_id": p.id, "error": str(e)})
     db.commit()
-    log_activity(db, admin, "model", f"Re-embedded {updated} reference(s)")
-    return {"updated": updated, "failed": failed}
+    note = f"; stray marks removed from {cleaned_refs}" if cleaned_refs else ""
+    log_activity(db, admin, "model", f"Re-embedded {updated} reference(s){note}")
+    return {"updated": updated, "failed": failed, "stray_marks_removed": cleaned_refs}
