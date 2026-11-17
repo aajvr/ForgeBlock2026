@@ -35,7 +35,7 @@ from ..ml.quality import dynamic_quality, static_quality
 from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
 from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
 from ..security import current_user, require_result_viewer, require_staff
-from ..ml.screening import screening_result
+from ..ml.screening import FEATURE_GATE_MAX, feature_gate, screening_result
 from ..services import (
     get_setting,
     inconclusive_band,
@@ -375,10 +375,11 @@ SIZE_MODES = ("adaptive", "always", "off")
 def size_mode(db: Session) -> str:
     """v8.25: how static questioned images are sized. "adaptive" (default) resizes
     only when the capture check flags the upload (more than 2x larger or smaller
-    than the references); "always" is the v8.8 behaviour; "off" never resizes.
+    than the references); "always" (v8.26 default) always matches the references'
+    size; "off" never resizes.
     The v8.22 on/off switch ("size_match") is no longer read."""
     mode = get_setting(db, "screening").get("size_mode")
-    return mode if mode in SIZE_MODES else "adaptive"
+    return mode if mode in SIZE_MODES else "always"
 
 
 def _static_decision(db: Session, test: np.ndarray, refs: list[np.ndarray], cfg: dict):
@@ -420,11 +421,22 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
     test = engine.static_embedding(img)
     refs = [np.array(p.embedding) for p in profiles]
     decision, classifier = _static_decision(db, test, refs, engine.static_cfg)
+    gate_on = bool(get_setting(db, "screening").get("feature_gate", True))
+    ref_features = [p.features for p in profiles]
+    features = compare_features(static_features(img), ref_features, "static")
+    raw_result = screening_result(decision, inconclusive_band(db))
+    result = feature_gate(raw_result, features["flagged"]) if gate_on else raw_result
+    gate_info = {"enabled": gate_on, "max_outside": FEATURE_GATE_MAX, "outside": features["flagged"],
+                 "applied": result != raw_result, "result_before_gate": raw_result}
     without_resizing = None
     if size_scale != 1.0:
         alt, alt_cc = _static_decision(db, engine.static_embedding(unresized), refs, engine.static_cfg)
+        alt_result = screening_result(alt, inconclusive_band(db))
+        if gate_on:
+            alt_result = feature_gate(alt_result, compare_features(static_features(unresized), ref_features,
+                                                                   "static")["flagged"])
         without_resizing = {
-            "screening_result": screening_result(alt, inconclusive_band(db)),
+            "screening_result": alt_result,
             "confidence": round(alt.confidence, 2),
             "p_genuine": None if alt.p_genuine is None else round(alt.p_genuine, 4),
             "similarity": round(alt.similarity, 4),
@@ -442,10 +454,11 @@ def screen_static_image(db: Session, user: User, client, img: np.ndarray, case: 
         "stray_marks": stray,
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
-        "features": compare_features(static_features(img), [p.features for p in profiles], "static"),
+        "features": features,
+        "feature_gate": gate_info,
     }
     log, _ = record_verification(
-        db, user=user, modality="static", mode="verify", decision=decision,
+        db, user=user, modality="static", mode="verify", decision=decision, result_override=result,
         test_sample_path=save_image(img, f"questioned/static/{client.id}"), client=client,
         case_id=case.id if case else None, reference_profile_ids=[p.id for p in profiles],
         document_ref=document_ref or (case.document_ref if case else None),

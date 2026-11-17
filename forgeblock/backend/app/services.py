@@ -78,7 +78,10 @@ DEFAULT_SETTINGS = {
     # v8.25: static questioned images are resized ADAPTIVELY by default: only when the
     # upload is more than 2x larger or smaller than the references (the capture notice).
     # Admins can choose "always" (v8.8 behaviour) or "off". Replaces the v8.22 switch.
-    "screening": {"size_mode": "adaptive"},
+    # v8.26: default is "always" (tested 2026-11-17 on 3 real clients: adaptive left
+    # genuine sheet-vs-sheet signatures Inconsistent that "always" passed), and the
+    # feature gate is on (Consistent needs at most 1 handwriting feature out of range).
+    "screening": {"size_mode": "always", "feature_gate": True},
 }
 
 
@@ -269,6 +272,7 @@ def record_verification(
     analysis: dict | None = None,
     capture_device: str | None = None,
     sample_hash: str | None = None,
+    result_override: str | None = None,
 ) -> tuple[VerificationLog, int]:
     """Store the screening, append its ledger block and log the activity.
 
@@ -277,7 +281,7 @@ def record_verification(
     Forged). This is skipped when the same signature was already decided, and
     for prepared evaluation samples (known answer). The case is created before
     the record, because the case number is part of the sealed record."""
-    result = screening_result(decision, inconclusive_band(db))
+    result = result_override or screening_result(decision, inconclusive_band(db))
     auto_case = None
     if (mode == "verify" and client is not None and case_id is None and expected_label is None
             and result in NEEDS_DECISION and prior_decision(db, client.id, sample_hash) is None):
