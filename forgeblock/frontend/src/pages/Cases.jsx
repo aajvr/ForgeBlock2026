@@ -131,7 +131,8 @@ export default function Cases() {
   const examinerName = examinerId === 'me' ? 'Opened by me' : examiners.find((u) => String(u.id) === examinerId)?.full_name
   const examinerParam = examinerId && examinerId !== 'me' ? examinerId : ''
   const setStatus = (v) => patchParams(setParams, { status: v === 'open' ? null : v || 'all' })
-  const [q, setQ] = useState('')
+  // ?q= pre-fills the search (the client page's "View all" link passes the client code).
+  const [q, setQ] = useState(() => params.get('q') || '')
   const [cases, setCases] = useState(null)
   const [error, setError] = useState('')
   const newOpen = params.get('new') === '1'

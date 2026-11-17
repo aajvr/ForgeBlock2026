@@ -211,25 +211,28 @@ export default function Records() {
       <Card bodyClass="p-0" data-tour="records-list">
         {isAdmin ? (
           <div className="border-b border-slate-100 p-4" data-tour="records-filters">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="w-full sm:w-56">{search}</div>
-              <Combobox label="Examiner" anyLabel="Any examiner" placeholder="Search examiners" value={filters.examiner} onChange={(v) => setVal('examiner', v)} options={examinerOptions} className="w-full sm:w-56" />
-              <div className="w-full sm:w-44">
+            {/* v8.26: a grid that fills the card: 2 columns on phones, 4 on iPad and laptops (two even rows), all 8 in one row on wide screens. */}
+            <div className="grid grid-cols-2 items-center gap-2.5 lg:grid-cols-4 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.3fr)_repeat(3,minmax(0,1fr))_auto]">
+              <div className="col-span-2 min-w-0 lg:col-span-1">{search}</div>
+              <Combobox label="Examiner" anyLabel="Any examiner" placeholder="Search examiners" value={filters.examiner} onChange={(v) => setVal('examiner', v)} options={examinerOptions} className="col-span-2 w-full min-w-0 sm:col-span-1" />
+              <div className="col-span-2 min-w-0 sm:col-span-1">
                 <Select value={filters.group} onChange={set('group')} aria-label="Group">
                   <option value="">Any group</option>
                   {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   <option value="none">No group</option>
                 </Select>
               </div>
-              <DateRange from={filters.date_from} to={filters.date_to} onChange={(f, t) => patchParams(setParams, { date_from: f || null, date_to: t || null })} className="w-full sm:w-56" />
-              <div className="w-[calc(50%-0.35rem)] sm:w-36">{resultSelect}</div>
-              <div className="w-[calc(50%-0.35rem)] sm:w-36">{modalitySelect}</div>
-              <div className="w-full sm:w-40">{decisionSelect}</div>
-              {anySet && <button type="button" onClick={clearAll} className="text-sm font-medium text-brand-700 hover:underline">Clear filters</button>}
-              <label className="ml-auto flex cursor-pointer items-center gap-2 whitespace-nowrap text-sm text-slate-700">
-                <input type="checkbox" checked={grouped} onChange={(e) => patchParams(setParams, { by: e.target.checked ? 'group' : null })} className="h-4 w-4 accent-brand-600" />
-                <Layers className="h-4 w-4 text-slate-400" /> Group by group
-              </label>
+              <DateRange from={filters.date_from} to={filters.date_to} onChange={(f, t) => patchParams(setParams, { date_from: f || null, date_to: t || null })} className="col-span-2 w-full min-w-0 sm:col-span-1" />
+              <div className="min-w-0">{resultSelect}</div>
+              <div className="min-w-0">{modalitySelect}</div>
+              <div className="min-w-0">{decisionSelect}</div>
+              <div className="flex min-w-0 items-center justify-end gap-4 whitespace-nowrap">
+                {anySet && <button type="button" onClick={clearAll} className="text-sm font-medium text-brand-700 hover:underline">Clear filters</button>}
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={grouped} onChange={(e) => patchParams(setParams, { by: e.target.checked ? 'group' : null })} className="h-4 w-4 accent-brand-600" />
+                  <Layers className="h-4 w-4 text-slate-400" /> Group by group
+                </label>
+              </div>
             </div>
             {(filters.examiner || filters.group || filters.date_from || filters.date_to) && (
               <div className="mt-3 flex flex-wrap gap-2">

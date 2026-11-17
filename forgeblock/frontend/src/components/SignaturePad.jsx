@@ -330,7 +330,7 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
             {nudge && <span className="text-[13px] text-amber-600">Sign first, then Save &amp; next.</span>}
             {penToggle}
             <Button variant="secondary" className="min-h-11" onClick={undo} disabled={!count}>
-              <Undo2 className="h-4 w-4" /> <span className={onNext ? 'hidden md:inline' : ''}>Undo last stroke</span>
+              <Undo2 className="h-4 w-4" /> <span className={onNext ? 'hidden md:inline' : 'hidden sm:inline'}>Undo last stroke</span><span className={onNext ? 'sr-only' : 'sm:hidden'}>Undo</span>
             </Button>
             <Button variant="secondary" className="min-h-11" onClick={askClear} disabled={!count}>Clear</Button>
             {onNext ? (

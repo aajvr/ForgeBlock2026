@@ -98,48 +98,30 @@ def explain_result(l: VerificationLog) -> dict | None:
     short = z < 0 if z is not None else passed * 2 < len(votes)
     side = "short of" if short else "past"
 
-    names = {"cosine": "cosine", "euclidean": "Euclidean", "manhattan": "Manhattan"}
-    ticks = ", ".join(f"{names.get(k, k)} {'passed' if v else 'not passed'}" for k, v in votes.items())
-    if z is None:
-        margin = ""
-    elif z >= 0:
-        margin = f"about {z:.1f} steps of this client's own variation past the thresholds"
-    else:
-        margin = f"about {abs(z):.1f} steps of this client's own variation short of the thresholds"
+    # v8.26: short, plain steps (shown in "How is this calculated?" and the Scores tab).
+    margin = f" by about {abs(z):.1f}x the client's normal variation" if z is not None else ""
     steps = [{
-        "title": "1. Scores against the thresholds",
-        "text": f"{passed} of {len(votes)} measures passed ({ticks}). Passing or failing alone does not decide the result.",
+        "title": "1. Scores",
+        "text": f"{passed} of {len(votes)} passed their thresholds. Passing alone does not decide the result.",
     }, {
-        "title": f"2. How far {side} the thresholds",
-        "text": (f"On average the scores were {margin}. " if margin else "")
-        + f"Signatures with this margin were genuine about {p_dist}% of the time in the calibration tests"
-        + (" (signatures that only just pass are often skilled forgeries)." if all_pass and p_dist < hi else "."),
+        "title": "2. Margin",
+        "text": f"The scores were {side} the thresholds{margin}: about {p_dist}% chance genuine.",
     }]
     if used:
-        bg = f"{people} other people" if people else "other people"
+        bg = f"{people} people" if people else "other people"
         steps.append({
-            "title": "3. Per-client check",
-            "text": (f"The signature was also compared with this client's references and with the signatures of {bg} "
-                     f"(not ForgeBlock clients). It scored {float(check.get('score', 0)):.2f}, where 0 is like the other "
-                     f"people and 1 is like this client's typical signature"
-                     + (" (below 0 is even less like this client than the other people are)" if float(check.get("score", 0)) < 0 else "")
-                     + f". That puts the chance it is genuine at about "
-                     f"{p}%. This is a second, separate estimate, not an adjustment of step 2, and it is the one used. "
-                     + (f"It changed the result: step 2 alone would have given {category(p_dist).capitalize()}."
-                        if changed else
-                        f"It agrees with step 2 ({p_dist}%): both give {category(p).capitalize()}. "
-                        "Small differences between the two are normal.")),
+            "title": "3. Check against other people",
+            "text": f"Compared with {bg} who are not clients: about {p}% chance genuine. This second estimate is the one used"
+                    + (f"; it changed the result from {category(p_dist).capitalize()}." if changed
+                       else "; it agrees with step 2."),
         })
     shown = {"consistent": "Consistent", "inconsistent": "Inconsistent", "inconclusive": "Inconclusive"}[l.screening_result]
     conf = round(min(99.0, l.confidence_score))
-    if l.screening_result == "consistent":
-        rule = f"{p}% is at least {hi}%, so the result is Consistent. The confidence score is that chance: {conf}%."
-    elif l.screening_result == "inconsistent":
-        rule = (f"{p}% is {lo}% or less, so the result is Inconsistent. The confidence score is the chance it is "
-                f"not genuine: 100 - {p} = {conf}%.")
-    else:
-        rule = (f"{p}% is between {lo}% and {hi}%, so the result is Inconclusive. The confidence score is the chance of "
-                f"the side it leans to: {conf}%.")
+    rule = {
+        "consistent": f"{p}% is {hi}% or more: Consistent. Confidence = {conf}%.",
+        "inconsistent": f"{p}% is {lo}% or less: Inconsistent. Confidence = 100 - {p} = {conf}%.",
+        "inconclusive": f"{p}% is between {lo}% and {hi}%: Inconclusive, for the examiner. Confidence = {conf}%.",
+    }[l.screening_result]
     steps.append({"title": f"{len(steps) + 1}. Result", "text": rule})
 
     # One or two sentences for the result card, under the confidence score.

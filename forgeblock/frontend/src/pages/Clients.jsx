@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, Check, CheckSquare, Database, FolderInput, FolderOpen, FolderPlus, History, Lock, MoreHorizontal, Pencil, PlayCircle, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Briefcase, Check, CheckSquare, Database, FolderInput, FolderOpen, FolderPlus, History, Lock, MoreHorizontal, Pencil, PlayCircle, Plus, ScanSearch, Share2, Trash2, UserPlus, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
@@ -280,6 +280,59 @@ function MoveClientModal({ client, groups, onClose, onMoved }) {
   )
 }
 
+// v8.26: move several selected clients to one group (one request per client).
+function BulkMoveModal({ clients, groups, currentGroup, onClose, onMoved }) {
+  const [to, setTo] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const ungrouped = currentGroup === 'none'
+  const options = groups.filter((g) => String(g.id) !== String(currentGroup))
+  useEffect(() => {
+    // From "Without a group", "No group" would change nothing: start on the first group.
+    setTo(ungrouped && options[0] ? String(options[0].id) : '')
+    setError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients])
+  if (!clients?.length) return null
+  const target = groups.find((g) => String(g.id) === to)
+  const n = clients.length
+  const move = async () => {
+    setBusy(true)
+    setError('')
+    const failed = []
+    for (const c of clients) {
+      try {
+        await api.patch(`/api/clients/${c.id}`, to ? { group_id: Number(to) } : { remove_from_group: true })
+      } catch (err) {
+        failed.push(`${c.client_code} (${err.message})`)
+      }
+    }
+    setBusy(false)
+    if (failed.length) setError(`Could not move ${failed.length} of ${n}: ${failed.join(', ')}.`)
+    onMoved(n - failed.length, target, failed.length > 0)
+  }
+  return (
+    <Modal open onClose={onClose} title={`Move ${n} client${n === 1 ? '' : 's'}`}>
+      <Field label="Move to">
+        <Select value={to} onChange={(e) => setTo(e.target.value)}>
+          {!ungrouped && <option value="">No group</option>}
+          {options.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </Select>
+      </Field>
+      <p className="mt-3 text-sm text-slate-600">
+        {target?.examiner
+          ? `${target.examiner.full_name} will see these clients and their screenings and cases. The current examiner will no longer see them.`
+          : 'Only administrators will see these clients until the group has an examiner.'}
+      </p>
+      <Alert className="mt-3">{error}</Alert>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button loading={busy} onClick={move}><FolderInput className="h-4 w-4" /> Move {n}</Button>
+      </div>
+    </Modal>
+  )
+}
+
 // Right-click (or the ⋯ button) on a client row.
 function RowMenu({ menu, onClose, onDelete, onMove, isAdmin }) {
   const navigate = useNavigate()
@@ -428,21 +481,48 @@ function FolderGrid({ data, clients, onOpen, onNew }) {
   )
 }
 
-function ClientsTable({ clients, user, onRowMenu }) {
+// A square checkbox (the same look as the reference cards' select mode).
+function SelectBox({ checked, label, onClick }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className="-m-2 flex h-9 w-9 items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-brand-600"
+    >
+      <span className={`flex h-5 w-5 items-center justify-center rounded-md border-2 transition-colors ${checked ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 bg-white'}`}>
+        {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+      </span>
+    </button>
+  )
+}
+
+// v8.26: in select mode a click on a row toggles it instead of opening it.
+function ClientsTable({ clients, user, onRowMenu, selecting = false, selected, onToggle, onToggleAll }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const all = selecting && clients.length > 0 && clients.every((c) => selected.has(c.id))
+  const head = ['Client', 'Code', 'Static references', 'Dynamic references', 'Account', 'Registered', '']
   return (
-    <Table head={['Client', 'Code', 'Static references', 'Dynamic references', 'Account', 'Registered', '']}>
+    <Table head={selecting ? [{ label: <SelectBox checked={all} label="Select all clients in this list" onClick={onToggleAll} /> }, ...head] : head}>
       {clients.map((c) => (
         <tr
           key={c.id}
-          className="cursor-pointer hover:bg-brand-50/50"
-          onClick={() => navigate(`/app/clients/${c.id}`, { state: { from: location.pathname + location.search } })}
+          className={`cursor-pointer ${selecting && selected.has(c.id) ? 'bg-brand-50/70' : 'hover:bg-brand-50/50'}`}
+          onClick={() => (selecting ? onToggle(c) : navigate(`/app/clients/${c.id}`, { state: { from: location.pathname + location.search } }))}
           onContextMenu={(e) => {
+            if (selecting) return
             e.preventDefault()
             onRowMenu({ client: c, x: e.clientX, y: e.clientY })
           }}
         >
+          {selecting && (
+            <td className={`${td} w-10`}>
+              <SelectBox checked={selected.has(c.id)} label={`Select ${c.client_code}`} onClick={() => onToggle(c)} />
+            </td>
+          )}
           <td className={td}>
             <span className="font-medium text-slate-900">{c.full_name}</span>
             {user.study_mode && c.is_practice && <Badge tone="violet" className="ml-2">Practice</Badge>}
@@ -455,7 +535,7 @@ function ClientsTable({ clients, user, onRowMenu }) {
           <td className={td}>{c.account ? <Badge tone="green" title={c.account.email}>Has account</Badge> : <span className="text-sm text-slate-400">None</span>}</td>
           <td className={`${td} text-slate-500`}>{fmtDay(c.created_at)}</td>
           <td className={`${td} w-10 text-right`}>
-            <button
+            {!selecting && <button
               className="rounded-md p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
               aria-label={`Actions for ${c.client_code}`}
               onClick={(e) => {
@@ -465,7 +545,7 @@ function ClientsTable({ clients, user, onRowMenu }) {
               }}
             >
               <MoreHorizontal className="h-4 w-4" />
-            </button>
+            </button>}
           </td>
         </tr>
       ))}
@@ -487,6 +567,10 @@ export default function Clients() {
   const [editGroup, setEditGroup] = useState(null) // null | 'new' | group
   const [msg, setMsg] = useState('')
   const [groupError, setGroupError] = useState('')
+  // v8.26: select several clients in a folder, then move or delete them (admins).
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkMove, setBulkMove] = useState(null)
   const confirm = useConfirm()
   // Admins start at the folder list; an examiner is always inside their own folder.
   const folder = isAdmin ? params.get('group') : (user.group_id ? String(user.group_id) : 'none')
@@ -517,6 +601,18 @@ export default function Clients() {
     }
   }
   const closeMenu = useCallback(() => setMenu(null), [])
+  const leaveSelect = useCallback(() => {
+    setSelecting(false)
+    setSelected(new Set())
+  }, [])
+  // Another folder or search starts fresh; Esc leaves select mode.
+  useEffect(() => leaveSelect(), [folder, q, leaveSelect])
+  useEffect(() => {
+    if (!selecting) return
+    const onKey = (e) => e.key === 'Escape' && leaveSelect()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selecting, leaveSelect])
   if (!groups || !clients) return <Spinner />
 
   const group = !isAdmin ? groups.groups[0] || null
@@ -527,6 +623,44 @@ export default function Clients() {
       : clients.filter((c) => String(c.group_id) === folder)
   const showGrid = isAdmin && !folder && !q
   const open_ = (g) => setParams(g ? { group: g } : {})
+  const chosen = inFolder.filter((c) => selected.has(c.id))
+  const toggle = (c) => setSelected((cur) => {
+    const next = new Set(cur)
+    if (next.has(c.id)) next.delete(c.id)
+    else next.add(c.id)
+    return next
+  })
+  const toggleAll = () => setSelected(inFolder.every((c) => selected.has(c.id)) ? new Set() : new Set(inFolder.map((c) => c.id)))
+  const bulkDelete = async () => {
+    const n = chosen.length
+    const refs = chosen.reduce((a, c) => a + (c.static_count || 0) + (c.dynamic_count || 0), 0)
+    const ok = await confirm({
+      title: `Delete ${n} client${n === 1 ? '' : 's'}?`,
+      message: (
+        <>
+          This deletes <b>{chosen.slice(0, 5).map((c) => c.client_code).join(', ')}{n > 5 ? ` and ${n - 5} more` : ''}</b>, their {refs} reference
+          signature{refs === 1 ? '' : 's'} and every stored image. Screening records stay in the ledger as hashes, so the chain stays valid. This cannot be undone.
+        </>
+      ),
+      confirmLabel: `Delete ${n}`,
+      danger: true,
+      icon: Trash2,
+    })
+    if (!ok) return
+    setGroupError('')
+    const failed = []
+    for (const c of chosen) {
+      try {
+        await api.del(`/api/clients/${c.id}`)
+      } catch (err) {
+        failed.push(`${c.client_code} (${err.message})`)
+      }
+    }
+    leaveSelect()
+    if (n - failed.length) setMsg(`${n - failed.length} client${n - failed.length === 1 ? '' : 's'} and their signatures were deleted.`)
+    if (failed.length) setGroupError(`Could not delete ${failed.length} of ${n}: ${failed.join(', ')}.`)
+    reload()
+  }
 
   return (
     <>
@@ -552,8 +686,13 @@ export default function Clients() {
           onEdit={() => setEditGroup(group)}
           onDelete={() => deleteGroup(group)} />
       ) : null)}
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} aria-label={showGrid || !folder ? 'Search all clients by name or code' : 'Search this group'} className={`${fieldClass} w-full max-w-sm shadow-raised`} />
+        {isAdmin && !showGrid && inFolder.length > 0 && (
+          selecting
+            ? <Button variant="ghost" size="sm" className="ml-auto" onClick={leaveSelect}>Done</Button>
+            : <Button variant="secondary" size="sm" className="ml-auto" onClick={() => setSelecting(true)}><CheckSquare className="h-3.5 w-3.5" /> Select</Button>
+        )}
       </div>
       {showGrid ? (
         <div data-tour="clients-list"><FolderGrid data={groups} clients={clients} onOpen={open_} onNew={() => setEditGroup('new')} /></div>
@@ -562,10 +701,27 @@ export default function Clients() {
           {inFolder.length === 0 ? (
             <Empty icon={Users}>{q ? 'No clients match.' : 'No clients in this group yet. Register a client and add their reference signatures.'}</Empty>
           ) : (
-            <ClientsTable clients={inFolder} user={user} onRowMenu={setMenu} />
+            <ClientsTable clients={inFolder} user={user} onRowMenu={setMenu}
+              selecting={selecting} selected={selected} onToggle={toggle} onToggleAll={toggleAll} />
           )}
         </Card>
       )}
+      {selecting && !showGrid && (
+        <div role="toolbar" aria-label="Selected clients" className="sticky bottom-4 z-20 mt-4 flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-white/95 px-4 py-2.5 shadow-xl backdrop-blur">
+          <span className="mr-auto text-sm font-semibold text-slate-900">{chosen.length} selected</span>
+          <Button variant="ghost" size="sm" onClick={toggleAll}>{inFolder.every((c) => selected.has(c.id)) ? 'Clear all' : 'Select all'}</Button>
+          <Button variant="secondary" size="sm" onClick={() => setBulkMove(chosen)} disabled={!chosen.length}><FolderInput className="h-3.5 w-3.5" /> Move to group</Button>
+          <Button variant="danger" size="sm" onClick={bulkDelete} disabled={!chosen.length}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
+          <Button variant="secondary" size="sm" onClick={leaveSelect}>Done</Button>
+        </div>
+      )}
+      <BulkMoveModal clients={bulkMove} groups={groups.groups} currentGroup={folder} onClose={() => setBulkMove(null)}
+        onMoved={(n, g, partial) => {
+          if (!partial) setBulkMove(null)
+          if (n) setMsg(`${n} client${n === 1 ? '' : 's'} moved to ${g ? g.name : 'no group'}.`)
+          leaveSelect()
+          reload()
+        }} />
       <RowMenu menu={menu} onClose={closeMenu} onDelete={setToDelete} onMove={setToMove} isAdmin={isAdmin} />
       <DeleteClientModal
         client={toDelete}
@@ -1033,7 +1189,8 @@ export function ClientDetail() {
             <div data-tour="enroll-strength"><StrengthMeter strength={strength} /></div>
             <Alert>{removeError}</Alert>
             {c.can_edit && refs.length > 0 && (
-              <div className="-mb-3 flex items-center justify-between gap-2">
+              // No negative margin here: with Tailwind 4's space-y it pulled the tiles up over this row.
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-slate-500">{selecting ? 'Tap cards to select them.' : `${refs.length} reference${refs.length === 1 ? '' : 's'}`}</span>
                 {selecting ? (
                   <Button variant="ghost" size="sm" onClick={leaveSelect}>Done</Button>
@@ -1093,30 +1250,37 @@ export function ClientDetail() {
             {c.cases.length === 0 ? (
               <p className="text-sm text-slate-500">No cases for this client.</p>
             ) : (
-              <ul className="space-y-2 text-sm">
-                {c.cases.map((k) => (
-                  <li key={k.id} className="flex justify-between gap-2">
-                    <Link to={`/app/cases/${k.id}`} className="truncate text-brand-700 hover:underline">{k.case_code} · {k.title}</Link>
-                    <span className="shrink-0 text-xs text-slate-500">{k.status === 'open' ? 'Needs decision' : 'Decided'}</span>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {/* The 5 most recent; the full list is on the Cases page. */}
+                <ul className="space-y-2 text-sm">
+                  {[...c.cases].sort((a, b) => b.id - a.id).slice(0, RECENT).map((k) => (
+                    <li key={k.id} className="flex justify-between gap-2">
+                      <Link to={`/app/cases/${k.id}`} className="truncate text-brand-700 hover:underline">{k.case_code} · {k.title}</Link>
+                      <span className="shrink-0 text-xs text-slate-500">{k.status === 'open' ? 'Needs decision' : 'Decided'}</span>
+                    </li>
+                  ))}
+                </ul>
+                <ViewAll to={`/app/cases?status=all&q=${encodeURIComponent(c.client_code)}`} />
+              </>
             )}
           </Card>
           <Card icon={History} title="Screening history">
             {c.checks.length === 0 ? (
               <p className="text-sm text-slate-500">No screenings yet.</p>
             ) : (
-              <ul className="space-y-2 text-sm">
-                {c.checks.slice(0, 12).map((l) => (
-                  <li key={l.id} className="flex items-center justify-between gap-2">
-                    <Link to={`/app/records/${l.id}`} className="text-slate-700 hover:underline">
-                      {l.modality} · <span className="text-xs text-slate-500">{fmtDate(l.created_at)}</span>
-                    </Link>
-                    <ScreeningBadge value={l.screening_result} />
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-2 text-sm">
+                  {c.checks.slice(0, RECENT).map((l) => (
+                    <li key={l.id} className="flex items-center justify-between gap-2">
+                      <Link to={`/app/records/${l.id}`} className="text-slate-700 hover:underline">
+                        {l.modality} · <span className="text-xs text-slate-500">{fmtDate(l.created_at)}</span>
+                      </Link>
+                      <ScreeningBadge value={l.screening_result} />
+                    </li>
+                  ))}
+                </ul>
+                <ViewAll to={`/app/records?q=${encodeURIComponent(c.client_code)}`} />
+              </>
             )}
           </Card>
           {user.role === 'admin' && user.study_mode && <AccessCard client={c} onDone={load} />}
@@ -1161,6 +1325,16 @@ export function ClientDetail() {
         </div>
       </div>
     </>
+  )
+}
+
+// The client page lists only the most recent cases and screenings.
+const RECENT = 5
+function ViewAll({ to }) {
+  return (
+    <Link to={to} className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+      View all <ArrowRight className="h-3.5 w-3.5" />
+    </Link>
   )
 }
 

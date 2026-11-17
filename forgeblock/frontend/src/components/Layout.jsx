@@ -108,7 +108,10 @@ function useDesktop() {
 // Only picks the shortcut label (Ctrl K or ⌘ K); nothing else depends on it.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgentData?.platform || navigator.platform || '')
 
-function GlobalSearch() {
+// v8.26: on phones (below md) the box is hidden until the search button in the
+// top bar opens it (`phoneOpen`); it then drops down under the bar, full width.
+// From md up (iPad and PC) nothing changes.
+function GlobalSearch({ phoneOpen = false, onPhoneClose }) {
   const [q, setQ] = useState('')
   const [res, setRes] = useState(null)
   const [open, setOpen] = useState(false)
@@ -126,7 +129,7 @@ function GlobalSearch() {
   }, [q])
 
   useEffect(() => {
-    const close = (e) => box.current && !box.current.contains(e.target) && setOpen(false)
+    const close = (e) => box.current && !box.current.contains(e.target) && !e.target.closest?.('[data-phone-search]') && (setOpen(false), onPhoneCloseRef.current?.())
     // Ctrl K (⌘K on a Mac) jumps to the search box.
     const key = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -142,16 +145,22 @@ function GlobalSearch() {
       window.removeEventListener('keydown', key)
     }
   }, [])
+  const onPhoneCloseRef = useRef(onPhoneClose)
+  onPhoneCloseRef.current = onPhoneClose
+  useEffect(() => {
+    if (phoneOpen) input.current?.focus()
+  }, [phoneOpen])
 
   const go = (to) => {
     setOpen(false)
     setQ('')
+    onPhoneClose?.()
     navigate(to)
   }
   const total = res ? res.clients.length + res.cases.length + res.receipts.length : 0
 
   return (
-    <div ref={box} className="relative mx-auto hidden w-full max-w-[520px] flex-1 md:block" data-tour="global-search">
+    <div ref={box} className={`${phoneOpen ? 'absolute inset-x-0 top-full z-30 mt-3 block' : 'hidden'} w-full md:relative md:inset-auto md:mx-auto md:mt-0 md:block md:max-w-[520px] md:flex-1`} data-tour="global-search">
       <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-white/80" />
       <input
         ref={input}
@@ -161,13 +170,13 @@ function GlobalSearch() {
           setOpen(true)
         }}
         onFocus={() => setOpen(true)}
-        onKeyDown={(e) => e.key === 'Escape' && (setOpen(false), e.currentTarget.blur())}
+        onKeyDown={(e) => e.key === 'Escape' && (setOpen(false), onPhoneClose?.(), e.currentTarget.blur())}
         placeholder="Search clients, cases, receipt codes"
         aria-label="Search clients, cases, receipt codes"
         aria-keyshortcuts={IS_MAC ? 'Meta+K' : 'Control+K'}
-        className="w-full rounded-[12px] border border-white/22 bg-white/12 py-2.5 pl-10 pr-16 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-white/75 hover:bg-white/16 focus:border-white/50 focus:bg-white/20 focus:ring-2 focus:ring-white/25"
+        className="w-full rounded-[12px] border border-white/22 bg-white/12 py-2.5 max-md:bg-[var(--role-top,#1d3a8a)] max-md:hover:bg-[var(--role-top,#1d3a8a)] max-md:focus:bg-[var(--role-top,#1d3a8a)] max-md:shadow-xl pl-10 pr-16 text-sm text-white outline-none backdrop-blur-sm transition placeholder:text-white/75 hover:bg-white/16 focus:border-white/50 focus:bg-white/20 focus:ring-2 focus:ring-white/25"
       />
-      <kbd className="pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-[6px] bg-white/15 px-1.5 py-0.5 font-sans text-[11px] text-white">
+      <kbd className="pointer-events-none absolute right-3 max-md:hidden top-1/2 z-10 -translate-y-1/2 rounded-[6px] bg-white/15 px-1.5 py-0.5 font-sans text-[11px] text-white">
         {IS_MAC ? '⌘ K' : 'Ctrl K'}
       </kbd>
       {open && res && (
@@ -264,6 +273,7 @@ export default function Layout() {
   const [pinned, setPinned] = useState(readPinned)
   const [peek, setPeek] = useState(false)
   const [tip, setTip] = useState(null)
+  const [phoneSearch, setPhoneSearch] = useState(false)
   const timer = useRef(null)
   const desktop = useDesktop()
   const role = ROLE_STYLE[user.role] ? user.role : 'examiner'
@@ -456,8 +466,13 @@ export default function Layout() {
                 </div>
               )}
             </div>
-            {staff ? <GlobalSearch /> : <div className="flex-1" />}
+            {staff ? <GlobalSearch phoneOpen={phoneSearch} onPhoneClose={() => setPhoneSearch(false)} /> : <div className="flex-1" />}
             <div className="ml-auto flex shrink-0 items-center justify-end gap-2.5 lg:min-w-[220px]">
+              {staff && (
+                <button type="button" data-phone-search className={`${bandButton} md:hidden`} onClick={() => setPhoneSearch((o) => !o)} aria-label="Search clients, cases, receipt codes" aria-expanded={phoneSearch}>
+                  <Search className="h-[19px] w-[19px]" />
+                </button>
+              )}
               <Link to="/app/help" className={bandButton} aria-label="Help Center">
                 <CircleHelp className="h-[19px] w-[19px]" />
               </Link>

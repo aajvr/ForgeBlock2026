@@ -124,7 +124,7 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-40 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-[16px] border border-line bg-white text-ink shadow-xl">
+        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-40 w-[min(24rem,calc(100vw-2rem))] max-sm:fixed max-sm:inset-x-4 max-sm:top-16 max-sm:w-auto overflow-hidden rounded-[16px] border border-line bg-white text-ink shadow-xl">
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
             <div className="text-sm font-semibold text-slate-900">Notifications</div>
             {data.unread > 0 && (

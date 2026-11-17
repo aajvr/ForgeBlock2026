@@ -43,8 +43,7 @@ def test_explanation_names_the_per_client_check():
         v.get_engine = v_engine
     assert ex["all_pass"] and ex["lowered_by_client_check"] and ex["p_distance_only"] == 58 and ex["p_genuine"] == 27
     assert "from 58% to 27%" in ex["why"] and "12 other people" in ex["how"]
-    assert [s["title"][3:] for s in ex["steps"]] == ["Scores against the thresholds", "How far past the thresholds",
-                                                      "Per-client check", "Result"]
+    assert [s["title"][3:] for s in ex["steps"]] == ["Scores", "Margin", "Check against other people", "Result"]
 
 
 def test_check_that_agrees_is_not_called_a_change():
@@ -66,7 +65,7 @@ def test_check_that_agrees_is_not_called_a_change():
         v.get_engine = v_engine
     assert "agreed (2%)" in ex["how"] and "short of the thresholds" in ex["how"]
     assert "moved" not in ex["how"] and "rais" not in ex["how"] and not ex["lowered_by_client_check"]
-    assert ex["steps"][1]["title"] == "2. How far short of the thresholds"
+    assert "short of the thresholds" in ex["steps"][1]["text"] and "agrees" in ex["steps"][2]["text"]
 
 
 def test_no_explanation_without_calibration(client, examiner, monkeypatch):

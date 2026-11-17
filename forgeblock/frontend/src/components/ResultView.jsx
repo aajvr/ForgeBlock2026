@@ -14,43 +14,31 @@ const digits = (i) => (COUNT_FEATURES.has(i.name) ? 0 : 2)
 
 function HowCalculated({ r }) {
   return (
-    <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+    // v8.26: kept short; the measures themselves are explained in the Scores tab.
+    <div className="space-y-2.5 text-sm leading-relaxed text-slate-700">
       <p>
-        The {r.modality} model turns each signature into a list of numbers (an embedding). The questioned signature is compared with every reference on
-        file using {r.modality === 'static' ? 'cosine similarity, Euclidean distance and Manhattan distance' : 'cosine similarity and Euclidean distance'}.
-        Each measure is checked against its threshold ({r.decision_rule.toLowerCase()}).
+        ForgeBlock compares the signature with the client’s {r.reference_count} references and estimates the <b>chance it is genuine</b>.
+        It looks at how far the signature is from the {r.threshold_source === 'adaptive' ? 'client’s personal' : 'standard'} thresholds, not just whether it passes them.
       </p>
       {r.explain ? (
         <>
-          <p>
-            Passing a threshold is not enough on its own. ForgeBlock measures <b>how far past</b> the thresholds the signature is, counted in the
-            client’s <b>own</b> natural variation (how much their references differ from each other), and turns that distance into the <b>chance that
-            the signature is genuine</b>. This was calibrated on people the model never saw: signatures that only just pass are still often skilled
-            forgeries, so a signature has to pass by a clear margin to count as Consistent.
-          </p>
-          <p>
-            <b>Consistent</b> when that chance is at least {r.explain.band[1]}%, <b>Inconsistent</b> when it is {r.explain.band[0]}% or less, and{' '}
-            <b>Inconclusive</b> in between, which goes to the examiner. The <b>confidence score</b> is how likely the shown result is (never above 99%).
-          </p>
+          <ul className="grid grid-cols-3 gap-1.5 text-center text-[12.5px]">
+            <li className="rounded-lg bg-ok-50 px-2 py-1.5 text-ok-700"><b className="block">Consistent</b>{r.explain.band[1]}% or more</li>
+            <li className="rounded-lg bg-warn-50 px-2 py-1.5 text-warn-700"><b className="block">Inconclusive</b>in between</li>
+            <li className="rounded-lg bg-bad-50 px-2 py-1.5 text-bad-700"><b className="block">Inconsistent</b>{r.explain.band[0]}% or less</li>
+          </ul>
+          <p>The <b>confidence score</b> is how likely the shown result is (never above 99%).</p>
           <div className="rounded-lg bg-slate-50 px-3 py-2">
-            <b>This screening, step by step</b>
+            <b>This screening</b>
             <ResultSteps steps={r.explain.steps} className="mt-1.5" />
           </div>
         </>
       ) : (
         <p>
-        The <b>confidence score</b> measures how far past the threshold the signature is, counted in the client’s <b>own</b> natural variation
-        (how much their references differ from each other). Right on the threshold is 0%; one step of their usual variation past it is about 68%,
-        two steps about 95%, and it never goes above 99%. On the Inconsistent side it is the same distance measured below the threshold.
-        Borderline results are <b>Inconclusive</b>{' '}
-        and go to the examiner. It is not a probability that the signature is genuine.
+          The <b>confidence score</b> grows the further past the thresholds the signature is, measured against how much the client’s own signatures
+          vary (never above 99%). Borderline results are <b>Inconclusive</b> and go to the examiner.
         </p>
       )}
-      <p>
-        {r.threshold_source === 'adaptive'
-          ? `Personal thresholds were used: with ${r.reference_count} references on file, ForgeBlock compares the client’s references with each other and sets the threshold from how much their own signatures vary. They change whenever references are added or removed.`
-          : 'Standard thresholds were used, because the client has fewer than 7 references. With 7 or more, personal thresholds are used.'}
-      </p>
     </div>
   )
 }
@@ -91,7 +79,7 @@ function HowPopover({ r, children, className = '', label = 'How is this calculat
         {children}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 max-h-96 w-[min(30rem,calc(100vw-4rem))] overflow-y-auto rounded-[16px] border border-line bg-white p-4 text-left normal-case tracking-normal text-ink shadow-lift" role="dialog" aria-label="How is this calculated?">
+        <div className="absolute right-0 top-full z-20 mt-2 max-h-96 w-[min(30rem,calc(100vw-4rem))] max-sm:fixed max-sm:inset-x-4 max-sm:top-20 max-sm:max-h-[75vh] max-sm:w-auto overflow-y-auto rounded-[16px] border border-line bg-white p-4 text-left normal-case tracking-normal text-ink shadow-lift" role="dialog" aria-label="How is this calculated?">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="font-semibold">How is this calculated?</div>
             <button onClick={() => setOpen(false)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close">
@@ -154,14 +142,8 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
           {r.explain?.why && <p className="mt-1 max-w-[560px] text-[14.5px] leading-normal text-muted">{r.explain.why}</p>}
         </div>
         <div className="shrink-0 sm:text-right">
-          <div className="flex items-center gap-1 text-[13.5px] font-bold uppercase tracking-[0.1em] text-[#3b4a5e] sm:justify-end">
-            Confidence score
-            {how && (
-              <HowPopover r={r} className="flex h-7 w-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-white hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-600">
-                <Info className="h-4 w-4" />
-              </HowPopover>
-            )}
-          </div>
+          {/* v8.26: one way into the explanation ("How is this calculated?" under the bar). */}
+          <div className="text-[13.5px] font-bold uppercase tracking-[0.1em] text-[#3b4a5e]">Confidence score</div>
           <div className="mt-1 leading-none text-ink">
             <span className="text-[52px] font-bold tracking-[-0.03em] tabular-nums">{score.toFixed(0)}</span>
             <span className="ml-0.5 text-[24px] font-bold text-muted">%</span>
@@ -685,8 +667,84 @@ const MARK_LAYERS = [
   { key: 'baseline', label: 'Baseline', color: '#0f6cbd' },
   { key: 'box', label: 'Size box', color: '#5b6b80' },
   { key: 'loops', label: 'Loops', color: '#118A4B' },
-  { key: 'endpoints', label: 'Stroke endings', color: '#E8950C' },
 ]
+// v8.26: stroke endings are no longer drawn or listed (hard to read for non-experts).
+const HIDDEN_MARKS = new Set(['endpoints'])
+
+// v8.26: plain-language findings for each mark: what it is, how the questioned
+// signature compares with the closest reference, and whether it is within the
+// client's usual range (from the screening's feature analysis).
+const leanWords = (deg) => (Math.abs(deg) < 4 ? 'stands upright' : deg > 0 ? 'leans to the right' : 'leans to the left')
+const lineWords = (deg) => (Math.abs(deg) < 2 ? 'sits on a level line' : deg > 0 ? 'rises toward the end' : 'drops toward the end')
+function markFindings(q, ref, items) {
+  const usual = (name) => {
+    const i = items.find((x) => x.name === name)
+    if (!i || i.low === null) return null
+    return i.outside ? 'This is outside what is usual for this client.' : 'This is normal for this client.'
+  }
+  const ds = q.slant.angle_deg - ref.slant.angle_deg
+  const db = q.baseline.tilt_deg - ref.baseline.tilt_deg
+  const ratio = q.width_height_ratio / (ref.width_height_ratio || 1)
+  const dl = q.loops.length - ref.loops.length
+  const n = (k, word) => `${k} ${word}${k === 1 ? '' : 's'}`
+  return [
+    {
+      key: 'slant', name: 'slant', outside: items.find((x) => x.name === 'slant')?.outside,
+      what: 'Which way the letters lean.',
+      text: `The signature ${leanWords(q.slant.angle_deg)}; the reference ${leanWords(ref.slant.angle_deg)}. `
+        + (Math.abs(ds) < 4 ? 'They lean about the same.' : `It leans ${ds > 0 ? 'more to the right' : 'more to the left'} than the reference.`),
+      usual: usual('slant'),
+    },
+    {
+      key: 'baseline', name: 'baseline', outside: items.find((x) => x.name === 'baseline')?.outside,
+      what: 'The imaginary line the signature sits on.',
+      text: `The signature ${lineWords(q.baseline.tilt_deg)}; the reference ${lineWords(ref.baseline.tilt_deg)}. `
+        + (Math.abs(db) < 2 ? 'Both lines are about the same.' : `Its line ${db > 0 ? 'rises more' : 'drops more'} than the reference’s.`),
+      usual: usual('baseline'),
+    },
+    {
+      key: 'box', name: 'aspect_ratio', outside: items.find((x) => x.name === 'aspect_ratio')?.outside,
+      what: 'The overall shape: how wide the signature is for its height.',
+      text: ratio > 1.15 ? 'The signature is wider and flatter than the reference.'
+        : ratio < 0.87 ? 'The signature is narrower and taller than the reference.'
+          : 'The signature has about the same shape as the reference.',
+      usual: usual('aspect_ratio'),
+    },
+    {
+      key: 'loops', name: 'loops', outside: items.find((x) => x.name === 'loops')?.outside,
+      what: 'Closed circles in the writing, such as in o, a or e.',
+      text: `The signature has ${n(q.loops.length, 'loop')}; the reference has ${ref.loops.length}. `
+        + (dl === 0 ? 'Same number.' : Math.abs(dl) === 1 ? 'Off by one, which is common.' : `${Math.abs(dl)} ${dl > 0 ? 'more' : 'fewer'}.`),
+      usual: usual('loops'),
+    },
+  ]
+}
+
+function MarkFindings({ data, r }) {
+  const items = r.analysis?.features?.items || []
+  const rows = markFindings(data.questioned, data.reference, items)
+  return (
+    <section aria-label="What the marks show">
+      <h4 className="text-[15px] font-semibold text-ink">What the marks show</h4>
+      <ul className="mt-2 grid gap-2.5 md:grid-cols-2">
+        {rows.map((f) => {
+          const layer = MARK_LAYERS.find((m) => m.key === f.key)
+          return (
+            <li key={f.key} className={`rounded-[12px] border px-3.5 py-3 ${f.outside ? 'border-warn-100 bg-warn-50' : 'border-line bg-white'}`}>
+              <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: layer.color }} aria-hidden="true" />
+                {layer.label}
+                <span className="font-normal text-muted">· {f.what}</span>
+              </div>
+              <p className="mt-1 text-[14px] leading-snug text-slate-700">{f.text}</p>
+              {f.usual && <p className={`mt-1 text-[13px] font-medium ${f.outside ? 'text-warn-700' : 'text-ok-700'}`}>{f.usual}</p>}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
 
 // Watches an element's size, for scaling image coordinates to the display.
 function useSize(ref) {
@@ -736,10 +794,6 @@ function MarkedImage({ src, marks, show, tag, tone, outsideLabels = [] }) {
           const [cx, cy] = P([l.cx, l.cy])
           return <circle key={i} cx={cx} cy={cy} r={Math.max(4, l.r * k)} fill="none" stroke="#118A4B" strokeWidth="2" />
         })}
-        {show.endpoints && marks.endpoints.map((p, i) => {
-          const [cx, cy] = P(p)
-          return <circle key={i} cx={cx} cy={cy} r="3.5" fill="#E8950C" stroke="#fff" strokeWidth="1" />
-        })}
       </svg>
     )
   }
@@ -765,7 +819,7 @@ function MarkedImage({ src, marks, show, tag, tone, outsideLabels = [] }) {
 
 function FeatureMarksView({ r }) {
   const [state, setState] = useState({ data: null, error: '' })
-  const [show, setShow] = useState({ slant: true, baseline: true, box: true, loops: true, endpoints: true })
+  const [show, setShow] = useState({ slant: true, baseline: true, box: true, loops: true })
   useEffect(() => {
     let live = true
     api.get(`/api/verifications/${r.id}/feature-marks`)
@@ -775,7 +829,7 @@ function FeatureMarksView({ r }) {
   }, [r.id])
   const { data, error } = state
   if (error) return <p className="text-[14.5px] text-muted">{error}</p>
-  const outside = data?.outside || []
+  const outside = (data?.outside || []).filter((o) => !HIDDEN_MARKS.has(o.name))
   const n = refNumber(r, r.best_match_profile_id)
   return (
     <div className="space-y-3.5">
@@ -809,6 +863,9 @@ function FeatureMarksView({ r }) {
           <MarkedImage src={`/api/verifications/${r.id}/image`} marks={data.questioned} show={show} tag="Questioned" tone="blue" outsideLabels={outside.map((o) => o.label)} />
           <MarkedImage src={`/api/references/${r.best_match_profile_id}/image`} marks={data.reference} show={show} tag={`Closest reference${n ? ` · #${n}` : ''}`} />
         </div>
+      ) : null}
+      {data ? (
+        <MarkFindings data={data} r={r} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           <div className="h-64 animate-pulse rounded-[12px] bg-slate-50 sm:h-72" />
