@@ -78,6 +78,85 @@ def explain_result(l: VerificationLog) -> dict | None:
     lo, hi = round(lo * 100), round(hi * 100)
     votes = _votes(l) or {}
     all_pass = bool(votes) and all(votes.values())
+    passed = sum(bool(v) for v in votes.values())
+
+    # v8.26: how this screening's number was reached, step by step.
+    # Step 2 (margin): the calibrated chance from the distance scores alone.
+    # Step 3 (static, v8.10): the per-client check, which REPLACES that chance.
+    check = (l.analysis or {}).get("client_classifier") or {} if l.modality == "static" else {}
+    used = bool(check.get("used")) and check.get("p_distance_only") is not None
+    p_dist = round(100 * float(check["p_distance_only"])) if used else p
+    p_dist = min(99, max(1, p_dist))
+    z = _margin_steps(check["p_distance_only"] if used else p / 100, cal)
+    people = check.get("background_clients") or 0
+    # The check is a separate estimate that replaces step 2's, not an adjustment
+    # of it, so a small difference (2% vs 1%) is noise. Only call it lowered or
+    # raised when it changed the result's category.
+    category = lambda v: "consistent" if v >= hi else ("inconsistent" if v <= lo else "inconclusive")  # noqa: E731
+    changed = used and category(p_dist) != category(p)
+    lowered = changed and p < p_dist
+    short = z < 0 if z is not None else passed * 2 < len(votes)
+    side = "short of" if short else "past"
+
+    names = {"cosine": "cosine", "euclidean": "Euclidean", "manhattan": "Manhattan"}
+    ticks = ", ".join(f"{names.get(k, k)} {'passed' if v else 'not passed'}" for k, v in votes.items())
+    if z is None:
+        margin = ""
+    elif z >= 0:
+        margin = f"about {z:.1f} steps of this client's own variation past the thresholds"
+    else:
+        margin = f"about {abs(z):.1f} steps of this client's own variation short of the thresholds"
+    steps = [{
+        "title": "1. Scores against the thresholds",
+        "text": f"{passed} of {len(votes)} measures passed ({ticks}). Passing or failing alone does not decide the result.",
+    }, {
+        "title": f"2. How far {side} the thresholds",
+        "text": (f"On average the scores were {margin}. " if margin else "")
+        + f"Signatures with this margin were genuine about {p_dist}% of the time in the calibration tests"
+        + (" (signatures that only just pass are often skilled forgeries)." if all_pass and p_dist < hi else "."),
+    }]
+    if used:
+        bg = f"{people} other people" if people else "other people"
+        steps.append({
+            "title": "3. Per-client check",
+            "text": (f"The signature was also compared with this client's references and with the signatures of {bg} "
+                     f"(not ForgeBlock clients). It scored {float(check.get('score', 0)):.2f}, where 0 is like the other "
+                     f"people and 1 is like this client's typical signature"
+                     + (" (below 0 is even less like this client than the other people are)" if float(check.get("score", 0)) < 0 else "")
+                     + f". That puts the chance it is genuine at about "
+                     f"{p}%. This is a second, separate estimate, not an adjustment of step 2, and it is the one used. "
+                     + (f"It changed the result: step 2 alone would have given {category(p_dist).capitalize()}."
+                        if changed else
+                        f"It agrees with step 2 ({p_dist}%): both give {category(p).capitalize()}. "
+                        "Small differences between the two are normal.")),
+        })
+    shown = {"consistent": "Consistent", "inconsistent": "Inconsistent", "inconclusive": "Inconclusive"}[l.screening_result]
+    conf = round(min(99.0, l.confidence_score))
+    if l.screening_result == "consistent":
+        rule = f"{p}% is at least {hi}%, so the result is Consistent. The confidence score is that chance: {conf}%."
+    elif l.screening_result == "inconsistent":
+        rule = (f"{p}% is {lo}% or less, so the result is Inconsistent. The confidence score is the chance it is "
+                f"not genuine: 100 - {p} = {conf}%.")
+    else:
+        rule = (f"{p}% is between {lo}% and {hi}%, so the result is Inconclusive. The confidence score is the chance of "
+                f"the side it leans to: {conf}%.")
+    steps.append({"title": f"{len(steps) + 1}. Result", "text": rule})
+
+    # One or two sentences for the result card, under the confidence score.
+    how = f"{passed} of {len(votes)} measures passed, and how far {side} the thresholds they were gave about {p_dist}% chance genuine"
+    if used:
+        others = f"{people} other people's" if people else "other people's"
+        if changed:
+            how += (f"; a separate check against {others} signatures gave {p}% instead, "
+                    f"{'lowering' if lowered else 'raising'} it to {category(p).capitalize()}")
+        else:
+            how += f"; a separate check against {others} signatures agreed ({p}%)"
+    how += ". " + {
+        "consistent": f"{shown} needs {hi}% or more, so the confidence is {conf}%.",
+        "inconsistent": f"{shown} is {lo}% or less, so the confidence (chance it is not genuine) is 100 - {p} = {conf}%.",
+        "inconclusive": f"Between {lo}% and {hi}% is {shown}; the confidence is the chance of the side it leans to, {conf}%.",
+    }[l.screening_result]
+
     if l.screening_result == "consistent":
         why = f"The chance that this signature is genuine is about {p}%, above the {hi}% needed for Consistent."
     elif l.screening_result == "inconsistent":
@@ -86,10 +165,32 @@ def explain_result(l: VerificationLog) -> dict | None:
         side = "leans genuine" if p >= 50 else "leans not genuine"
         why = (f"The chance that this signature is genuine is about {p}%: it {side}, but it falls between "
                f"{lo}% and {hi}%, too close to call either way, so an examiner should review it.")
-        if all_pass:
+    if passed and l.screening_result != "consistent":
+        if lowered:
+            looks = ("looks more like other people's signatures than this client's own"
+                     if float(check.get("score", 0)) < 0.5 else "is less like this client's typical signature than the scores suggested")
+            why += (f" The scores passed {passed} of {len(votes)} thresholds, but compared with other people's signatures "
+                    f"it {looks}, which lowered the chance from {p_dist}% to {p}%.")
+        elif all_pass:
             why += (" Every score passed its threshold, but only by a little compared with how much this "
                     "client's own signatures vary, and signatures that only just pass are often skilled forgeries.")
-    return {"p_genuine": p, "band": [lo, hi], "all_pass": all_pass, "why": why}
+    return {"p_genuine": p, "p_distance_only": p_dist, "client_check_used": used, "band": [lo, hi],
+            "all_pass": all_pass, "passed": passed, "lowered_by_client_check": lowered,
+            "why": why, "how": how, "steps": steps}
+
+
+def _margin_steps(p: float, cal: dict) -> float | None:
+    """The mean z margin behind a calibrated P(genuine): inverse of
+    decision.calibrated_probability, z = (logit p - b) / a."""
+    from math import log
+    try:
+        p = float(p)
+        a, b = float(cal["a"]), float(cal["b"])
+        if not 0.001 < p < 0.999 or a == 0:
+            return None
+        return (log(p / (1 - p)) - b) / a
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:

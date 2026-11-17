@@ -23,7 +23,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import Logo from './Logo'
@@ -319,14 +319,28 @@ export default function Layout() {
     const r = e.currentTarget.getBoundingClientRect()
     setTip({ label, top: r.top + r.height / 2, left: r.right + 14 })
   }
-  const tipProps = (label) => (rail
-    ? {
-        onMouseEnter: (e) => showTip(e, label),
-        onMouseLeave: () => setTip(null),
-        onFocus: (e) => showTip(e, label),
-        onBlur: () => setTip(null),
-      }
-    : {})
+  // The hide handlers stay attached in every state: when the rail opened while a
+  // tooltip was showing, its mouse-leave used to be dropped, so the stale tooltip
+  // came back when the rail closed again and stayed until the menu was re-pinned.
+  const tipProps = (label) => ({
+    onMouseEnter: (e) => rail && showTip(e, label),
+    onMouseLeave: () => setTip(null),
+    onFocus: (e) => rail && showTip(e, label),
+    onBlur: () => setTip(null),
+  })
+  // Any change of the menu's state or of the page clears a leftover tooltip.
+  const location = useLocation()
+  useEffect(() => setTip(null), [rail, location.pathname])
+  useEffect(() => {
+    if (!tip) return
+    const hide = () => setTip(null)
+    window.addEventListener('scroll', hide, true)
+    window.addEventListener('blur', hide)
+    return () => {
+      window.removeEventListener('scroll', hide, true)
+      window.removeEventListener('blur', hide)
+    }
+  }, [tip])
 
   // Labels stay rendered and fade with a small slide; icons keep their place as the pill widens.
   const fade = `transition-[opacity,translate] motion-fb ${expanded ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0'}`

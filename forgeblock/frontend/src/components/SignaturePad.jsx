@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Undo2 } from 'lucide-react'
+import { ChevronRight, Maximize2, Minimize2, Undo2 } from 'lucide-react'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { PAD_HEIGHT_CLASS } from './padSize'
@@ -15,7 +15,13 @@ import { Button, ConfirmDialog } from './ui'
 // pad changes size mid-signature (rotation, the full-screen focus mode), the
 // drawing is redrawn from the stored points, scaled to fit, and new points are
 // mapped back into that same frame, so a signature never mixes two scales.
-const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOnlyChange, onChange, label }, ref) {
+//
+// Quick enrollment (v8.26): with `onNext`, full screen gets a "Save & next"
+// button that hands the signature to onNext(strokes) and clears the pad for
+// the next one; `kept` is how many were handed over so far. Done also keeps
+// the signature on the pad (if any). `onClose` runs whenever full screen is
+// closed (Done, Exit or Esc), so the caller can save the kept signatures then.
+const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOnlyChange, onChange, label, onNext, kept = 0, onClose }, ref) {
   const canvasRef = useRef(null)
   const strokesRef = useRef([])
   const drawingRef = useRef(false)
@@ -27,6 +33,9 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
   const [rejected, setRejected] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [nudge, setNudge] = useState(false) // "Save & next" pressed on an empty pad
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   const ctx = () => canvasRef.current?.getContext('2d')
 
@@ -127,6 +136,7 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
       return
     }
     setRejected(false)
+    setNudge(false)
     setTouched(true)
     e.preventDefault()
     canvasRef.current.setPointerCapture(e.pointerId)
@@ -184,11 +194,31 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
     changed()
   }
 
-  useImperativeHandle(ref, () => ({
-    clear,
-    getStrokes: () => strokesRef.current.map((s) => s.map((p) => ({ ...p }))),
-    isEmpty: () => strokesRef.current.reduce((a, s) => a + s.length, 0) < 10,
-  }))
+  const getStrokes = () => strokesRef.current.map((s) => s.map((p) => ({ ...p })))
+  const isEmpty = () => strokesRef.current.reduce((a, s) => a + s.length, 0) < 10
+
+  useImperativeHandle(ref, () => ({ clear, getStrokes, isEmpty }))
+
+  // Quick enrollment: hand the signature over and start the next one.
+  const next = () => {
+    if (isEmpty()) return setNudge(true)
+    setNudge(false)
+    onNext(getStrokes())
+    clear()
+  }
+  // Leaving full screen. `keep` (Done in quick enrollment) also hands over the
+  // signature still on the pad; Exit and Esc leave it on the pad.
+  const close = (keep = false) => {
+    if (keep && onNext && !isEmpty()) {
+      onNext(getStrokes())
+      clear()
+    }
+    setNudge(false)
+    setExpanded(false)
+    onCloseRef.current?.()
+  }
+  const closeRef = useRef(close)
+  closeRef.current = close
 
   // Focus mode: lock page scroll, block pinch and double-tap zoom, Esc = Done.
   useEffect(() => {
@@ -199,7 +229,7 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
     document.body.style.overflow = 'hidden'
     const stop = (e) => e.preventDefault()
     const multiTouch = (e) => e.touches && e.touches.length > 1 && e.preventDefault()
-    const esc = (e) => e.key === 'Escape' && !confirmClear && setExpanded(false)
+    const esc = (e) => e.key === 'Escape' && !confirmClear && closeRef.current()
     document.addEventListener('gesturestart', stop, { passive: false }) // Safari pinch
     document.addEventListener('touchmove', multiTouch, { passive: false })
     document.addEventListener('dblclick', stop)
@@ -284,17 +314,37 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
         >
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-3 py-1.5 sm:gap-3 sm:px-4" style={{ paddingTop: 'max(0.375rem, env(safe-area-inset-top))' }}>
             {/* A visible way out (Done and Esc do the same); the strokes are kept. */}
-            <Button variant="secondary" className="min-h-11" onClick={() => setExpanded(false)} aria-label="Exit full screen (keeps the signature)">
+            <Button
+              variant="secondary"
+              className="min-h-11"
+              onClick={() => close()}
+              aria-label={onNext ? 'Exit full screen (saves the kept signatures; the one on the pad stays there)' : 'Exit full screen (keeps the signature)'}
+            >
               <Minimize2 className="h-4 w-4" /> <span className="hidden sm:inline">Exit full screen</span>
             </Button>
-            <span className="mr-auto truncate font-mono text-[14px] font-semibold text-ink">{label}</span>
+            <span className="mr-auto truncate font-mono text-[14px] font-semibold text-ink">
+              {label}
+              {onNext && <span className="ml-2 font-sans font-medium text-muted">· signature {kept + 1}{kept ? ` (${kept} kept)` : ''}</span>}
+            </span>
             {rejected && <span className="text-[13px] text-amber-600">Pen only: finger and mouse are ignored.</span>}
+            {nudge && <span className="text-[13px] text-amber-600">Sign first, then Save &amp; next.</span>}
             {penToggle}
             <Button variant="secondary" className="min-h-11" onClick={undo} disabled={!count}>
-              <Undo2 className="h-4 w-4" /> Undo last stroke
+              <Undo2 className="h-4 w-4" /> <span className={onNext ? 'hidden md:inline' : ''}>Undo last stroke</span>
             </Button>
             <Button variant="secondary" className="min-h-11" onClick={askClear} disabled={!count}>Clear</Button>
-            <Button className="min-h-11 min-w-[88px]" onClick={() => setExpanded(false)}>Done</Button>
+            {onNext ? (
+              <>
+                <Button className="min-h-11" onClick={next}>
+                  <ChevronRight className="h-4 w-4" /> Save &amp; next
+                </Button>
+                <Button variant="secondary" className="min-h-11" onClick={() => close(true)}>
+                  {kept + (count >= 10 ? 1 : 0) ? `Done, save ${kept + (count >= 10 ? 1 : 0)}` : 'Done'}
+                </Button>
+              </>
+            ) : (
+              <Button className="min-h-11 min-w-[88px]" onClick={() => close()}>Done</Button>
+            )}
           </div>
           <div className="relative min-h-0 flex-1 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             {canvas}

@@ -32,9 +32,10 @@ function HowCalculated({ r }) {
             <b>Consistent</b> when that chance is at least {r.explain.band[1]}%, <b>Inconsistent</b> when it is {r.explain.band[0]}% or less, and{' '}
             <b>Inconclusive</b> in between, which goes to the examiner. The <b>confidence score</b> is how likely the shown result is (never above 99%).
           </p>
-          <p className="rounded-lg bg-slate-50 px-3 py-2">
-            <b>This screening:</b> {r.explain.why}
-          </p>
+          <div className="rounded-lg bg-slate-50 px-3 py-2">
+            <b>This screening, step by step</b>
+            <ResultSteps steps={r.explain.steps} className="mt-1.5" />
+          </div>
         </>
       ) : (
         <p>
@@ -51,6 +52,20 @@ function HowCalculated({ r }) {
           : 'Standard thresholds were used, because the client has fewer than 7 references. With 7 or more, personal thresholds are used.'}
       </p>
     </div>
+  )
+}
+
+// v8.26: how this screening's number was reached (from the backend's explain.steps).
+function ResultSteps({ steps, className = '' }) {
+  if (!steps?.length) return null
+  return (
+    <ol className={`space-y-1.5 ${className}`}>
+      {steps.map((s) => (
+        <li key={s.title}>
+          <span className="font-semibold text-ink">{s.title}.</span> <span className="text-slate-700">{s.text}</span>
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -165,6 +180,11 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
       >
         <div className="h-full rounded-full" style={{ width: `${score}%`, background: theme.main }} />
       </div>
+      {r.explain?.how && (
+        <p className="mt-2.5 text-[13.5px] leading-normal text-[#3b4a5e]">
+          <span className="font-semibold text-ink">How this score was reached: </span>{r.explain.how}
+        </p>
+      )}
       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
         <p className="m-0 text-[12.5px] text-muted">{client ? 'Your examiner makes the final decision.' : `Measured against ${against}. Never above 99%.`}</p>
         {how && (
@@ -387,6 +407,49 @@ const FEATURE_GROUPS = [
 ]
 const FEATURE_COLORS = { within: '#118A4B', outside: '#E8950C', band: '#CFE4FA' }
 
+// v8.26: what each feature is and how it is measured (app/ml/features.py).
+const FEATURE_INFO = {
+  stroke_length: 'How much line the signature has: the ink thinned to a one-pixel line, its length divided by the signature’s height.',
+  thickness: 'How thick the pen line is: the ink area divided by the length of that one-pixel line, as a share of the height.',
+  slant: 'The usual lean of the strokes, from the direction of the ink edges. 0° is upright; positive leans right.',
+  baseline: 'The tilt of the line the signature sits on, fitted through the lowest ink points. Positive rises to the right.',
+  aspect_ratio: 'How wide the signature is compared with its height.',
+  ink_density: 'How much of the signature’s box is covered by ink.',
+  pieces: 'How many separate pieces of ink there are. Each piece is a stretch written without lifting the pen, so it tracks pen lifts.',
+  loops: 'Closed loops in the ink, such as in o, a, e or l, counted as holes inside the ink.',
+  endpoints: 'Places where a stroke starts or ends.',
+  duration: 'Time from the first touch to the last lift of the pen.',
+  speed: 'How fast the pen moves while touching, in signature heights per second.',
+  pauses: 'Moments the pen stays still while touching (over 0.15 s), plus long gaps between strokes (over 0.4 s).',
+  pen_lifts: 'How many times the pen leaves the screen and comes back.',
+  strokes: 'How many separate strokes the signature is made of.',
+  pressure: 'The average pen pressure reported by the Apple Pencil.',
+  path_length: 'The total distance the pen travels while touching, divided by the signature’s height.',
+}
+
+function FeaturesIntro({ r }) {
+  const isStatic = r.modality === 'static'
+  return (
+    <div className="mt-4 space-y-1.5 rounded-[12px] bg-[#f6f8fc] px-4 py-3 text-[13.5px] leading-relaxed text-slate-700">
+      <p>
+        <b>How they are acquired.</b>{' '}
+        {isStatic
+          ? 'The ink is separated from the paper, cropped to the signature and scaled to the same height, so the scan size or resolution does not change the numbers. Each feature is then measured from that ink.'
+          : 'Each feature is measured from the pen points the iPad recorded: where the pen was, when, and how hard it pressed. Sizes are divided by the signature’s height, so signing bigger or smaller does not change them.'}
+      </p>
+      <p>
+        <b>How they are compared.</b> The same features are measured on every reference. The client’s usual range is the average of their references,
+        give or take twice how much they normally vary (with a small minimum, so tiny changes are not flagged). A feature outside that range means
+        this signature differs there more than the client’s own signatures usually differ from each other.
+      </p>
+      <p>
+        <b>What they show.</b> These are measured separately from the model, to show <i>where</i> the two signatures differ in plain terms.
+        They do not change the result, which comes from the scores.
+      </p>
+    </div>
+  )
+}
+
 // The usual range as a blue band on a grey line, and this signature as a dot.
 // Scale: the range padded by 35% on each side, extended to include the value.
 function FeatureTrack({ i }) {
@@ -412,7 +475,13 @@ function FeatureRow({ i }) {
   const known = i.low !== null
   return (
     <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-[10px] px-3 py-3 lg:grid-cols-[240px_170px_minmax(120px,1fr)_130px_92px] ${i.outside ? 'bg-gradient-to-r from-warn-100 to-transparent' : ''}`}>
-      <div className="order-1 text-[15px] font-semibold text-ink">{i.label}</div>
+      <div className="order-1 min-w-0">
+        <div className="text-[15px] font-semibold text-ink">{i.label}</div>
+        {FEATURE_INFO[i.name] && <p className="mt-0.5 text-[12.5px] font-normal leading-snug text-muted">{FEATURE_INFO[i.name]}</p>}
+        {known && i.mean !== null && i.mean !== undefined && (
+          <p className="mt-0.5 text-[12.5px] text-muted">Client’s average {fmt(i.mean, d)}{i.unit === '°' ? '°' : ''}</p>
+        )}
+      </div>
       <div className="order-2 justify-self-end lg:order-5">
         {known && (i.outside
           ? <Badge tone="amber">Outside</Badge>
@@ -459,6 +528,7 @@ function FeatureAnalysis({ r }) {
           <Badge tone="amber"><TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" /> {outside.length} outside</Badge>
         </div>
       </div>
+      <FeaturesIntro r={r} />
 
       {callouts.length > 0 ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -796,7 +866,32 @@ function trackRange(value, threshold, higherIsBetter) {
 
 // One measure: name, value against its threshold, a track with the threshold
 // tick, the passing side shaded, a dot for this signature, and Passed / Not passed.
-function MeasureRow({ name, value, threshold, higherIsBetter, passed, personal }) {
+// v8.26: what each measure is. All three compare embeddings: the list of
+// numbers the model makes from a signature (same model for every signature).
+const METRIC_INFO = {
+  cosine: 'Compares the pattern of the two embeddings, ignoring their overall size. 1 means the same pattern, 0 means unrelated. Two signatures by the same person point the same way even when one is drawn bigger or darker.',
+  euclidean: 'The straight-line distance between the two embeddings. 0 means identical; the further apart, the more the model sees the signatures as different. A few large differences weigh heavily.',
+  manhattan: 'The sum of the differences in every number of the two embeddings. Like Euclidean, but many small differences count as much as a few large ones.',
+}
+
+function MeasuresIntro({ r }) {
+  const personal = r.threshold_source === 'adaptive'
+  return (
+    <div className="mt-2 space-y-1.5 rounded-[12px] bg-[#f6f8fc] px-4 py-3 text-[13.5px] leading-relaxed text-slate-700">
+      <p>
+        <b>How they are acquired.</b> The {r.modality === 'static' ? 'static model reads the scanned image' : 'dynamic model reads the pen data (position, timing, pressure and tilt of every point)'} and
+        turns each signature into an embedding, a list of numbers that describes it. The questioned signature and every reference go through the same model, so their numbers can be compared directly.
+      </p>
+      <p>
+        <b>How they are compared.</b> Each measure is computed between the questioned signature and each reference{r.reference_count > 1 ? ', then averaged over the references' : ''}.
+        The threshold is {personal ? 'personal: where this client’s own references fall when compared with each other (their average, allowing 1.5 times their usual spread, within fixed limits)' : 'standard (the client has fewer than 7 references): set by testing on people the model never saw, at the point where as many genuine signatures are rejected as forgeries are accepted'}.
+        A value on the passing side means the questioned signature is about as close to the references as genuine signatures usually are; on the other side, it differs more.
+      </p>
+    </div>
+  )
+}
+
+function MeasureRow({ name, metric, value, threshold, higherIsBetter, passed, personal }) {
   const drawable = Number.isFinite(value) && Number.isFinite(threshold)
   const [lo, hi] = drawable ? trackRange(value, threshold, higherIsBetter) : [0, 1]
   const at = (x) => Math.max(0, Math.min(100, ((x - lo) / (hi - lo)) * 100))
@@ -809,6 +904,7 @@ function MeasureRow({ name, value, threshold, higherIsBetter, passed, personal }
         <div className="min-w-0">
           <div className="text-[15.5px] font-semibold text-ink">{name}</div>
           <div className="text-[13px] text-muted">{higherIsBetter ? 'Higher is more similar' : 'Lower is more similar'}</div>
+          {METRIC_INFO[metric] && <p className="mt-1 max-w-[520px] text-[13px] leading-snug text-slate-600">{METRIC_INFO[metric]}</p>}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
@@ -861,10 +957,12 @@ function Scores({ r, quality = true }) {
         <p className="mt-1 text-[14px] text-muted">
           {r.reference_count > 1 ? 'Values are averaged over all references. ' : ''}The dot shows this signature; the shaded part is the passing side of the threshold.
         </p>
+        <MeasuresIntro r={r} />
         <div className="mt-2">
           {votes.map(([k, vote]) => (
             <MeasureRow
               key={k}
+              metric={k}
               name={r.metric_labels?.[k] || k}
               value={r.metrics[k]}
               threshold={r.thresholds[k]}
@@ -876,11 +974,19 @@ function Scores({ r, quality = true }) {
         </div>
       </section>
 
-      {r.explain?.all_pass && r.screening_result !== 'consistent' && (
-        <p className="rounded-[10px] bg-warn-50 px-3.5 py-2.5 text-[14px] text-warn-700">
-          All metrics pass, but the result also depends on how far past the thresholds the signature is, compared with this client’s own
-          signatures. Here the margin was small, so the chance it is genuine is about {r.explain.p_genuine}%.
-        </p>
+      {r.explain?.steps?.length > 0 && (
+        <section>
+          <h3 className="text-[17px] font-semibold text-ink">How the result was reached</h3>
+          {r.explain.passed > 0 && r.screening_result !== 'consistent' && (
+            <p className="mt-2 rounded-[10px] bg-warn-50 px-3.5 py-2.5 text-[14px] text-warn-700">
+              {r.explain.all_pass ? 'Every measure passed' : `${r.explain.passed} of ${votes.length} measures passed`}, but passing is not what decides the result.{' '}
+              {r.explain.lowered_by_client_check
+                ? `The comparison with other people’s signatures (step 3) lowered the chance it is genuine from ${r.explain.p_distance_only}% to ${r.explain.p_genuine}%.`
+                : `What counts is how far past the thresholds the scores are, compared with how much this client’s own signatures vary; here that gave only about ${r.explain.p_genuine}%.`}
+            </p>
+          )}
+          <ResultSteps steps={r.explain.steps} className="mt-3 text-[14px] leading-relaxed" />
+        </section>
       )}
 
       {per.length > 0 && (

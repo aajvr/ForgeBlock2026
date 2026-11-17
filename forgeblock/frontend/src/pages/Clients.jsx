@@ -61,7 +61,6 @@ function NewClientModal({ open, onClose, groups, defaultGroup }) {
   const isAdmin = user.role === 'admin'
   const blank = { full_name: '', email: '', is_practice: false, notes: '', group_id: '' }
   const [form, setForm] = useState(blank)
-  const [ack, setAck] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(null)
@@ -132,30 +131,13 @@ function NewClientModal({ open, onClose, groups, defaultGroup }) {
         ) : (
           myGroup && <p className="text-sm text-slate-600">The client goes into your group, <b>{myGroup}</b>.</p>
         )}
-        {study && (user.is_test_account ? (
-          <Alert kind="info">Test accounts register practice clients only (PR- code).</Alert>
-        ) : (
-          <label className="flex items-start gap-2 rounded-[12px] border border-line p-3 text-sm">
-            <input type="checkbox" className="mt-0.5" checked={form.is_practice} onChange={(e) => setForm({ ...form, is_practice: e.target.checked })} />
-            <span>
-              <span className="font-medium">Practice client</span>
-              <span className="block text-slate-500">For testing with a made-up practice signature, not a real legal signature. Gets a PR- code.</span>
-            </span>
-          </label>
-        ))}
-        {study && (
-          <label className="flex items-start gap-2 rounded-[12px] border border-[#f4d49c] bg-warn-50 p-3 text-sm">
-            <input type="checkbox" className="mt-0.5" checked={ack} onChange={(e) => setAck(e.target.checked)} required />
-            <span>The signatures I add will be samples prepared by the researchers or made-up practice signatures, not my own or anyone else's legal signature.</span>
-          </label>
-        )}
         <Field label="Notes (optional)">
           <Textarea value={form.notes} onChange={set('notes')} />
         </Field>
         <Alert>{error}</Alert>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button loading={busy} disabled={study && !ack}>Register client</Button>
+          <Button loading={busy}>Register client</Button>
         </div>
       </form>
     </Modal>
@@ -795,24 +777,34 @@ function DynamicEnroll({ client, onDone, onDirty }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [last, setLast] = useState(null)
+  // Mirrors `samples`, so closing full screen right after "Save & next" saves
+  // the signature that was just kept (state updates are not visible yet then).
+  const samplesRef = useRef([])
+  const keepSample = (s) => {
+    samplesRef.current = [...samplesRef.current, s]
+    setSamples(samplesRef.current)
+    setLast(s)
+  }
   const add = () => {
     if (pad.current.isEmpty()) return setError('Please sign in the box first.')
     setError('')
-    const s = pad.current.getStrokes()
-    setSamples([...samples, s])
-    setLast(s)
+    keepSample(pad.current.getStrokes())
     pad.current.clear()
   }
   const save = async () => {
+    const batch = samplesRef.current
+    if (!batch.length || busy) return
     setBusy(true)
     setError('')
     try {
-      const r = await api.post(`/api/clients/${client.id}/dynamic/enroll`, { samples })
+      const r = await api.post(`/api/clients/${client.id}/dynamic/enroll`, { samples: batch })
       setRes(r)
-      setSamples([])
+      // Signatures kept while this was saving stay for the next save.
+      samplesRef.current = samplesRef.current.slice(batch.length)
+      setSamples(samplesRef.current)
       onDone()
     } catch (err) {
-      setError(err.message)
+      setError(err.message) // the kept signatures stay, so Save can be tried again
     } finally {
       setBusy(false)
     }
@@ -823,7 +815,18 @@ function DynamicEnroll({ client, onDone, onDirty }) {
         <input type="checkbox" checked={penOnly} onChange={(e) => setPenOnly(e.target.checked)} /> Pen-only mode (ignore finger and palm touches)
       </label>
       <DevPenNotice />
-      <SignaturePad ref={pad} penOnly={penOnly} onPenOnlyChange={setPenOnly} label={client.client_code} />
+      <p className="text-sm text-slate-600">
+        Quickest way: open full screen, sign, tap <b>Save &amp; next</b> after each signature, and close full screen when done. The kept signatures are saved as references when you close it.
+      </p>
+      <SignaturePad
+        ref={pad}
+        penOnly={penOnly}
+        onPenOnlyChange={setPenOnly}
+        label={client.client_code}
+        onNext={(s) => { setError(''); keepSample(s) }}
+        kept={samples.length}
+        onClose={save}
+      />
       {/* Tap-sized (44px) buttons in one row under the pad. */}
       <div className="flex flex-wrap items-center gap-2.5">
         <Button variant="secondary" className="min-h-11" onClick={add}>Keep this signature</Button>
