@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -42,13 +42,11 @@ export default function ResearchUse() {
         </div>
         <div className="rounded-[16px] border border-line bg-white p-6 shadow-raised sm:p-8">
           <div className="mb-1 flex items-center gap-2 text-brand-700">
-            <FileText className="h-5 w-5" /> <span className="text-sm font-semibold">Terms and conditions</span>
+            <ShieldCheck className="h-5 w-5" /> <span className="text-sm font-semibold">Terms of use</span>
           </div>
           <h2 className="text-[26px] font-bold leading-tight tracking-[-0.01em] text-ink">Before you start</h2>
           <p className="mb-5 mt-1 text-sm text-muted">
-            {user.is_test_account
-              ? 'This is a test account. Please read and accept these terms to continue.'
-              : 'Please read and accept these terms to use ForgeBlock.'}
+            Please read and accept these terms to use ForgeBlock.
           </p>
           <ol className="list-decimal space-y-3 pl-5 text-sm leading-relaxed text-slate-700">
             {terms.map((t) => (
@@ -57,7 +55,7 @@ export default function ResearchUse() {
           </ol>
           <label className="mt-6 flex items-start gap-2 rounded-[12px] border border-line bg-[#f6f8fc] p-3 text-sm">
             <input type="checkbox" className="mt-0.5" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-            <span>I have read and agree to these terms and conditions.</span>
+            <span>I have read these terms and agree to use ForgeBlock as described.</span>
           </label>
           <Alert className="mt-3">{error}</Alert>
           <div className="mt-5 flex items-center gap-3">

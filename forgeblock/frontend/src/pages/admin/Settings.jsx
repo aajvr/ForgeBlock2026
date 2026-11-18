@@ -66,7 +66,6 @@ export default function Settings() {
             <li>Users are signed out after {s.security.idle_timeout_minutes} minutes without activity.</li>
             <li>New accounts get a temporary password that must be changed at first sign-in.</li>
           </ul>
-          <p className="mt-2 text-xs text-slate-500">Change these in the backend .env file (MAX_FAILED_LOGINS, LOCKOUT_MINUTES, IDLE_TIMEOUT_MINUTES).</p>
         </Card>
       </div>
       <ConfirmDialog
