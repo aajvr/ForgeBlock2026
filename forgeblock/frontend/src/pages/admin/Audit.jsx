@@ -96,7 +96,7 @@ export default function Audit() {
           </div>
         )}
         {!rows ? <Spinner /> : (
-          <Table head={['When', 'Who', 'Type', 'What']}>
+          <Table scroll head={['When', 'Who', 'Type', 'What']}>
             {rows.map((a) => (
               <tr key={a.id}>
                 <td className={`${td} whitespace-nowrap text-xs text-slate-500`}>{fmtDate(a.created_at)}</td>

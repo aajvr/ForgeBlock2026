@@ -508,7 +508,7 @@ function ClientsTable({ clients, user, onRowMenu, selecting = false, selected, o
   const all = selecting && clients.length > 0 && clients.every((c) => selected.has(c.id))
   const head = ['Client', 'Code', 'Static references', 'Dynamic references', 'Account', 'Registered', '']
   return (
-    <Table head={selecting ? [{ label: <SelectBox checked={all} label="Select all clients in this list" onClick={onToggleAll} /> }, ...head] : head}>
+    <Table scroll head={selecting ? [{ label: <SelectBox checked={all} label="Select all clients in this list" onClick={onToggleAll} /> }, ...head] : head}>
       {clients.map((c) => (
         <tr
           key={c.id}

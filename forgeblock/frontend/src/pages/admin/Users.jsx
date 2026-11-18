@@ -156,7 +156,7 @@ export default function Users() {
         </div>
         {patchError && <Alert className="mx-5 my-3">{patchError}</Alert>}
         {!users ? <Spinner /> : (
-          <Table head={['Account', 'Code', 'Role', 'Group', 'Status', 'Last sign-in', { label: '', right: true }]}>
+          <Table scroll head={['Account', 'Code', 'Role', 'Group', 'Status', 'Last sign-in', { label: '', right: true }]}>
             {users.map((u) => (
               <tr key={u.id}>
                 <td className={td}><div className="font-medium">{u.full_name}</div><div className="text-xs text-slate-500">{u.email}{u.client_code ? ` · ${u.client_code}` : ''}</div></td>

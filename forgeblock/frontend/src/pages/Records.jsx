@@ -25,7 +25,7 @@ export function RecordsTable({ rows, showExaminer = false, hideGroup = false }) 
   const navigate = useNavigate()
   const head = ['Receipt', 'Module', 'Client', ...(showExaminer ? ['Examiner'] : []), 'Result', { label: 'Confidence', right: true }, 'Decision', 'Case', 'Date']
   return (
-    <Table head={head}>
+    <Table scroll head={head}>
       {rows.map((l) => (
         <tr key={l.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/app/records/${l.id}`)}>
           <td className={`${td} whitespace-nowrap`}><span className="font-mono text-sm font-medium text-brand-700">{l.receipt_code}</span></td>

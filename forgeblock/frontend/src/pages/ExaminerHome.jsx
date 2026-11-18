@@ -56,14 +56,14 @@ export default function ExaminerHome() {
       <div className="grid items-start gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Card icon={ClipboardCheck} title="Needs your decision" subtitle="Screenings that were not clearly Consistent" bodyClass="p-0" data-tour="home-decisions"
           actions={<Link to="/app/cases" className={headerLink}>All cases</Link>}>
-          {d.open_cases.length === 0 ? <Empty icon={CheckCircle2}>Nothing is waiting for you.</Empty> : <CasesTable cases={d.open_cases} compact />}
+          {d.open_cases.length === 0 ? <Empty icon={CheckCircle2}>Nothing is waiting for you.</Empty> : <CasesTable cases={d.open_cases} compact scroll="max-h-[28rem]" />}
         </Card>
         <Card icon={ScanSearch} title="Latest screenings" bodyClass="p-0"
           actions={<Link to="/app/records" className={headerLink}>Records</Link>}>
           {d.recent.length === 0 ? (
             <Empty icon={ScanSearch}>No screenings yet.</Empty>
           ) : (
-            <ul className="divide-y divide-track border-t border-track">
+            <ul className="max-h-[28rem] divide-y divide-track overflow-y-auto overscroll-contain border-t border-track">
               {d.recent.map((l) => (
                 <li key={l.id}>
                   <button onClick={() => navigate(`/app/records/${l.id}`)} className="flex w-full items-center justify-between gap-3 px-[22px] py-3 text-left transition-colors hover:bg-[#f7fafd] focus-visible:bg-brand-50 focus-visible:outline-none">

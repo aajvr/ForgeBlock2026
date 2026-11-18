@@ -77,13 +77,13 @@ function Handler({ c }) {
   )
 }
 
-export function CasesTable({ cases, compact = false, showExaminer = false }) {
+export function CasesTable({ cases, compact = false, showExaminer = false, scroll = false }) {
   const navigate = useNavigate()
   const decision = (c) => (c.status === 'open' ? <Badge tone="amber">Needs decision</Badge> : <FindingBadge value={c.finding} />)
   const screening = (c) => (c.latest_screening ? <ScreeningBadge value={c.latest_screening} /> : <span className="text-sm text-slate-400">Not screened</span>)
   if (compact) {
     return (
-      <Table head={['Case', 'Client', 'Screening', 'Decision']}>
+      <Table head={['Case', 'Client', 'Screening', 'Decision']} scroll={scroll}>
         {cases.map((c) => (
           <tr key={c.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/app/cases/${c.id}`)}>
             <td className={td}>
@@ -99,7 +99,7 @@ export function CasesTable({ cases, compact = false, showExaminer = false }) {
     )
   }
   return (
-    <Table head={['Case', 'Questioned signature', 'Client', ...(showExaminer ? ['Examiner'] : []), 'Screening', 'Decision', 'Opened']}>
+    <Table head={['Case', 'Questioned signature', 'Client', ...(showExaminer ? ['Examiner'] : []), 'Screening', 'Decision', 'Opened']} scroll={scroll}>
       {cases.map((c) => (
         <tr key={c.id} className="cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/app/cases/${c.id}`)}>
           <td className={`${td} whitespace-nowrap`}><span className="font-medium text-brand-700">{c.case_code}</span></td>
@@ -183,7 +183,7 @@ export default function Cases() {
         ) : cases.length === 0 ? (
           <Empty icon={Briefcase}>{status === 'open' ? 'Nothing waiting for a decision.' : 'No cases here yet.'}</Empty>
         ) : (
-          <CasesTable cases={cases} showExaminer={isAdmin} />
+          <CasesTable cases={cases} showExaminer={isAdmin} scroll />
         )}
       </Card>
       <NewCaseModal open={newOpen} onClose={() => patchParams(setParams, { new: null, client: null })} clientId={params.get('client') || ''} />

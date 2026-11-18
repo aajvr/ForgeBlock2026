@@ -406,11 +406,14 @@ export function ConfirmDialog({ open, title, children, confirmLabel = 'Confirm',
     </Modal>
   )
 }
-export function Table({ head, children }) {
+// `scroll`: long lists scroll inside the card with the column headings kept in
+// view. true = up to 65% of the screen height, or pass a Tailwind max-h class.
+export function Table({ head, children, scroll = false }) {
+  const box = scroll ? `${scroll === true ? 'max-h-[65vh]' : scroll} overflow-y-auto overscroll-contain` : ''
   return (
-    <div className="overflow-x-auto">
+    <div className={`overflow-x-auto ${box}`}>
       <table className="w-full text-sm">
-        <thead>
+        <thead className={scroll ? 'sticky top-0 z-10 bg-white shadow-[0_1px_0_#eef1f6]' : undefined}>
           <tr className="border-b border-track text-left text-[12.5px] font-semibold text-muted">
             {head.map((h, i) => (
               <th key={i} className={`px-4 py-3 font-semibold ${h.right ? 'text-right' : ''}`}>

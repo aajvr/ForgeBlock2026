@@ -36,7 +36,7 @@ export default function ClientHome() {
         {c.checks.length === 0 ? (
           <Empty>No documents in your name have been screened.</Empty>
         ) : (
-          <Table head={['Document', 'Module', 'Screening', 'Examiner', 'Examiner’s decision', 'Receipt', 'Date']}>
+          <Table scroll head={['Document', 'Module', 'Screening', 'Examiner', 'Examiner’s decision', 'Receipt', 'Date']}>
             {c.checks.map((k) => (
               <tr
                 key={k.id}
