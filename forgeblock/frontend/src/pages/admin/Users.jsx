@@ -1,4 +1,4 @@
-import { KeyRound, Lock, Unlock, UserPlus, Users as UsersIcon } from 'lucide-react'
+import { KeyRound, Lock, Unlock, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { useAuth } from '../../auth'
@@ -92,40 +92,6 @@ function CreateUser({ onDone }) {
   )
 }
 
-function BulkCreate({ onDone }) {
-  const [form, setForm] = useState({ prefix: 'EVAL', start: 1, count: 50, email_domain: 'forgeblock.local' })
-  const [res, setRes] = useState(null)
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      setRes(await api.post('/api/admin/users/bulk', { ...form, start: Number(form.start), count: Number(form.count) }))
-      onDone()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-  if (res) return <>{res.skipped.length > 0 && <Alert kind="info" className="mb-3">Already existed: {res.skipped.join(', ')}</Alert>}<Credentials rows={res.created} /></>
-  return (
-    <form onSubmit={submit} className="space-y-4">
-      <p className="text-sm text-slate-600">Creates numbered test examiner accounts for evaluation respondents, for example EVAL-01 to EVAL-50.</p>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Prefix"><Input value={form.prefix} onChange={(e) => setForm({ ...form, prefix: e.target.value.toUpperCase() })} /></Field>
-        <Field label="Start at"><Input type="number" min="1" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></Field>
-        <Field label="How many"><Input type="number" min="1" max="100" value={form.count} onChange={(e) => setForm({ ...form, count: e.target.value })} /></Field>
-      </div>
-      <Field label="Email domain"><Input value={form.email_domain} onChange={(e) => setForm({ ...form, email_domain: e.target.value })} /></Field>
-      <Alert>{error}</Alert>
-      <Button loading={busy}>Create accounts</Button>
-    </form>
-  )
-}
-
 export default function Users() {
   const { user: me } = useAuth()
   const [users, setUsers] = useState(null)
@@ -181,7 +147,6 @@ export default function Users() {
   return (
     <>
       <PageHeader title="Users and roles" description="Create accounts, set roles, reset passwords and disable accounts. There is no self-registration. Client accounts are also created when a client is registered with an email. Examiners are assigned to a group on the Clients page.">
-        {me.study_mode && <Button variant="secondary" onClick={() => setModal('bulk')}><UsersIcon className="h-4 w-4" /> Evaluation accounts</Button>}
         <Button onClick={() => setModal('one')}><UserPlus className="h-4 w-4" /> New account</Button>
       </PageHeader>
       <Card bodyClass="p-0" data-tour="users-list">
@@ -235,7 +200,6 @@ export default function Users() {
         )}
       </Card>
       <Modal open={modal === 'one'} onClose={() => setModal(null)} title="New account"><CreateUser onDone={load} /></Modal>
-      <Modal open={modal === 'bulk'} onClose={() => setModal(null)} title="Create test examiner accounts" wide><BulkCreate onDone={load} /></Modal>
       <ConfirmDialog
         open={!!toReset}
         title="Reset password?"

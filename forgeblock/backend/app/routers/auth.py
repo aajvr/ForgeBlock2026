@@ -47,17 +47,16 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 ROLE_LABELS = {"admin": "Administrator", "examiner": "Examiner", "client": "Client"}
 PROVIDER_LABELS = {"password": "Email and password", "azure": "Microsoft", "microsoft": "Microsoft", "google": "Google"}
 
-# Shown on first sign-in and in the Help Center. Wording follows Section 3.8.
+# Shown on first sign-in and in the Help Center.
 RESEARCH_USE_TERMS = [
-    "I will use ForgeBlock only for its intended purpose and in line with these terms.",
-    "ForgeBlock screens signatures and gives a confidence score. Its results support, but do not replace, "
-    "the judgment of a qualified document examiner, and are not by themselves proof that a signature is genuine or forged.",
-    "I will only submit signatures that I am authorized to use, and I will not submit anyone's signature without their consent.",
+    "ForgeBlock is a signature screening tool. Its results support a qualified examiner, who makes the "
+    "final finding. A result alone is not proof that a signature is genuine or forged.",
+    "I will submit only signatures that I am allowed to use, with the consent of the person who signed them.",
+    "I consent to ForgeBlock storing my signatures and activity records, and recording each screening "
+    "in its tamper-evident ledger, for as long as the data retention policy allows.",
     "I will not photograph, copy, share or reproduce any signature shown in ForgeBlock. "
-    "Signature images are view-only and cannot be downloaded or exported.",
-    "I will keep my sign-in details private and will not share my account. "
-    "I can see only the records my account is allowed to access.",
-    "My activity in ForgeBlock is recorded to keep the system secure, and access may be removed if these terms are not followed.",
+    "ForgeBlock has no function to download or export signature images.",
+    "I can see only my own signatures and activity records. Accounts are created only by the administrator.",
 ]
 
 

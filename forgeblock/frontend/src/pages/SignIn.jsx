@@ -196,7 +196,6 @@ export default function SignIn() {
           </div>
         </div>
         <div className="relative space-y-2 text-sm text-white/75">
-          {providers?.study_mode && <p>A research prototype of De La Salle University–Dasmariñas, for the approved activities of the ForgeBlock study only. Not for actual legal, financial or official documents.</p>}
         </div>
       </div>
 
@@ -262,7 +261,6 @@ export default function SignIn() {
             </ul>
           </div>
           <div className="mt-6 space-y-2 text-sm text-slate-500 lg:hidden">
-              {providers?.study_mode && <p>A research prototype of De La Salle University–Dasmariñas, for the approved activities of the ForgeBlock study only. Not for actual legal, financial or official documents.</p>}
           </div>
         </div>
       </div>

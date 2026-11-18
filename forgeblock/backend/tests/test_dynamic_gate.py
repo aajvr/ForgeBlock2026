@@ -67,14 +67,17 @@ def test_gate_rules():
 
 
 def test_gate_explanation_is_plain():
+    items = [{"name": n, "outside": True} for n in ("duration", "pauses", "pen_lifts", "strokes", "pressure",
+                                                       "path_length")] + [{"name": "speed", "outside": False}]
     log = SimpleNamespace(analysis={
-        "features": {"items": [{"mean": 1.0}] * 7},
+        "features": {"items": items},
         "shape": {"ratio": 3.4},
         "dynamic_gate": {"applied": True, "reasons": ["shape", "features"], "features_outside": 6,
                          "result_before_gate": "inconclusive"},
     })
     text = _gate_because(log)
-    assert "3.4x" in text and "6 of 7 handwriting features" in text
+    assert "overall shape is clearly different" in text
+    assert "6 handwriting measurements (signing time, pauses, pen lifts, strokes, pressure and pen path length)" in text
     assert _gate_because(SimpleNamespace(analysis={"dynamic_gate": {"applied": False}})) is None
 
 

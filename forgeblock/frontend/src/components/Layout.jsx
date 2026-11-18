@@ -81,7 +81,6 @@ export function navFor(role) {
   return [...main, ...COMMON]
 }
 
-const STUDY_NOTE = 'For the approved ForgeBlock study activities. Not for actual legal, financial or official documents.'
 
 const PINNED_KEY = 'forgeblock_sidebar_pinned'
 const DESKTOP = '(min-width: 64rem)' // Tailwind's lg
@@ -457,14 +456,6 @@ export default function Layout() {
             </button>
             <div className="min-w-0 shrink lg:w-[220px] lg:shrink-0">
               <div className="truncate text-[13.5px] font-medium text-white/80">{style.workspace}</div>
-              {/* Study mode: the research-use notice, always in view. */}
-              {user.study_mode && (
-                <div className="mt-0.5 flex items-center gap-1 text-[11.5px] font-medium text-white/75" title={STUDY_NOTE}>
-                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">Research use only</span>
-                  <span className="sr-only">. {STUDY_NOTE}</span>
-                </div>
-              )}
             </div>
             {staff ? <GlobalSearch phoneOpen={phoneSearch} onPhoneClose={() => setPhoneSearch(false)} /> : <div className="flex-1" />}
             <div className="ml-auto flex shrink-0 items-center justify-end gap-2.5 lg:min-w-[220px]">

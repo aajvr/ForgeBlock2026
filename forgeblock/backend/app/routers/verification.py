@@ -128,8 +128,7 @@ def explain_result(l: VerificationLog) -> dict | None:
     if because:
         before = ((l.analysis or {}).get("dynamic_gate") or (l.analysis or {}).get("feature_gate") or {}).get(
             "result_before_gate", "")
-        rule = (f"{p}% alone would be {before.capitalize()}, but {because}, so the result is {shown}. "
-                f"Confidence = {conf}%.")
+        rule = f"Would be {before.capitalize()}, but {because}, so the result is {shown}. Confidence = {conf}%."
     steps.append({"title": f"{len(steps) + 1}. Result", "text": rule})
 
     # One or two sentences for the result card, under the confidence score.
@@ -148,50 +147,88 @@ def explain_result(l: VerificationLog) -> dict | None:
         "inconclusive": f"Between {lo}% and {hi}% is {shown}; the confidence is the chance of the side it leans to, {conf}%.",
     }[l.screening_result])
 
-    if because:
-        why = (f"The chance that this signature is genuine is about {p}%, which on its own is "
-               f"{before.capitalize()}. But {because}, so it was marked {shown}.")
-    elif l.screening_result == "consistent":
-        why = f"The chance that this signature is genuine is about {p}%, above the {hi}% needed for Consistent."
-    elif l.screening_result == "inconsistent":
-        why = f"The chance that this signature is genuine is only about {p}%, below the {lo}% line for Inconsistent."
-    else:
-        side = "leans genuine" if p >= 50 else "leans not genuine"
-        why = (f"The chance that this signature is genuine is about {p}%: it {side}, but it falls between "
-               f"{lo}% and {hi}%, too close to call either way, so an examiner should review it.")
-    if passed and l.screening_result != "consistent" and not because:
-        if lowered:
-            looks = ("looks more like other people's signatures than this client's own"
-                     if float(check.get("score", 0)) < 0.5 else "is less like this client's typical signature than the scores suggested")
-            why += (f" The scores passed {passed} of {len(votes)} thresholds, but compared with other people's signatures "
-                    f"it {looks}, which lowered the chance from {p_dist}% to {p}%.")
-        elif all_pass:
-            why += (" Every score passed its threshold, but only by a little compared with how much this "
-                    "client's own signatures vary, and signatures that only just pass are often skilled forgeries.")
+    why, next_step = plain_reason(l)
     return {"p_genuine": p, "p_distance_only": p_dist, "client_check_used": used, "band": [lo, hi],
             "all_pass": all_pass, "passed": passed, "lowered_by_client_check": lowered,
-            "why": why, "how": how, "steps": steps}
+            "why": why, "next": next_step, "how": how, "steps": steps}
+
+
+# v8.27: short names of the handwriting measurements, for the plain wording.
+MEASUREMENT_NAMES = {
+    # static
+    "stroke_length": "stroke length", "thickness": "stroke thickness", "slant": "slant",
+    "baseline": "baseline tilt", "aspect_ratio": "width", "ink_density": "ink density",
+    "pieces": "pen lifts", "loops": "loops", "endpoints": "stroke endings",
+    # dynamic
+    "duration": "signing time", "speed": "speed", "pauses": "pauses", "pen_lifts": "pen lifts",
+    "strokes": "strokes", "pressure": "pressure", "path_length": "pen path length",
+}
+
+
+def _and(words: list[str]) -> str:
+    words = list(dict.fromkeys(words))
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def _outside(a: dict) -> tuple[int, str]:
+    """(how many, "width and slant") of the measurements outside the client's usual range."""
+    items = [i for i in (a.get("features") or {}).get("items", []) if i.get("outside")]
+    names = [MEASUREMENT_NAMES.get(i.get("name"), str(i.get("label", "")).lower()) for i in items]
+    return len(items), (_and(names) if names else "")
+
+
+def _measurements(n: int, names: str) -> str:
+    """"2 handwriting measurements (width and slant)"."""
+    return f"{n} handwriting measurement{'' if n == 1 else 's'}" + (f" ({names})" if names else "")
 
 
 def _gate_because(l: VerificationLog) -> str | None:
     """Plain words for why a gate moved the result, or None if none did."""
     a = l.analysis or {}
+    n, names = _outside(a)
+    are = "is" if n == 1 else "are"
     parts = []
     dyn = a.get("dynamic_gate") or {}
     if dyn.get("applied"):
-        total = sum(1 for i in (a.get("features") or {}).get("items", []) if i.get("mean") is not None)
         if "shape" in (dyn.get("reasons") or []):
-            ratio = (a.get("shape") or {}).get("ratio")
-            parts.append(f"its shape is about {ratio:.1f}x as far from this client's signatures as they are from "
-                         "each other" if ratio else "its shape is clearly different from this client's signatures")
+            parts.append("its overall shape is clearly different from this client's signatures")
         if "features" in (dyn.get("reasons") or []):
-            parts.append(f"{dyn.get('features_outside')} of {total} handwriting features are outside this client's "
-                         "usual range")
-    st = a.get("feature_gate") or {}
-    if st.get("applied"):
-        parts.append(f"{st.get('outside')} handwriting features are outside this client's usual range "
-                     f"(more than {st.get('max_outside')} sends a result to the examiner)")
+            parts.append(f"{_measurements(n, names)} {are} outside this client's usual range")
+    if (a.get("feature_gate") or {}).get("applied"):
+        parts.append(f"{_measurements(n, names)} {are} outside this client's usual range")
     return " and ".join(parts) or None
+
+
+def plain_reason(l: VerificationLog) -> tuple[str, str]:
+    """v8.27: (why, next step) in plain words for the result card. No numbers:
+    the chance and the scores stay in explain.steps and explain.how."""
+    a = l.analysis or {}
+    n, names = _outside(a)
+    found = _measurements(n, names)
+    dyn = a.get("dynamic_gate") or {}
+    gated_static = bool((a.get("feature_gate") or {}).get("applied"))
+    gated_dyn = bool(dyn.get("applied"))
+    compare_tab = "Stroke replay" if l.modality == "dynamic" else "Feature marks"
+    if l.screening_result == "consistent":
+        return ("ForgeBlock found that this signature's overall shape and handwriting measurements fall within "
+                "how this client usually signs.",
+                "Confirm the finding. ForgeBlock screens, and you decide.")
+    if l.screening_result == "inconclusive":
+        why = "ForgeBlock found this signature similar to the client's references, but not similar enough to be sure."
+        if gated_static or (gated_dyn and "features" in (dyn.get("reasons") or [])):
+            why += f" Its overall shape matches, but ForgeBlock detected {found} outside this client's usual range."
+            return why, f"Check those measurements in the Handwriting features tab, then compare in the {compare_tab} tab."
+        if gated_dyn:
+            why += " Its overall shape is clearly different from this client's signatures."
+        return why, f"Check the Handwriting features tab, then compare in the {compare_tab} tab."
+    # Inconsistent
+    why = ("ForgeBlock compared this signature with the client's references and found that its overall shape "
+           "differs from how this client usually signs.")
+    if gated_dyn and "features" in (dyn.get("reasons") or []):
+        why += f" ForgeBlock also detected {found} outside this client's usual range."
+    else:
+        why += " Some measurements, like size or slant, may look close, but skilled forgeries often copy those."
+    return why, f"Compare it with the references in the {compare_tab} tab and record your finding."
 
 
 def _margin_steps(p: float, cal: dict) -> float | None:
@@ -244,6 +281,8 @@ def result_out(l: VerificationLog, db: Session, viewer: User) -> dict:
         if viewer.role != "client":
             out["internal_decision"] = l.classification  # for evaluation pages only
         out["explain"] = explain_result(l)
+        if viewer.role == "client" and out["explain"]:
+            out["explain"].pop("next", None)  # the next step is for staff only
     out["case"] = None
     out["finding"] = None
     if l.case_id:

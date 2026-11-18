@@ -105,11 +105,19 @@ const PASS = { main: '#118A4B', tint: '#E3F5EA' }
 const FAIL = { main: '#D13438', tint: '#FDE7EB' }
 
 // One short sentence; the number itself is shown large next to it.
-function shortCaption(r, whose) {
-  const against = r.mode === 'compare' ? 'the other signature' : `${whose} signatures on file`
+// v8.27: clients get a plain line with no numbers and no next step.
+function shortCaption(r, whose, client = false) {
+  const compare = r.mode === 'compare'
+  if (client) {
+    const yours = compare ? 'the other signature' : 'your signatures on file'
+    if (r.screening_result === 'consistent') return `ForgeBlock found a match with ${yours}. An examiner will confirm it.`
+    if (r.screening_result === 'inconsistent') return `ForgeBlock did not find a match with ${yours}. An examiner will review it.`
+    return 'ForgeBlock could not decide on this signature. An examiner will review it.'
+  }
+  const against = compare ? 'the other signature' : `${whose === 'the client’s' ? 'this client’s' : whose} signatures on file`
   if (r.screening_result === 'consistent') return `Matches ${against}.`
   if (r.screening_result === 'inconsistent') return `Does not match ${against}.`
-  return 'Too close to call; an examiner should review it.'
+  return 'Too close to call. Please review.'
 }
 
 // The result card (v3.1), tinted by the result: a diagonal gradient from the
@@ -138,8 +146,13 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
             <res.Icon className="h-7 w-7 shrink-0" style={{ color: theme.main }} aria-hidden="true" />
             {res.label}
           </div>
-          <p className="mt-3 text-[17px] font-semibold text-ink">{shortCaption(r, whose)}</p>
-          {r.explain?.why && <p className="mt-1 max-w-[560px] text-[14.5px] leading-normal text-muted">{r.explain.why}</p>}
+          <p className="mt-3 text-[17px] font-semibold text-ink">{shortCaption(r, whose, client)}</p>
+          {!client && r.explain?.why && <p className="mt-1 max-w-[560px] text-[14.5px] leading-normal text-muted">{r.explain.why}</p>}
+          {!client && r.explain?.next && (
+            <p className="mt-1.5 max-w-[560px] text-[14.5px] leading-normal text-ink">
+              <b>Next step:</b> {r.explain.next}
+            </p>
+          )}
         </div>
         <div className="shrink-0 sm:text-right">
           {/* v8.26: one way into the explanation ("How is this calculated?" under the bar). */}
@@ -162,11 +175,6 @@ export function ResultHeader({ r, label = 'Screening result', whose = 'the clien
       >
         <div className="h-full rounded-full" style={{ width: `${score}%`, background: theme.main }} />
       </div>
-      {r.explain?.how && (
-        <p className="mt-2.5 text-[13.5px] leading-normal text-[#3b4a5e]">
-          <span className="font-semibold text-ink">How this score was reached: </span>{r.explain.how}
-        </p>
-      )}
       <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
         <p className="m-0 text-[12.5px] text-muted">{client ? 'Your examiner makes the final decision.' : `Measured against ${against}. Never above 99%.`}</p>
         {how && (

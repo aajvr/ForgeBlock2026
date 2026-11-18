@@ -15,7 +15,8 @@ def test_result_explains_itself(client, examiner, monkeypatch):
     p = ex["p_genuine"]
     expected = "consistent" if p >= 65 else ("inconsistent" if p <= 35 else "inconclusive")
     assert r["screening_result"] == expected or abs(p - 65) <= 1 or abs(p - 35) <= 1  # rounding at the edges
-    assert f"{p}%" in ex["why"]
+    # v8.27: plain "why" with no numbers, plus the examiner's next step.
+    assert ex["why"].startswith("ForgeBlock") and "%" not in ex["why"] and ex["next"]
     assert ex["all_pass"] == all(r["votes"].values())
     # v8.26: how the number was reached, step by step, ending with the result rule
     assert ex["passed"] == sum(r["votes"].values()) and f"{p}%" in ex["how"]
@@ -42,7 +43,8 @@ def test_explanation_names_the_per_client_check():
     finally:
         v.get_engine = v_engine
     assert ex["all_pass"] and ex["lowered_by_client_check"] and ex["p_distance_only"] == 58 and ex["p_genuine"] == 27
-    assert "from 58% to 27%" in ex["why"] and "12 other people" in ex["how"]
+    assert "58%" in ex["how"] and "27%" in ex["how"] and "12 other people" in ex["how"]
+    assert "%" not in ex["why"] and "passed" not in ex["why"]
     assert [s["title"][3:] for s in ex["steps"]] == ["Scores", "Margin", "Check against other people", "Result"]
 
 
@@ -74,3 +76,30 @@ def test_no_explanation_without_calibration(client, examiner, monkeypatch):
     r = client.post("/api/screen/static", headers=examiner, data={"client_id": str(cid)},
                     files={"file": ("q.png", signature_png(1, jitter=0.65), "image/png")}).json()
     assert r["explain"] is None
+
+
+def test_gated_result_names_the_measurements():
+    """v8.27: an Inconclusive caused by the feature gate names the measurements,
+    and the Result step says what it would have been without the gate."""
+    from types import SimpleNamespace as N
+
+    from app.routers import verification as v
+    v_engine = v.get_engine
+    v.get_engine = lambda: N(static_cfg={"calibration": {"a": 1.3581, "b": -1.3802, "band": [0.35, 0.65]}})
+    try:
+        l = N(modality="static", classification="genuine", confidence_score=80.0, screening_result="inconclusive",
+              metrics={"cosine": 0.9, "euclidean": 0.3, "manhattan": 5},
+              thresholds={"cosine": 0.7, "euclidean": 0.6, "manhattan": 8},
+              analysis={"features": {"items": [{"name": "aspect_ratio", "outside": True},
+                                               {"name": "slant", "outside": True},
+                                               {"name": "loops", "outside": False}], "flagged": 2},
+                        "feature_gate": {"enabled": True, "applied": True, "outside": 2, "max_outside": 1,
+                                         "result_before_gate": "consistent"}})
+        ex = v.explain_result(l)
+    finally:
+        v.get_engine = v_engine
+    assert "ForgeBlock detected 2 handwriting measurements (width and slant) outside this client's usual range" in ex["why"]
+    assert "Handwriting features tab" in ex["next"]
+    last = ex["steps"][-1]["text"]
+    assert "Would be Consistent, but 2 handwriting measurements (width and slant) are outside" in last
+    assert "35%" not in last and "65%" not in last
