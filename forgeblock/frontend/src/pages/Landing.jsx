@@ -26,13 +26,11 @@ import { cancelFrame, cubicBezier, frame, transform } from 'motion'
 import { motion as Motion, useMotionValueEvent, useScroll, useTransform } from 'motion/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { api } from '../api'
 import { useAuth } from '../auth'
 import Logo from '../components/Logo'
 import SignatureTrace from '../components/SignatureTrace'
 import { SIGNATURE_HEIGHT, SIGNATURE_PATHS, SIGNATURE_WIDTH } from '../components/signaturePaths'
 import useOnScreen from '../components/useOnScreen'
-import { ScreeningNotice } from '../components/ui'
 import { homeFor } from './SignIn'
 
 const DEMO_VIDEO = `${import.meta.env.BASE_URL}forgeblock-demo.mp4`
@@ -82,7 +80,6 @@ const PRIVACY = [
 
 const FOOTER_COLUMNS = [
   { title: 'Product', links: [['#how', 'How it works'], ['#who', 'Who uses it'], ['#access', 'Getting an account']] },
-  { title: 'Privacy and Help', links: [['#privacy', 'Privacy and security'], ['/app/help', 'Help Center (after sign-in)'], ['/signin', 'Sign in']] },
 ]
 
 const SECTIONS = [
@@ -733,11 +730,7 @@ function SealScene() {
 
 export default function Landing() {
   const { user } = useAuth()
-  const [study, setStudy] = useState(false)
   useSmoothScroll()
-  useEffect(() => {
-    api.get('/api/auth/providers').then((p) => setStudy(!!p.study_mode)).catch(() => {})
-  }, [])
   if (user) return <Navigate to={homeFor(user)} replace />
 
   return (
@@ -875,7 +868,7 @@ export default function Landing() {
 
       <footer className="border-t border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-6xl px-5 pb-8 pt-14 text-sm text-slate-500">
-          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[2fr_1fr]">
             <div>
               <Logo variant="blue" size={40} />
               <p className="mt-3 max-w-xs">Signature screening with a tamper-evident record of every result and every examiner’s decision.</p>
@@ -894,18 +887,9 @@ export default function Landing() {
                 </ul>
               </nav>
             ))}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-700">The study</h3>
-              <p className="mt-3">
-                {study
-                  ? 'A research prototype of De La Salle University–Dasmariñas, used only for the approved activities of the ForgeBlock study. Not for actual legal, financial or official documents.'
-                  : 'A thesis project of De La Salle University–Dasmariñas, by CloudNine.'}
-              </p>
-            </div>
           </div>
-          <div className="mt-12 flex flex-col gap-3 border-t border-slate-200 pt-6 md:flex-row md:items-start md:justify-between md:gap-10">
-            <p className="shrink-0">© 2026 CloudNine. All rights reserved.</p>
-            <ScreeningNotice className="max-w-2xl md:text-right" />
+          <div className="mt-12 border-t border-slate-200 pt-6">
+            <p>© 2026 CloudNine. All rights reserved.</p>
           </div>
         </div>
       </footer>

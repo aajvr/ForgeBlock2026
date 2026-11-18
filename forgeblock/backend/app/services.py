@@ -81,7 +81,7 @@ DEFAULT_SETTINGS = {
     # v8.26: default is "always" (tested 2026-11-17 on 3 real clients: adaptive left
     # genuine sheet-vs-sheet signatures Inconsistent that "always" passed), and the
     # feature gate is on (Consistent needs at most 1 handwriting feature out of range).
-    "screening": {"size_mode": "always", "feature_gate": True},
+    "screening": {"size_mode": "always", "feature_gate": True, "dynamic_gate": True},
 }
 
 

@@ -199,7 +199,8 @@ def capture_flags(profiles: list[SignatureProfile]) -> dict[int, dict]:
     return out
 
 
-def profile_out(p: SignatureProfile, cons: dict | None = None, capture_flag: dict | None = None) -> dict:
+def profile_out(p: SignatureProfile, cons: dict | None = None, capture_flag: dict | None = None,
+                check_reasons: list[str] | None = None) -> dict:
     c = (cons or {}).get(p.id, {})
     return {
         "id": p.id,
@@ -216,6 +217,9 @@ def profile_out(p: SignatureProfile, cons: dict | None = None, capture_flag: dic
         "status": p.status,
         # v8.23: static only; None for dynamic or when it could not be checked.
         "capture_flag": capture_flag if p.modality == "static" else None,
+        # Dynamic only (ml/dynamic_ref_checks.py): why this reference may be a
+        # bad capture. Staff only; empty when nothing looks wrong.
+        "check_reasons": list(check_reasons or []) if p.modality == "dynamic" else None,
     }
 
 

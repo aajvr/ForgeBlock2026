@@ -322,6 +322,7 @@ def add_as_reference(case_id: int, body: AddReferenceIn, db: Session = Depends(g
                              quality=q["score"], enrolled_by=user.id)
     else:
         from ..ml.dynamic_features import points_from_payload
+        from ..ml.dynamic_shape import shape_points
 
         strokes = load_strokes(log.test_sample_path)
         if strokes is None:
@@ -332,7 +333,8 @@ def add_as_reference(case_id: int, body: AddReferenceIn, db: Session = Depends(g
                              sample_path=save_strokes(strokes, f"profiles/dynamic/{client.id}"),
                              embedding=pen["embedding"],
                              model_version=engine.dynamic_cfg["model_version"],
-                             features={**dynamic_features(strokes), "_pen": pen["pen"]},
+                             features={**dynamic_features(strokes), "_pen": pen["pen"],
+                                       "_shape": shape_points(strokes)},
                              quality=dynamic_quality(strokes)["score"],
                              capture_device=pen["capture_device"], enrolled_by=user.id)
     db.add(p)

@@ -102,3 +102,32 @@ Section 3.8 "System Access Control and Ethical Use" is now implemented as writte
 - **Client groups (Ch3 §3.8 and system features).** Clients are organized in groups (e.g. Lawyers, OSS, CCJE). Each group has exactly one assigned examiner and an examiner belongs to one group only, so examiners never see another group's clients, screenings or cases. Suggested 3.8 sentence: "Examiners can view only the clients, screenings and cases of the client group assigned to them; each group is assigned to one examiner."
 - **Client accounts and client view.** Registering a client with an email creates the client's account automatically (temporary password). Clients see their assigned examiner and can open each screening in a limited view: screening result, confidence score, the examiner's decision, receipt and ledger proof, without metric scores, thresholds or handwriting analysis.
 - **Records and Cases** show which examiner handles each screening/case (name and code) for the administrator.
+
+## 16. Dynamic enrollment quality checks (added 2026-11-18)
+
+For Ch3, enrollment quality checks. These checks only flag or reject bad captures. They do not change the dynamic model, embeddings, thresholds, calibration or how a screening is computed. No model version bump and no re-embed.
+
+**Single signature** (`app/ml/quality.py`, used at enrollment and screening; score starts at 100, unusable below 30):
+- Long pause: any gap longer than 3 s between consecutive points, or between strokes: −25. Longer than 8 s: unusable (rejected).
+- Unusually long signature: over 15 s overall: −20.
+- No pen pressure: pressure missing or constant over the signature: −10. This uses the same rule as the "Limited pen data" label (`dynamic_model.pen_channels_present`), so the two always agree.
+- Stray tap or palm touch: a stroke with fewer than 5 points, or under 2% of the total path length, starting more than 25% of the signature's width away from the rest: −15, not rejected. Dots on an i or j are close to the rest and do not count.
+
+**Against the client's other references** (`app/ml/dynamic_ref_checks.py`; at least 4 references; each reference compared with the others, leave-one-out). Advice to the examiner only; nothing is removed automatically:
+- Duration more than 2.5× or less than 0.4× the median of the others.
+- Stroke count 2 or more away from the others' most common count.
+- Looks different: mean cosine to the others, compared in the pen-data mode both share, below 0.80 and below median − 3 × MAD of all references' means.
+- Mixed pens: references with full pen data and with Limited pen data. This is one notice for the client, not a per-reference flag.
+
+Motivating case: one client reference took 28 s with 2 strokes against about 2 s and 1 stroke for the other nine. Its cosine to screenings was 0.2–0.7 against 0.95–1.00. It widened the reference spread, which lowered the personal threshold to 0.93 and made 7 of 11 genuine screenings Inconclusive.
+
+**Signing pad palm rejection** (frontend): pen-only mode turns on automatically the first time a pen is used on a device. The pad follows one pointer at a time, and iOS `pointercancel` ends a stroke like a lift.
+
+## 17. Dynamic shape and feature gate (added 2026-11-18)
+
+For Ch3, dynamic screening decision. The dynamic model gives one similarity number from the pen's movement over time, so a signature that looks entirely different could land in the Inconclusive band. Two checks that do not use the model now act as a gate on the result (`ml/screening.dynamic_gate`). The model, embeddings, thresholds and calibration are unchanged, and the static and dynamic modules stay separate.
+
+- **Shape check** (`ml/dynamic_shape.py`): each signature is resampled to 96 points along the ink, centred and scaled by its larger side. Two shapes are compared with the symmetric chamfer distance, so stroke order and pen lifts do not matter. The questioned signature's median distance to the references is divided by the client's own median reference-to-reference distance (floor 0.02). The shape counts as clearly different at a ratio of 2.0 or more AND a distance of at least 0.04 of the signature's size. It is used from 3 references.
+- **Handwriting features:** 5 or more of the 7 dynamic features outside the client's usual range.
+- **Rules:** Consistent becomes Inconclusive when either check disagrees. Inconclusive becomes Inconsistent only when the model already leans not genuine (P(genuine) < 0.5) and a check disagrees. Inconsistent is never changed, and the gate never produces Consistent. Admins can turn it off with the `dynamic_gate` screening setting.
+- Synthetic test (5 writers, 9 references each): genuine variations had a ratio of 0.9 to 1.6; entirely different signatures had 1.6 to 6+. These thresholds should be checked on the team's iPad dataset (held-out writers, genuine vs. random and skilled forgeries) before the final chapter figures.

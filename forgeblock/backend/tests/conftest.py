@@ -17,6 +17,11 @@ os.environ["CORS_ORIGINS"] = "http://localhost:5173"
 os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123"
 # Pin the reference minimum (Chapter 3: 7) so a local .env cannot change test results.
 os.environ["MIN_ADAPTIVE_SAMPLES"] = "7"
+# Never use the real shared storage from a local .env: tests would upload their
+# samples to the live Supabase bucket and hang on a slow connection.
+# (test_shared_storage.py fakes the bucket itself.)
+os.environ["SUPABASE_URL"] = ""
+os.environ["SUPABASE_SERVICE_KEY"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

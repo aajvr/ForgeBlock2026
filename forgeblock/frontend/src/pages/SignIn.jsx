@@ -8,7 +8,7 @@ import Brand from '../components/Brand'
 import DriftingLines from '../components/DriftingLines'
 import SignatureTrace from '../components/SignatureTrace'
 import useOnScreen from '../components/useOnScreen'
-import { Alert, Button, Field, Input, ScreeningBadge, ScreeningNotice, fmtDate } from '../components/ui'
+import { Alert, Button, Field, Input, ScreeningBadge, fmtDate } from '../components/ui'
 
 export function homeFor(user) {
   if (user.must_change_password) return '/change-password'
@@ -196,7 +196,6 @@ export default function SignIn() {
           </div>
         </div>
         <div className="relative space-y-2 text-sm text-white/75">
-          <ScreeningNotice />
           {providers?.study_mode && <p>A research prototype of De La Salle University–Dasmariñas, for the approved activities of the ForgeBlock study only. Not for actual legal, financial or official documents.</p>}
         </div>
       </div>
@@ -263,8 +262,7 @@ export default function SignIn() {
             </ul>
           </div>
           <div className="mt-6 space-y-2 text-sm text-slate-500 lg:hidden">
-            <ScreeningNotice />
-            {providers?.study_mode && <p>A research prototype of De La Salle University–Dasmariñas, for the approved activities of the ForgeBlock study only. Not for actual legal, financial or official documents.</p>}
+              {providers?.study_mode && <p>A research prototype of De La Salle University–Dasmariñas, for the approved activities of the ForgeBlock study only. Not for actual legal, financial or official documents.</p>}
           </div>
         </div>
       </div>

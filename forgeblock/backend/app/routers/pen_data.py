@@ -140,3 +140,22 @@ def screening_note(mode: str, test_missing, pairs) -> dict | None:
 def public_features(features: dict | None) -> dict:
     """Profile features without the stored embeddings."""
     return {k: v for k, v in (features or {}).items() if not k.startswith("_")}
+
+
+# Shape of each dynamic reference (ml/dynamic_shape.py): stored in
+# features["_shape"] at enrollment; for older references it is worked out from
+# the stored strokes and cached by sample_path (stored strokes never change).
+_SHAPES: dict[str, list | None] = {}
+
+
+def reference_shape(p: SignatureProfile) -> list | None:
+    stored = (p.features or {}).get("_shape")
+    if stored:
+        return stored
+    key = p.sample_path
+    if key not in _SHAPES:
+        from ..ml.dynamic_shape import shape_points
+
+        strokes = load_strokes(key) if key else None
+        _SHAPES[key] = shape_points(strokes) if strokes else None
+    return _SHAPES[key]

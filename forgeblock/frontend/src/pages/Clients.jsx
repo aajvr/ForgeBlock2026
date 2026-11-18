@@ -9,6 +9,7 @@ import ImagePicker from '../components/ImagePicker'
 import SheetEnroll from '../components/SheetEnroll'
 import SignaturePad from '../components/SignaturePad'
 import { penMissing } from '../components/penData'
+import { usePenOnly } from '../components/penOnly'
 import { AuthImage, DevPenNotice, LimitedPenBadge, PenDataHint, StrokePreview } from '../components/shared'
 import {
   Alert,
@@ -32,6 +33,7 @@ import {
   Textarea,
   fmtDate,
   fmtDay,
+  InfoTip,
   td,
   fieldClass,
 } from '../components/ui'
@@ -841,6 +843,17 @@ function RefTile({ p, modality, onRemove, onKeep, onReplace, selecting = false, 
         </div>
       )}
       {p.pen_label && <div className="mt-1"><LimitedPenBadge missing={p.pen_missing} /></div>}
+      {p.check_reasons?.length > 0 && (
+        // Dynamic: may be a bad capture (advice only; the examiner decides whether to remove it).
+        <div className="mt-1 flex items-center gap-1">
+          <Badge tone="amber">Check this signature</Badge>
+          <InfoTip label="Why this signature should be checked" align="right">
+            <ul className="list-disc space-y-1 pl-4">
+              {p.check_reasons.map((r) => <li key={r}>{r}</li>)}
+            </ul>
+          </InfoTip>
+        </div>
+      )}
       {onRemove && !selecting && (
         // Touch (and any device that cannot hover): always shown, a 40px round button with a 44px hit area.
         // Mouse: the small button that appears on hover or keyboard focus, as before.
@@ -928,7 +941,7 @@ function DynamicEnroll({ client, onDone, onDirty }) {
   const pad = useRef(null)
   const [samples, setSamples] = useState([])
   useReportDirty(samples.length > 0, onDirty)
-  const [penOnly, setPenOnly] = useState(false)
+  const [penOnly, setPenOnly, penSeen] = usePenOnly()
   const [res, setRes] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -978,6 +991,7 @@ function DynamicEnroll({ client, onDone, onDirty }) {
         ref={pad}
         penOnly={penOnly}
         onPenOnlyChange={setPenOnly}
+        onPenSeen={penSeen}
         label={client.client_code}
         onNext={(s) => { setError(''); keepSample(s) }}
         kept={samples.length}
@@ -1092,6 +1106,7 @@ export function ClientDetail() {
     }
   }
   const refs = c[`${tab}_references`]
+  const toCheck = refs.filter((p) => p.check_reasons?.length).length
   const strength = c[`${tab}_strength`]
   const toggle = (p) => setSelected((cur) => {
     const next = new Set(cur)
@@ -1203,6 +1218,14 @@ export function ClientDetail() {
               <Alert kind="warn">
                 Some references were captured differently from the others (much larger or smaller in the image). Screening works best when references and questioned documents are captured the same way, with the in-app camera at a similar distance. Replace the reference if it was a mistake; keep it if this client's documents will be captured this way too.
               </Alert>
+            )}
+            {tab === 'dynamic' && toCheck > 0 && (
+              <p className="text-sm font-medium text-warn-700">
+                {toCheck === 1 ? '1 reference may be a bad capture.' : `${toCheck} references may be bad captures.`} Review {toCheck === 1 ? 'it' : 'them'} before screening.
+              </p>
+            )}
+            {tab === 'dynamic' && c.dynamic_pen_mix_notice && (
+              <p className="text-sm text-warn-700">{c.dynamic_pen_mix_notice}</p>
             )}
             {refs.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">

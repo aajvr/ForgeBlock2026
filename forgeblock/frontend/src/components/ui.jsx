@@ -263,15 +263,6 @@ export function InfoTip({ label, children, align = 'left' }) {
   )
 }
 
-// What ForgeBlock's result means, for the public pages.
-export function ScreeningNotice({ className = '' }) {
-  return (
-    <p className={className}>
-      <b className="font-semibold">ForgeBlock screens signatures; a qualified examiner makes the final call.</b> Every result comes with a confidence score and is sealed in a tamper-evident ledger.
-    </p>
-  )
-}
-
 export function Tabs({ tabs, value, onChange }) {
   return (
     // v3: a grey track with the selected tab in white and brand-blue text.

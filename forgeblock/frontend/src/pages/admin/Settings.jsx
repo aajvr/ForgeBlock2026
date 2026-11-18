@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, LockKeyhole, Ruler, Scale, ShieldHalf, Trash2 } from 'lucide-react'
+import { CalendarClock, LockKeyhole, Ruler, Scale, ScanSearch, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api'
@@ -9,10 +9,8 @@ export default function Settings() {
   const [ret, setRet] = useState(null)
   const [days, setDays] = useState('')
   const [msg, setMsg] = useState('')
-  const [access, setAccess] = useState(null)
   const [toDelete, setToDelete] = useState(null)
   const load = () => {
-    api.get('/api/admin/access-policy').then(setAccess).catch(() => {})
     api.get('/api/admin/settings').then((d) => { setS(d); setDays(String(d.retention.days)) })
     api.get('/api/admin/retention').then(setRet)
   }
@@ -29,6 +27,7 @@ export default function Settings() {
       </Card>
 
       <SizeMatchSetting value={s.screening?.size_mode || 'adaptive'} onSaved={load} />
+      <GateSettings screening={s.screening || {}} onSaved={load} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card icon={CalendarClock} title="Data retention" subtitle="New clients are kept this many days, then their signature data is deleted automatically (checked daily).">
@@ -61,7 +60,6 @@ export default function Settings() {
             </div>
           ))}
         </Card>
-        {access?.study_mode && <AccessControlCard a={access} />}
         <Card icon={LockKeyhole} title="Sign-in security">
           <ul className="space-y-1 text-sm text-slate-700">
             <li>Accounts lock after {s.security.max_failed_logins} wrong passwords, for {s.security.lockout_minutes} minutes.</li>
@@ -86,41 +84,66 @@ export default function Settings() {
   )
 }
 
-// Chapter 3, Section 3.8: System Access Control and Ethical Use, as applied.
-function AccessControlCard({ a }) {
-  const rows = [
-    ['Accounts are created only by the research team', !a.self_registration, 'No sign-up page or endpoint.'],
-    ['Administrator access is limited to the research team', a.admins.every((x) => x.in_research_team),
-      `${a.admins.length} admin account(s); allowed emails come from RESEARCH_TEAM_EMAILS.`],
-    ['Users see only their own signatures and activity', true, 'Enforced by the backend for every request.'],
-    ['Evaluation respondents use test accounts', a.test_accounts > 0, `${a.test_accounts} test account(s). Share prepared test clients from each client's page.`],
-    ['No download or export of signature images', !a.image_export, 'Images are view-only inside the app.'],
-    ['Research use only', a.accounts_without_research_terms === 0,
-      a.accounts_without_research_terms ? `${a.accounts_without_research_terms} active account(s) have not accepted the research-use terms yet.` : 'Every active account accepted the research-use terms.'],
-  ]
-  return (
-    <Card icon={ShieldHalf} title="Access control and ethical use" subtitle="Chapter 3, Section 3.8, as ForgeBlock applies it.">
-      <ul className="space-y-2 text-sm">
-        {rows.map(([label, ok, note]) => (
-          <li key={label} className="flex items-start gap-2">
-            <CheckCircle2 className={`mt-0.5 h-4 w-4 shrink-0 ${ok ? 'text-ok-600' : 'text-slate-300'}`} />
-            <span>
-              <span className="font-medium">{label}</span>
-              <span className="block text-xs text-slate-500">{note}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  )
-}
-
 // v8.25: one system-wide setting for static size matching (adaptive by default).
 const SIZE_MODES = [
   ['adaptive', 'Adaptive', 'Resize only when the questioned signature is more than 2× larger or smaller than the references (recommended).'],
   ['always', 'Always', 'Always resize the questioned signature to the width of the references.'],
   ['off', 'Off', 'Never resize.'],
 ]
+
+// Checks that can move a model result (ml/screening.py). Both are on by default.
+const GATES = [
+  ['dynamic_gate', 'Dynamic: shape and handwriting check',
+    'When an iPad signature clearly looks different from the client’s signatures, or most of its handwriting features are outside their usual range: an Inconclusive result that leans not genuine becomes Inconsistent, and a Consistent result goes to the examiner as Inconclusive.'],
+  ['feature_gate', 'Static: handwriting feature check',
+    'When more than one handwriting feature of a scanned signature is outside the client’s usual range, a Consistent result goes to the examiner as Inconclusive.'],
+]
+
+function GateSettings({ screening, onSaved }) {
+  const [busy, setBusy] = useState('')
+  const [msg, setMsg] = useState('')
+  const toggle = async (key, label, on) => {
+    setBusy(key)
+    try {
+      await api.put('/api/admin/settings/screening', { [key]: on })
+      setMsg(`${label} is ${on ? 'on' : 'off'} for new screenings.`)
+      onSaved()
+    } finally { setBusy('') }
+  }
+  return (
+    <Card icon={ScanSearch} title="Extra screening checks" className="mb-6">
+      <p className="max-w-3xl text-sm text-slate-700">
+        These checks do not use the model. They can only send a result to the examiner or mark a clearly different signature
+        Inconsistent; they never make a result Consistent. Changes apply to new screenings only and are written to the audit log.
+      </p>
+      <ul className="mt-4 space-y-3">
+        {GATES.map(([key, label, note]) => {
+          const on = screening[key] !== false
+          return (
+            <li key={key} className="flex items-start justify-between gap-4 rounded-[10px] border border-slate-200 px-3 py-2.5">
+              <span className="min-w-0 text-sm">
+                <span className="block font-medium">{label}</span>
+                <span className="block text-xs text-slate-500">{note}</span>
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={on}
+                aria-label={label}
+                disabled={busy === key}
+                onClick={() => toggle(key, label, !on)}
+                className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-60 ${on ? 'bg-brand-600' : 'bg-slate-300'}`}
+              >
+                <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {msg && <Alert kind="success" className="mt-3">{msg}</Alert>}
+    </Card>
+  )
+}
 
 function SizeMatchSetting({ value, onSaved }) {
   const [busy, setBusy] = useState(false)

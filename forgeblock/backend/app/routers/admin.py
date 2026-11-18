@@ -359,6 +359,7 @@ class RetentionIn(BaseModel):
 class ScreeningSettingsIn(BaseModel):
     size_mode: Literal["adaptive", "always", "off"] | None = None
     feature_gate: bool | None = None
+    dynamic_gate: bool | None = None
 
 
 @router.get("/settings")
@@ -383,12 +384,15 @@ def set_screening(body: ScreeningSettingsIn, db: Session = Depends(get_db), admi
     """v8.25: system-wide static size matching mode (default adaptive). One setting
     for everyone, so screenings stay comparable; every result records how it was made."""
     current = {k: v for k, v in get_setting(db, "screening").items() if k != "size_match"}  # v8.22 key retired
-    changes = {k: v for k, v in (("size_mode", body.size_mode), ("feature_gate", body.feature_gate)) if v is not None}
+    changes = {k: v for k, v in (("size_mode", body.size_mode), ("feature_gate", body.feature_gate),
+                                 ("dynamic_gate", body.dynamic_gate)) if v is not None}
     value = set_setting(db, "screening", {**current, **changes})
     if body.size_mode is not None:
         log_activity(db, admin, "settings", f"Set static size matching to {body.size_mode}")
     if body.feature_gate is not None:
         log_activity(db, admin, "settings", f"Turned the static feature gate {'on' if body.feature_gate else 'off'}")
+    if body.dynamic_gate is not None:
+        log_activity(db, admin, "settings", f"Turned the dynamic shape and feature check {'on' if body.dynamic_gate else 'off'}")
     return value
 
 
@@ -599,7 +603,10 @@ def reembed_profiles(db: Session = Depends(get_db), admin: User = Depends(requir
                 pen = pen_data.enroll_payload(pts)
                 p.embedding = pen["embedding"]
                 p.capture_device = pen["capture_device"]
-                p.features = {**pen_data.public_features(p.features), "_pen": pen["pen"]}
+                from ..ml.dynamic_shape import shape_points
+
+                p.features = {**pen_data.public_features(p.features), "_pen": pen["pen"],
+                              "_shape": shape_points(strokes)}
                 p.model_version = engine.dynamic_cfg["model_version"]
             updated += 1
         except Exception as e:  # keep going; report which profiles could not be updated

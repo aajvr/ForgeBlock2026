@@ -76,6 +76,37 @@ def feature_gate(result: str, features_outside: int) -> str:
     return result
 
 
+# Dynamic gate (2026-11-18). The dynamic model gives one similarity number, so
+# a signature that looks entirely different can land in the Inconclusive band.
+# Two checks that do not use the model can move the result:
+#   * shape (ml/dynamic_shape.py): the drawn shape is clearly different from the
+#     client's signatures;
+#   * handwriting features (features.compare_features): at least
+#     DYNAMIC_FEATURES_FAR of them outside the client's usual range.
+# Consistent -> Inconclusive when either check disagrees (an examiner looks).
+# Inconclusive -> Inconsistent only when the model already leans not genuine
+# (P(genuine) < 0.5) AND a check clearly disagrees, so the shown confidence (the
+# chance of the side it leans to) still fits the result. Inconsistent is never
+# changed, and nothing is ever made Consistent.
+DYNAMIC_FEATURES_FAR = 5
+
+
+def dynamic_gate(result: str, leans_genuine: bool, features_outside: int, shape_far: bool) -> tuple[str, list[str]]:
+    """(result, reasons): the result after the dynamic gate and why it moved."""
+    reasons = []
+    if shape_far:
+        reasons.append("shape")
+    if features_outside >= DYNAMIC_FEATURES_FAR:
+        reasons.append("features")
+    if not reasons:
+        return result, []
+    if result == "consistent":
+        return "inconclusive", reasons
+    if result == "inconclusive" and not leans_genuine:
+        return "inconsistent", reasons
+    return result, []
+
+
 def caption(result: str, confidence: float, mode: str = "verify") -> str:
     """Plain-language sentence shown under the screening result."""
     n = round(confidence)
