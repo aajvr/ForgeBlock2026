@@ -21,10 +21,18 @@ import { Button, ConfirmDialog } from './ui'
 // the next one; `kept` is how many were handed over so far. Done also keeps
 // the signature on the pad (if any). `onClose` runs whenever full screen is
 // closed (Done, Exit or Esc), so the caller can save the kept signatures then.
-const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOnlyChange, onChange, label, onNext, kept = 0, onClose }, ref) {
+//
+// Palm rejection: one pointer at a time. The pointer that started a stroke is
+// the only one followed until it lifts (a second touch neither starts a stroke
+// nor adds points), and pointercancel (iOS deciding a touch was a palm) ends
+// the stroke like a lift. `onPenSeen` runs once, the first time a pen touches
+// or hovers, so the caller can turn pen-only mode on (components/penOnly.js).
+const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOnlyChange, onPenSeen, onChange, label, onNext, kept = 0, onClose }, ref) {
   const canvasRef = useRef(null)
   const strokesRef = useRef([])
   const drawingRef = useRef(false)
+  const pointerRef = useRef(null) // pointerId of the stroke in progress
+  const penSeenRef = useRef(false)
   const startRef = useRef(null)
   const frameRef = useRef(null) // {w, h} of the pad when this signature started
   const sizeRef = useRef({ w: 0, h: 0 }) // the pad's current CSS size
@@ -98,6 +106,9 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
   useEffect(() => {
     const c = canvasRef.current
     if (!c) return
+    // A new canvas never gets the old one's pointerup: no stroke is in progress.
+    drawingRef.current = false
+    pointerRef.current = null
     resizeRef.current()
     const onResize = () => resizeRef.current()
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null
@@ -130,7 +141,19 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
     return p
   }
 
+  const sawPen = (e) => {
+    if (e.pointerType !== 'pen' || penSeenRef.current) return
+    penSeenRef.current = true
+    onPenSeen?.()
+  }
+
   const down = (e) => {
+    // A stroke is in progress: ignore any other touch (palm, second finger).
+    if (drawingRef.current) {
+      e.preventDefault()
+      return
+    }
+    sawPen(e)
     if (penOnly && e.pointerType !== 'pen') {
       setRejected(true)
       return
@@ -141,13 +164,18 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
     e.preventDefault()
     canvasRef.current.setPointerCapture(e.pointerId)
     drawingRef.current = true
+    pointerRef.current = e.pointerId
     // A new signature takes the pad's current size as its coordinate frame.
     if (!strokesRef.current.length) frameRef.current = { ...sizeRef.current }
     strokesRef.current.push([point(e)])
   }
 
   const move = (e) => {
-    if (!drawingRef.current) return
+    if (!drawingRef.current) {
+      sawPen(e) // a hovering pen counts too
+      return
+    }
+    if (e.pointerId !== pointerRef.current) return
     e.preventDefault()
     const stroke = strokesRef.current[strokesRef.current.length - 1]
     const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]
@@ -166,9 +194,11 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
     onChange?.(strokesRef.current)
   }
 
-  const up = () => {
-    if (!drawingRef.current) return
+  // Pen lifted, or the touch cancelled (iOS palm rejection): the stroke ends.
+  const up = (e) => {
+    if (!drawingRef.current || e.pointerId !== pointerRef.current) return
     drawingRef.current = false
+    pointerRef.current = null
     changed()
   }
 
@@ -254,6 +284,7 @@ const SignaturePad = forwardRef(function SignaturePad({ penOnly = false, onPenOn
       onPointerUp={up}
       onPointerCancel={up}
       onPointerLeave={up}
+      onLostPointerCapture={up}
     />
   )
   // The signing line and the hint, sized to the pad.

@@ -61,6 +61,31 @@ def missing_from_key(key: str) -> frozenset:
             "basic": frozenset(PEN_CHANNELS)}[key]
 
 
+# Pressure that varies less than this over the signature counts as "no
+# pressure": a pen without a pressure sensor sends a constant value (0.5 for a
+# mouse, 0.12 seen on one stylus). Used by the model AND the quality check.
+PRESSURE_CONSTANT_TOL = 1e-6
+
+
+def pen_channels_present(pts: np.ndarray) -> tuple[bool, bool]:
+    """(has_angles, has_pressure) of rows (x, y, t, b, azimuth, altitude,
+    pressure): the pen reported CHANGING angles / pressure while touching.
+    The one rule for "Limited pen data" and the quality message."""
+    pts = np.asarray(pts, dtype=np.float64)
+    if pts.ndim != 2 or len(pts) == 0:
+        return False, False
+    if pts.shape[1] < 7:
+        pts = np.hstack([pts, np.full((len(pts), 7 - pts.shape[1]), np.nan)])
+    down = pts[:, 3] > 0.5
+    if not down.any():
+        return False, False
+    az, alt, pr = pts[:, 4], pts[:, 5], pts[:, 6]
+    has_angles = bool(np.isfinite(az[down]).all() and np.isfinite(alt[down]).all()
+                      and (np.ptp(az[down]) > 0 or np.ptp(alt[down]) > 0))
+    has_pressure = bool(np.isfinite(pr[down]).all() and np.ptp(pr[down]) > PRESSURE_CONSTANT_TOL)
+    return has_angles, has_pressure
+
+
 def load_checkpoint(path: Path) -> dict:
     """torch.load without arbitrary pickles; the notebook's checkpoints also
     store the torch version object."""
@@ -163,12 +188,7 @@ class SvcDynamicModel:
     @staticmethod
     def _channels(pts: np.ndarray) -> tuple[bool, bool]:
         """Whether the pen reported changing angles and changing pressure."""
-        down = pts[:, 3] > 0.5
-        az, alt, pr = pts[:, 4], pts[:, 5], pts[:, 6]
-        has_angles = bool(np.isfinite(az[down]).all() and np.isfinite(alt[down]).all()
-                          and (np.ptp(az[down]) > 0 or np.ptp(alt[down]) > 0))
-        has_pressure = bool(np.isfinite(pr[down]).all() and np.ptp(pr[down]) > 1e-6)
-        return has_angles, has_pressure
+        return pen_channels_present(pts)
 
     def missing_channels(self, points: np.ndarray) -> frozenset:
         """Pen channels this model uses that the signature does not have."""

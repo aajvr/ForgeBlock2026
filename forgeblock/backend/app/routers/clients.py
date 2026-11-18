@@ -25,6 +25,8 @@ from ..ml import enroll_sheet, stray_marks
 from ..ml.capture import standardize
 from ..ml.engine import get_engine
 from ..ml.features import dynamic_features, static_features
+from ..ml.dynamic_ref_checks import flag_references, pen_mix_notice
+from ..ml.dynamic_shape import shape_points
 from ..ml.quality import dynamic_quality, static_quality
 from ..models import Case, Client, ClientAccess, ClientGroup, SignatureProfile, User, VerificationLog, utcnow
 from ..security import hash_password, require_admin, require_result_viewer, require_staff, temporary_password
@@ -183,7 +185,11 @@ def client_card(client_id: int, db: Session = Depends(get_db), user: User = Depe
         profiles = active_profiles(db, c.id, modality)
         cons = consistency(profiles, modality)
         caps = capture_flags(profiles) if modality == "static" else {}
-        out[f"{modality}_references"] = [profile_out(p, cons, caps.get(p.id)) for p in profiles]
+        checks = flag_references(profiles) if modality == "dynamic" else {}
+        out[f"{modality}_references"] = [profile_out(p, cons, caps.get(p.id), checks.get(p.id))
+                                         for p in profiles]
+        if modality == "dynamic":
+            out["dynamic_pen_mix_notice"] = pen_mix_notice(profiles)
     cases = db.scalars(own_cases(select(Case).where(Case.client_id == c.id), user).order_by(Case.id.desc())).all()
     nm = names(db)
     out["cases"] = [{"id": k.id, "case_code": k.case_code, "title": k.title, "status": k.status,
@@ -410,7 +416,7 @@ def enroll_dynamic(client_id: int, body: DynamicEnrollIn, db: Session = Depends(
             sample_path=save_strokes(strokes, f"profiles/dynamic/{c.id}"),
             embedding=pen["embedding"],
             model_version=engine.dynamic_cfg["model_version"],
-            features={**dynamic_features(strokes), "_pen": pen["pen"]},
+            features={**dynamic_features(strokes), "_pen": pen["pen"], "_shape": shape_points(strokes)},
             quality=q["score"],
             capture_device=pen["capture_device"],
             enrolled_by=user.id,
@@ -422,11 +428,15 @@ def enroll_dynamic(client_id: int, body: DynamicEnrollIn, db: Session = Depends(
                          "capture_device": p.capture_device, "pen_missing": pen["pen"]["missing"],
                          "notice": notice})
     limited = [a for a in accepted if a.get("notice")]
+    # Checked over ALL the client's references, so a bad capture on file shows too.
+    on_file = active_profiles(db, c.id, "dynamic")
+    flags = flag_references(on_file)
     if accepted:
         log_activity(db, user, "enrollment", f"Added {len(accepted)} dynamic reference(s) to {c.client_code}",
                      modality="dynamic")
         _notify_references(db, user, c, len(accepted), "dynamic")
     return {"accepted": accepted, "rejected": rejected, "client": client_out(c, db),
+            "flags": flags, "pen_mix_notice": pen_mix_notice(on_file),
             "limited_notice": (f"{len(limited)} of the saved signature(s) have no pen pressure or tilt and are "
                                f"labelled \"{pen_data.LIMITED_LABEL}\". Your saved signature or pen did not record "
                                "this pen data, so screenings with them compare shape and timing only."

@@ -35,7 +35,8 @@ from ..ml.quality import dynamic_quality, static_quality
 from ..ml.screening import CALIBRATED_BAND, DISCLAIMER, caption
 from ..models import BlockchainLedger, Case, Client, Finding, SignatureProfile, User, VerificationLog
 from ..security import current_user, require_result_viewer, require_staff
-from ..ml.screening import FEATURE_GATE_MAX, feature_gate, screening_result
+from ..ml.dynamic_shape import shape_check, shape_points
+from ..ml.screening import DYNAMIC_FEATURES_FAR, FEATURE_GATE_MAX, dynamic_gate, feature_gate, screening_result
 from ..services import (
     get_setting,
     inconclusive_band,
@@ -122,6 +123,13 @@ def explain_result(l: VerificationLog) -> dict | None:
         "inconsistent": f"{p}% is {lo}% or less: Inconsistent. Confidence = 100 - {p} = {conf}%.",
         "inconclusive": f"{p}% is between {lo}% and {hi}%: Inconclusive, for the examiner. Confidence = {conf}%.",
     }[l.screening_result]
+    # A gate (static feature gate, dynamic shape/feature gate) moved the result.
+    because = _gate_because(l)
+    if because:
+        before = ((l.analysis or {}).get("dynamic_gate") or (l.analysis or {}).get("feature_gate") or {}).get(
+            "result_before_gate", "")
+        rule = (f"{p}% alone would be {before.capitalize()}, but {because}, so the result is {shown}. "
+                f"Confidence = {conf}%.")
     steps.append({"title": f"{len(steps) + 1}. Result", "text": rule})
 
     # One or two sentences for the result card, under the confidence score.
@@ -133,13 +141,17 @@ def explain_result(l: VerificationLog) -> dict | None:
                     f"{'lowering' if lowered else 'raising'} it to {category(p).capitalize()}")
         else:
             how += f"; a separate check against {others} signatures agreed ({p}%)"
-    how += ". " + {
+    how += ". " + (f"That alone is {before.capitalize()}, but {because}, so the result is {shown} "
+                   f"(confidence {conf}%)." if because else {
         "consistent": f"{shown} needs {hi}% or more, so the confidence is {conf}%.",
         "inconsistent": f"{shown} is {lo}% or less, so the confidence (chance it is not genuine) is 100 - {p} = {conf}%.",
         "inconclusive": f"Between {lo}% and {hi}% is {shown}; the confidence is the chance of the side it leans to, {conf}%.",
-    }[l.screening_result]
+    }[l.screening_result])
 
-    if l.screening_result == "consistent":
+    if because:
+        why = (f"The chance that this signature is genuine is about {p}%, which on its own is "
+               f"{before.capitalize()}. But {because}, so it was marked {shown}.")
+    elif l.screening_result == "consistent":
         why = f"The chance that this signature is genuine is about {p}%, above the {hi}% needed for Consistent."
     elif l.screening_result == "inconsistent":
         why = f"The chance that this signature is genuine is only about {p}%, below the {lo}% line for Inconsistent."
@@ -147,7 +159,7 @@ def explain_result(l: VerificationLog) -> dict | None:
         side = "leans genuine" if p >= 50 else "leans not genuine"
         why = (f"The chance that this signature is genuine is about {p}%: it {side}, but it falls between "
                f"{lo}% and {hi}%, too close to call either way, so an examiner should review it.")
-    if passed and l.screening_result != "consistent":
+    if passed and l.screening_result != "consistent" and not because:
         if lowered:
             looks = ("looks more like other people's signatures than this client's own"
                      if float(check.get("score", 0)) < 0.5 else "is less like this client's typical signature than the scores suggested")
@@ -159,6 +171,27 @@ def explain_result(l: VerificationLog) -> dict | None:
     return {"p_genuine": p, "p_distance_only": p_dist, "client_check_used": used, "band": [lo, hi],
             "all_pass": all_pass, "passed": passed, "lowered_by_client_check": lowered,
             "why": why, "how": how, "steps": steps}
+
+
+def _gate_because(l: VerificationLog) -> str | None:
+    """Plain words for why a gate moved the result, or None if none did."""
+    a = l.analysis or {}
+    parts = []
+    dyn = a.get("dynamic_gate") or {}
+    if dyn.get("applied"):
+        total = sum(1 for i in (a.get("features") or {}).get("items", []) if i.get("mean") is not None)
+        if "shape" in (dyn.get("reasons") or []):
+            ratio = (a.get("shape") or {}).get("ratio")
+            parts.append(f"its shape is about {ratio:.1f}x as far from this client's signatures as they are from "
+                         "each other" if ratio else "its shape is clearly different from this client's signatures")
+        if "features" in (dyn.get("reasons") or []):
+            parts.append(f"{dyn.get('features_outside')} of {total} handwriting features are outside this client's "
+                         "usual range")
+    st = a.get("feature_gate") or {}
+    if st.get("applied"):
+        parts.append(f"{st.get('outside')} handwriting features are outside this client's usual range "
+                     f"(more than {st.get('max_outside')} sends a result to the examiner)")
+    return " and ".join(parts) or None
 
 
 def _margin_steps(p: float, cal: dict) -> float | None:
@@ -529,15 +562,27 @@ def screen_dynamic(body: DynamicScreenIn, db: Session = Depends(get_db), user: U
     best = max(per_ref, key=lambda r: r["cosine"])["profile_id"]
     pen_note = pen_data.screening_note(mode, test_missing, pairs)
     device = pen_data.LIMITED if pen_note else "standard"
+    features = compare_features(dynamic_features(body.test), [p.features for p in profiles], "dynamic")
+    # Dynamic gate: shape and handwriting features (ml/screening.dynamic_gate).
+    gate_on = bool(get_setting(db, "screening").get("dynamic_gate", True))
+    shape = shape_check(shape_points(body.test), [pen_data.reference_shape(p) for p in profiles])
+    raw_result = screening_result(decision, inconclusive_band(db))
+    leans_genuine = decision.p_genuine >= 0.5 if decision.p_genuine is not None else decision.classification == "genuine"
+    result, gate_reasons = (dynamic_gate(raw_result, leans_genuine, features["flagged"], bool(shape.get("far")))
+                            if gate_on else (raw_result, []))
     analysis = {
         "quality": q,
         "exact_match": _exact_match(test, refs, profiles),
         "per_reference": per_ref,
-        "features": compare_features(dynamic_features(body.test), [p.features for p in profiles], "dynamic"),
+        "features": features,
         "pen_data": pen_note,
+        "shape": shape,
+        "dynamic_gate": {"enabled": gate_on, "applied": result != raw_result, "result_before_gate": raw_result,
+                         "reasons": gate_reasons, "features_outside": features["flagged"],
+                         "features_far": DYNAMIC_FEATURES_FAR, "shape_far": bool(shape.get("far"))},
     }
     log, _ = record_verification(
-        db, user=user, modality="dynamic", mode="verify", decision=decision,
+        db, user=user, modality="dynamic", mode="verify", decision=decision, result_override=result,
         test_sample_path=save_strokes(body.test, f"questioned/dynamic/{client.id}"), client=client,
         case_id=case.id if case else None, reference_profile_ids=[p.id for p in profiles],
         document_ref=body.document_ref or (case.document_ref if case else None),

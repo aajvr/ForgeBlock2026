@@ -5,10 +5,10 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import ImagePicker from '../components/ImagePicker'
 import SignaturePad from '../components/SignaturePad'
+import { usePenOnly } from '../components/penOnly'
 import { CasePicker, ClientPicker, DevPenNotice, PenDataHint } from '../components/shared'
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Tabs } from '../components/ui'
 
-const PEN_KEY = 'forgeblock_pen_only'
 
 function ModelView({ file, removeText }) {
   const [url, setUrl] = useState(null)
@@ -61,14 +61,9 @@ export default function Screen() {
   useEffect(() => {
     api.get('/api/static/text-removal').then((d) => setCanRemoveText(!!d.available)).catch(() => setCanRemoveText(false))
   }, [])
-  const [penOnly, setPenOnly] = useState(() => {
-    try { return localStorage.getItem(PEN_KEY) === '1' } catch { return false }
-  })
-  // Pen-only from the page checkbox or the pad's full-screen toolbar; remembered.
-  const changePenOnly = (on) => {
-    setPenOnly(on)
-    try { localStorage.setItem(PEN_KEY, on ? '1' : '0') } catch { /* ignore */ }
-  }
+  // Pen-only from the page checkbox or the pad's full-screen toolbar; remembered,
+  // and turned on by itself when the pad first sees a pen.
+  const [penOnly, changePenOnly, penSeen] = usePenOnly()
   // The chosen client's code, shown in the pad's full-screen toolbar.
   const [clientCode, setClientCode] = useState('')
   useEffect(() => {
@@ -157,6 +152,7 @@ export default function Screen() {
                   ref={pad}
                   penOnly={penOnly}
                   onPenOnlyChange={changePenOnly}
+                  onPenSeen={penSeen}
                   label={clientId ? clientCode : ''}
                   onChange={(st) => setSigned(st.length ? st.map((x) => [...x]) : null)}
                 />

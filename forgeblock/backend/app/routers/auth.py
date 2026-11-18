@@ -49,15 +49,15 @@ PROVIDER_LABELS = {"password": "Email and password", "azure": "Microsoft", "micr
 
 # Shown on first sign-in and in the Help Center. Wording follows Section 3.8.
 RESEARCH_USE_TERMS = [
-    "ForgeBlock is an academic research prototype of De La Salle University–Dasmariñas. "
-    "I will use it only for the approved research activities of the ForgeBlock study.",
-    "I will not use ForgeBlock to verify signatures on actual legal, financial or official documents. "
-    "Its results are experimental and are not evidence of a signature's authenticity.",
-    "I will use only the test accounts and signature samples prepared by the researchers, "
-    "not my own or anyone else's legal signature.",
+    "I will use ForgeBlock only for its intended purpose and in line with these terms.",
+    "ForgeBlock screens signatures and gives a confidence score. Its results support, but do not replace, "
+    "the judgment of a qualified document examiner, and are not by themselves proof that a signature is genuine or forged.",
+    "I will only submit signatures that I am authorized to use, and I will not submit anyone's signature without their consent.",
     "I will not photograph, copy, share or reproduce any signature shown in ForgeBlock. "
-    "ForgeBlock has no function to download or export signature images.",
-    "I can see only my own signatures and activity records. Accounts are created only by the researchers.",
+    "Signature images are view-only and cannot be downloaded or exported.",
+    "I will keep my sign-in details private and will not share my account. "
+    "I can see only the records my account is allowed to access.",
+    "My activity in ForgeBlock is recorded to keep the system secure, and access may be removed if these terms are not followed.",
 ]
 
 
