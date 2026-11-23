@@ -65,13 +65,6 @@ ForgeBlock stays invite-only: Microsoft or Google sign-in only works for an emai
 
 For a production Clerk instance, Clerk asks for your own Google/Microsoft credentials (its docs walk through it). Never put the secret key in the frontend or in Git.
 
-## Upgrading from v4/v5/v6/v7
-
-v8: extract `forgeblock-v8-update.zip` over your folder (see `UPDATE_V8.md`). No new packages; the database gets the new group columns by itself. Existing clients start ungrouped; create groups under **Clients** and move them in.
-
-
-Copy the changed files over your existing folder (the v7 update zip). No new packages are needed, and the database is upgraded automatically on the next start: new columns are added, open "second opinion" cases go back to "Needs decision", and the ledger stays valid. Old Inconclusive/Inconsistent screenings made before v7 show "No case" in Records; open a case for them by hand if needed.
-
 ## Project layout
 
 ```
